@@ -45,6 +45,7 @@ class Student(db.Model):
     phone = db.Column(db.String(20), nullable=True)
     course = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    profile_pic = db.Column(db.String(255), nullable=True) 
 
     # Link to admin who encoded the student
     encoded_by = db.Column(
