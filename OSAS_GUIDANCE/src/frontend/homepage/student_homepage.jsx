@@ -328,33 +328,57 @@ export default function StudentHome() {
               </span>
             )}
           </button>
-        </nav>
+        </nav><br></br>
 
-        <div className="px-4 mt-auto pb-4">
-          <button
-            onClick={() => {
-              Swal.fire({
-                title: "Logout",
-                text: "Are you sure you want to log out?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "Yes, log out",
-                cancelButtonText: "Cancel",
-                confirmButtonColor: "#16a34a",
-                cancelButtonColor: "#d33",
-              }).then((result) => {
-                if (result.isConfirmed) {
-                  localStorage.removeItem("student");
-                  window.location.href = "/";
-                }
-              });
-            }}
-            className="flex items-center gap-1 w-full py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all justify-center"
-          >
-            <ArrowRightOnRectangleIcon className="w-6 h-6" />
-            Logout
-          </button>
-        </div>
+ {/* DESKTOP LOGOUT BUTTON */}
+<div className="px-4 pb-6 mt-auto">
+  <button
+    onClick={() => {
+  Swal.fire({
+    title: "Logout",
+    text: "Are you sure you want to log out?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Logout",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+  }).then((result) => {
+    if (result.isConfirmed) {
+
+      // SUCCESS TOAST BAGO MAG-REDIRECT
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Logged out successfully",
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+      });
+
+      // DELAY REDIRECT
+      setTimeout(() => {
+        localStorage.removeItem("student");
+        window.location.href = "/";
+      }, 1500);
+    }
+  });
+}}
+
+    className="
+      flex items-center justify-center gap-3 
+      w-full py-3
+      bg-red-600 text-white 
+      rounded-lg shadow-md 
+      hover:bg-red-700 
+      transition-all select-none
+    "
+  >
+    <ArrowRightOnRectangleIcon className="w-6 h-6" />
+    <span className="text-base font-semibold">Logout</span>
+  </button>
+</div>
       </aside>
 
       {/* Sidebar drawer for mobile */}
@@ -403,18 +427,63 @@ export default function StudentHome() {
               </div>
               {notifications.length > 0 && <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{notifications.length}</span>}
             </button>
-          </nav>
+          </nav><br></br>
 
-          <div className="mt-auto">
-            <button onClick={() => { localStorage.removeItem("student"); window.location.href = "/"; }} className="w-full bg-red-600 py-2 rounded-lg mt-4">
-              Logout
+          {/* MOBILE LOGOUT BUTTON */}
+          <div className="px-4 pb-6 mt-auto">
+            <button
+              onClick={() => {
+                Swal.fire({
+                  title: "Logout",
+                  text: "Are you sure you want to log out?",
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonText: "Logout",
+                  cancelButtonText: "Cancel",
+                  confirmButtonColor: "#d33",
+                  cancelButtonColor: "#3085d6",
+                }).then((result) => {
+                  if (result.isConfirmed) {
+
+                    // SUCCESS TOAST BAGO MAG-REDIRECT
+                    Swal.fire({
+                      toast: true,
+                      position: "top-end",
+                      icon: "success",
+                      title: "Logged out successfully",
+                      showConfirmButton: false,
+                      timer: 1500,
+                      timerProgressBar: true,
+                    });
+
+                    // DELAY REDIRECT
+                    setTimeout(() => {
+                      localStorage.removeItem("student");
+                      window.location.href = "/";
+                    }, 1500);
+                  }
+                });
+              }}
+
+              className="
+                flex items-center justify-center gap-3 
+                w-full py-3
+                bg-red-600 text-white 
+                rounded-lg shadow-md 
+                hover:bg-red-700 
+                transition-all select-none
+              "
+            >
+              <ArrowRightOnRectangleIcon className="w-6 h-6" />
+              <span className="text-base font-semibold">Logout</span>
             </button>
           </div>
+
         </div>
       </div>
 
       {/* MAIN */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* HEADER */}
         <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
@@ -483,6 +552,31 @@ export default function StudentHome() {
 
                   <button className="w-full bg-green-600 text-white cursor-pointer py-2 rounded-lg hover:bg-green-700 mt-3">
                     Manage Account
+                  </button>
+
+                  {/* Account logout (confirmation) */}
+                  <button
+                    onClick={() => {
+                      Swal.fire({
+                        title: "Logout",
+                        text: "Are you sure you want to log out?",
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonText: "Logout",
+                        cancelButtonText: "Cancel",
+                        confirmButtonColor: "#d33",
+                        cancelButtonColor: "#3085d6",
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+                          localStorage.removeItem("student");
+                          setAccountModal(false);
+                          window.location.href = "/";
+                        }
+                      });
+                    }}
+                    className="w-full mt-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                  >
+                    Logout
                   </button>
                 </div>
               </div>
@@ -564,6 +658,7 @@ export default function StudentHome() {
               )}
             </>
           )}
+          
 
           {/* GOOD MORAL */}
           {activePage === "GoodMoral" && (
