@@ -1,8 +1,14 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import {ChartBarIcon,NewspaperIcon,MagnifyingGlassIcon,PencilSquareIcon,ArrowRightOnRectangleIcon,UserGroupIcon,UserCircleIcon,DocumentPlusIcon, XMarkIcon, EyeIcon, TrashIcon} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
-import {LineChart,Line,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer,} from "recharts";
+import {
+  LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell, Legend
+} from "recharts";
+import { Document, Packer, Paragraph, TextRun } from "docx";
+import { saveAs } from "file-saver";
+
+
 
 export default function AdminHome() {
   const [activePage, setActivePage] = useState("trends");
@@ -46,8 +52,78 @@ const [currentRules, setCurrentRules] = useState(null);
    const [showViolationDetailsModal, setShowViolationDetailsModal] = useState(false);
    const [currentViolation, setCurrentViolation] = useState(null);
 
+   //request view list
+  const [showRequestList, setShowRequestList] = useState(false);
+  const [showRequestDetails, setShowRequestDetails] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState([
+  // Dummy data for now
+  { student_number: "202210221", section: "Section 8", violation: "Late Submission", status: "Pending" },
+  { student_number: "202210225", section: "Section 3", violation: "Absent", status: "Pending" },
+]);
+const [selectedRequest, setSelectedRequest] = useState(null);
    
+// Function to generate a DOCX for a specific violation
+const downloadViolationDoc = (violation) => {
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Violation Report", bold: true, size: 28 }),
+            ],
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Student Name: ${violation.student_name}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Student ID: ${violation.student_id}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Course/Year/Section: ${violation.course_year_section}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Gender: ${violation.gender}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Section: ${violation.predicted_section || "—"}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Violation: ${violation.predicted_violation || "—"}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Admin Note: ${violation.violation_text}`, size: 24 }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Date: ${violation.formattedDate || "—"}`, size: 24 }),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
 
+  Packer.toBlob(doc).then((blob) => {
+    saveAs(blob, `${violation.student_id}_violation.docx`);
+  });
+};
 
 useEffect(() => {
   const handleClickOutside = (e) => {
@@ -59,18 +135,48 @@ useEffect(() => {
   return () => document.removeEventListener("click", handleClickOutside);
 }, []);
   
+// STATES
+const [lineData, setLineData] = useState([]);
+const [sectionData, setSectionData] = useState([]);
+const chartColors = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6", "#14b8a6"];
+const [sections, setSections] = useState([]); // to track unique section names for bars/legend
 
-  // Sample chart data (you can later map real data)
-  const chartData = [
-    { month: "Jan", cases: 0 },
-    { month: "Feb", cases: 0 },
-    { month: "Mar", cases: 0 },
-    { month: "Apr", cases: 0 },
-    { month: "May", cases: 0 },
-    { month: "Jun", cases: 0 },
-  ];
+// FETCH CHART DATA
+useEffect(() => {
+  fetch("/violations")
+    .then((res) => res.json())
+    .then((data) => {
+      // 1️⃣ LINE CHART (Monthly Cases)
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const monthlyCounts = months.map((m, i) => ({
+        month: m,
+        cases: data.filter((v) => {
+          const d = new Date(v.violation_date);
+          return !isNaN(d) && d.getMonth() === i;
+        }).length,
+      }));
+      setLineData(monthlyCounts);
 
-  
+      // 2️⃣ SECTION CHART (Case count per section)
+      const sectionCounts = {};
+      data.forEach((v) => {
+        const sec = v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown";
+        sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
+      });
+
+      // Convert to array for Recharts
+      const sectionArray = Object.keys(sectionCounts).map((sec) => ({
+        section: sec,
+        value: sectionCounts[sec],
+      }));
+
+      setSectionData(sectionArray);
+      setSections(Object.keys(sectionCounts)); // store unique section names
+    })
+    .catch((err) => console.error("Failed to fetch violations:", err));
+}, []);
+
+
   //email
 const [profilePicPreview, setProfilePicPreview] = useState(null);
 const [user, setUser] = useState({ name: "", email: "", profile_pic:"" });
@@ -564,7 +670,6 @@ const [enrollmentInfo, setEnrollmentInfo] = useState("");
 
 // Modals for viewing, editing, deleting
 const [viewStudent, setViewStudent] = useState(null);
-const [editStudent, setEditStudent] = useState(null);
 const [deleteStudent, setDeleteStudent] = useState(null);
 
 // ===================== ADD STUDENT =====================
@@ -742,6 +847,19 @@ useEffect(() => {
   setFilteredStudents(result);
 }, [query, filterCategory, students]);
 
+//request view list
+const handleApprove = (req) => {
+  alert(`Approved ${req.student_number}`);
+  setPendingRequests(prev => prev.filter(r => r.student_number !== req.student_number));
+  setShowRequestDetails(false);
+};
+
+const handleReject = (req) => {
+  alert(`Rejected ${req.student_number}`);
+  setPendingRequests(prev => prev.filter(r => r.student_number !== req.student_number));
+  setShowRequestDetails(false);
+};
+
   // ------------------ Render ------------------
   return (
     <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
@@ -905,26 +1023,105 @@ useEffect(() => {
             {activePage === "news" && "News Management"}
           </h2>
 
-          {/* Trends */}
-          {activePage === "trends" && (
+    {/* Trends */}
+      {activePage === "trends" && (
+        <div className="space-y-8">
+
+          {/* LINE CHART */}
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <h3 className="text-xl font-semibold text-gray-700 mb-4">
+              Monthly Behavioral Case Trends
+            </h3>
+
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={lineData}>
+                <CartesianGrid stroke="#e5e7eb" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="cases"
+                  stroke="#16a34a"
+                  strokeWidth={3}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* BAR CHART */}
+<div className="bg-white p-6 rounded-xl shadow-lg">
+  <h3 className="text-xl font-semibold text-gray-700 mb-4">
+    Case Count Per Section
+  </h3>
+
+  <ResponsiveContainer width="100%" height={350}>
+    <BarChart data={sectionData} barCategoryGap="30%">
+      <CartesianGrid stroke="#e5e7eb" />
+      <XAxis dataKey="section" />
+      <YAxis />
+      <Tooltip />
+
+      {/* Centered legend */}
+      <Legend
+        verticalAlign="bottom"
+        align="center"
+        height={60} // adjust spacing if needed
+        content={() => (
+          <div className="flex flex-wrap justify-center gap-4 mt-2">
+            {sectionData.map((entry, index) => (
+              <div key={entry.section} className="flex items-center gap-1">
+                <span
+                  className="w-4 h-4 block"
+                  style={{ backgroundColor: chartColors[index % chartColors.length] }}
+                ></span>
+                <span className="text-gray-700">{entry.section}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      />
+
+      {/* Single Bar with per-cell colors */}
+      <Bar dataKey="value">
+        {sectionData.map((entry, index) => (
+          <Cell
+            key={entry.section}
+            fill={chartColors[index % chartColors.length]}
+          />
+        ))}
+      </Bar>
+    </BarChart>
+  </ResponsiveContainer>
+</div>
+
+            {/* PIE CHART */}
             <div className="bg-white p-6 rounded-xl shadow-lg">
               <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                Monthly Behavioral Case Trends
+                Case Distribution by Section
               </h3>
+
               <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={chartData}>
-                  <CartesianGrid stroke="#e5e7eb" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
+                <PieChart>
                   <Tooltip />
-                  <Line type="monotone" dataKey="cases" stroke="#16a34a" strokeWidth={3} />
-                </LineChart>
+                  <Legend />
+                  <Pie
+                    data={sectionData}
+                    dataKey="value"
+                    nameKey="section"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    label
+                  >
+                    {sectionData.map((entry, index) => (
+                      <Cell key={index} fill={chartColors[index % chartColors.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
               </ResponsiveContainer>
-              <p className="text-gray-500 text-sm mt-3">
-                Waiting for database connection… (currently shows zero)
-              </p>
             </div>
-          )}
+          </div>
+            )}
 
           {/* News */}
           {activePage === "news" && (
@@ -1116,10 +1313,8 @@ useEffect(() => {
 {/* Modal for Viewing Violation Details */}
 {showViolationDetailsModal && currentViolation && (
   <div className="fixed inset-0 z-50 flex items-center justify-center">
-    {/* Full-screen solid black overlay */}
     <div className="absolute inset-0 bg-black opacity-50"></div>
 
-    {/* Modal content */}
     <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 z-10 overflow-y-auto max-h-[80vh]">
       <button
         onClick={() => setShowViolationDetailsModal(false)}
@@ -1131,7 +1326,7 @@ useEffect(() => {
       <h3 className="text-2xl font-semibold text-gray-800 mb-4">Violation Details</h3>
 
       <div className="space-y-4">
-        {/* Display Student Info */}
+        {/* Student Info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Student Name</label>
@@ -1173,7 +1368,7 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Violation Text (Admin Note) */}
+        {/* Admin Note */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">Violation Text (Admin Note)</label>
           <textarea
@@ -1184,7 +1379,7 @@ useEffect(() => {
           />
         </div>
 
-        {/* Standard Model-Generated Text */}
+        {/* Standard Model Text */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">Standard Model-Generated Text</label>
           <textarea
@@ -1195,7 +1390,7 @@ useEffect(() => {
           />
         </div>
 
-        {/* Date (Read-Only) */}
+        {/* Date */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">Date</label>
           <input
@@ -1207,12 +1402,44 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="flex justify-end gap-6 mt-6">
+      {/* Actions: Close (red) + Download */}
+      <div className="flex justify-end gap-4 mt-6">
         <button
           onClick={() => setShowViolationDetailsModal(false)}
-          className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+          className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
         >
           Close
+        </button>
+
+        <button
+          onClick={async () => {
+            const doc = new Document({
+              sections: [
+                {
+                  properties: {},
+                  children: [
+                    new Paragraph({ children: [new TextRun({ text: "Student Violation Record", bold: true, size: 28 })] }),
+                    new Paragraph({ children: [new TextRun("")] }),
+                    new Paragraph({ children: [new TextRun(`Student Name: ${currentViolation.student_name}`)] }),
+                    new Paragraph({ children: [new TextRun(`Student ID: ${currentViolation.student_id}`)] }),
+                    new Paragraph({ children: [new TextRun(`Course/Year/Section: ${currentViolation.course_year_section}`)] }),
+                    new Paragraph({ children: [new TextRun(`Gender: ${currentViolation.gender}`)] }),
+                    new Paragraph({ children: [new TextRun(`Violation: ${currentViolation.predicted_violation || "—"}`)] }),
+                    new Paragraph({ children: [new TextRun(`Section: ${currentViolation.predicted_section || "—"}`)] }),
+                    new Paragraph({ children: [new TextRun(`Admin Note: ${currentViolation.violation_text || "—"}`)] }),
+                    new Paragraph({ children: [new TextRun(`Standard Model Text: ${currentViolation.standard_text || "—"}`)] }),
+                    new Paragraph({ children: [new TextRun(`Date: ${currentViolation.violation_date || "—"}`)] }),
+                  ],
+                },
+              ],
+            });
+
+            const blob = await Packer.toBlob(doc);
+            saveAs(blob, `${currentViolation.student_name}_Violation.docx`);
+          }}
+          className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        >
+          Download as DOCX
         </button>
       </div>
     </div>
@@ -1221,248 +1448,248 @@ useEffect(() => {
 
 
     {/* Encode Violation Section */}
-{activePage === "violation" && (
-  <div className="space-y-4">
-    {/* Button to open modal */}
-    <div className="mb-6">
-      <button
-        onClick={() => setShowViolationModal(true)}
-        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-      >
-        Encode New Violation
-      </button>
-    </div>
-
-    {/* Violation Modal for Submission */}
-    {showViolationModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        {/* Full-screen solid black overlay */}
-        <div className="absolute inset-0 bg-black opacity-70"></div>
-
-        {/* Modal content */}
-        <div className="relative bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 z-10 overflow-y-auto max-h-[90vh]">
+    {activePage === "violation" && (
+      <div className="space-y-4">
+        {/* Button to open modal */}
+        <div className="mb-6">
           <button
-            onClick={() => {
-              setShowViolationModal(false);
-              setStudentInfo(null);
-            }}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+            onClick={() => setShowViolationModal(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
           >
-            ✕
+            Encode New Violation
           </button>
-
-          <h3 className="text-2xl font-semibold text-gray-700 mb-6">Encode Student Violation</h3>
-
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-              <input
-                type="text"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                placeholder="Enter student full name"
-                className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Student Number</label>
-              <input
-                type="number"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                placeholder="Enter student number"
-                className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Course/Year/Section</label>
-              <input
-                type="text"
-                value={courseYearSection}
-                onChange={(e) => setCourseYearSection(e.target.value)}
-                placeholder="Enter Course/Year/Section"
-                className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Violation Text */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Interview Text</label>
-            <textarea
-              value={violationText}
-              onChange={async (e) => {
-                const value = e.target.value;
-                setViolationText(value);
-
-                if (value.trim() !== "") {
-                  try {
-                    const res = await fetch("http://127.0.0.1:5000/predict", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ text: value }),
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      setPredictedViolation(data.predicted_violation || "—");
-                      setPredictedSection(data.predicted_section || "—");
-                      setPredictiveText(data.predictive_text || "—");
-                      setStandardText(data.standard_text || "No standard violation text available.");
-                    }
-                  } catch (err) {
-                    console.error("Prediction error:", err);
-                    setPredictedViolation("—");
-                    setPredictedSection("—");
-                    setPredictiveText("—");
-                    setStandardText("No standard violation text available.");
-                  }
-                } else {
-                  setPredictedViolation("—");
-                  setPredictedSection("—");
-                  setPredictiveText("—");
-                  setStandardText("No standard violation text available.");
-                }
-              }}
-              placeholder="Write interview details or violation text…"
-              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              rows={5}
-            />
-          </div>
-
-          {/* Display Predicted Violation & Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Predicted Violation</label>
-              <input
-                type="text"
-                readOnly
-                value={predictedViolation || "—"}
-                className="w-full p-2 border rounded-lg bg-gray-100"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Predicted Section</label>
-              <input
-                type="text"
-                readOnly
-                value={predictedSection || "—"}
-                className="w-full p-2 border rounded-lg bg-gray-100"
-              />
-            </div>
-          </div>
-
-          {/* Display Predictive Text */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Predictive Text (Top-3)</label>
-            <textarea
-              value={predictiveText || "—"}
-              readOnly
-              className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
-              rows={3}
-            />
-          </div>
-
-          {/* Display Standard Text */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Standard Model-Generated Text</label>
-            <textarea
-              value={standardText || "No standard violation text available."}
-              readOnly
-              className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
-              rows={3}
-            />
-          </div>
-
-          {/* Date (auto-filled to current date) */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input
-              type="date"
-              value={violationDate}
-              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              onChange={(e) => setViolationDate(e.target.value)}
-            />
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setShowViolationModal(false);
-                setStudentInfo(null);
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmitViolation}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Submit Violation
-            </button>
-          </div>
         </div>
-      </div>
-    )}
 
-    {/* Violation Cards */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-      {violations.length === 0 ? (
-        <p className="text-gray-500 col-span-full">No violation records yet.</p>
-      ) : (
-       violations.map((v, idx) => {
-  // Format violation date to MM/DD/YY
-  const date = new Date(v.violation_date);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const yy = String(date.getFullYear()).slice(-2);
-  const formattedDate = `${mm}/${dd}/${yy}`;
+        {/* Violation Modal for Submission */}
+        {showViolationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            {/* Full-screen solid black overlay */}
+            <div className="absolute inset-0 bg-black opacity-70"></div>
 
-  return (
-    <div
-      key={idx}
-      className="bg-white p-5 rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-      onClick={() => {
-        // Pass formattedDate with the violation
-        setCurrentViolation({ ...v, formattedDate });
-        setShowViolationDetailsModal(true); // Open modal
-      }}
-    >
-      <p className="font-semibold text-gray-700 text-lg mb-2">
-        {v.student_name} (Number: {v.student_id})
-      </p>
-      <p className="text-gray-600 mb-1">Gender: {v.gender}</p>
-      <p className="text-gray-600 mb-1">CYS: {v.course_year_section}</p>
+            {/* Modal content */}
+            <div className="relative bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 z-10 overflow-y-auto max-h-[90vh]">
+              <button
+                onClick={() => {
+                  setShowViolationModal(false);
+                  setStudentInfo(null);
+                }}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+              >
+                ✕
+              </button>
 
-      {/* DESCRIPTION (truncated to prevent overflow) */}
-      <p className="text-gray-600 mb-1 truncate" title={v.violation_text}>
-        Admin Note: {v.violation_text}
-      </p>
+              <h3 className="text-2xl font-semibold text-gray-700 mb-6">Encode Student Violation</h3>
 
-      {/* SECTION */}
-      <p className="text-gray-600 mb-1">Section: {v.predicted_section || "—"}</p>
+              {/* Form Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                  <input
+                    type="text"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="Enter student full name"
+                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Student Number</label>
+                  <input
+                    type="number"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    placeholder="Enter student number"
+                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Course/Year/Section</label>
+                  <input
+                    type="text"
+                    value={courseYearSection}
+                    onChange={(e) => setCourseYearSection(e.target.value)}
+                    placeholder="Enter Course/Year/Section"
+                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+              </div>
 
-      {/* VIOLATION */}
-      <p className="text-gray-600 mb-2">Violation: {v.predicted_violation || "—"}</p>
+              {/* Violation Text */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Interview Text</label>
+                <textarea
+                  value={violationText}
+                  onChange={async (e) => {
+                    const value = e.target.value;
+                    setViolationText(value);
 
-      <p className="text-sm text-gray-400">Date: {formattedDate}</p>
-    </div>
-  );
-})
+                    if (value.trim() !== "") {
+                      try {
+                        const res = await fetch("http://127.0.0.1:5000/predict", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ text: value }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setPredictedViolation(data.predicted_violation || "—");
+                          setPredictedSection(data.predicted_section || "—");
+                          setPredictiveText(data.predictive_text || "—");
+                          setStandardText(data.standard_text || "No standard violation text available.");
+                        }
+                      } catch (err) {
+                        console.error("Prediction error:", err);
+                        setPredictedViolation("—");
+                        setPredictedSection("—");
+                        setPredictiveText("—");
+                        setStandardText("No standard violation text available.");
+                      }
+                    } else {
+                      setPredictedViolation("—");
+                      setPredictedSection("—");
+                      setPredictiveText("—");
+                      setStandardText("No standard violation text available.");
+                    }
+                  }}
+                  placeholder="Write interview details or violation text…"
+                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  rows={5}
+                />
+              </div>
+
+              {/* Display Predicted Violation & Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Predicted Violation</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={predictedViolation || "—"}
+                    className="w-full p-2 border rounded-lg bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Predicted Section</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={predictedSection || "—"}
+                    className="w-full p-2 border rounded-lg bg-gray-100"
+                  />
+                </div>
+              </div>
+
+              {/* Display Predictive Text */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Predictive Text (Top-3)</label>
+                <textarea
+                  value={predictiveText || "—"}
+                  readOnly
+                  className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Display Standard Text */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Standard Model-Generated Text</label>
+                <textarea
+                  value={standardText || "No standard violation text available."}
+                  readOnly
+                  className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Date (auto-filled to current date) */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={violationDate}
+                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  onChange={(e) => setViolationDate(e.target.value)}
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowViolationModal(false);
+                    setStudentInfo(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitViolation}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Submit Violation
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Violation Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+          {violations.length === 0 ? (
+            <p className="text-gray-500 col-span-full">No violation records yet.</p>
+          ) : (
+          violations.map((v, idx) => {
+        // Format violation date to MM/DD/YY
+        const date = new Date(v.violation_date);
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        const yy = String(date.getFullYear()).slice(-2);
+        const formattedDate = `${mm}/${dd}/${yy}`;
+
+      return (
+        <div
+          key={idx}
+          className="bg-white p-5 rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+          onClick={() => {
+            // Pass formattedDate with the violation
+            setCurrentViolation({ ...v, formattedDate });
+            setShowViolationDetailsModal(true); // Open modal
+          }}
+        >
+          <p className="font-semibold text-gray-700 text-lg mb-2">
+            {v.student_name} (Number: {v.student_id})
+          </p>
+          <p className="text-gray-600 mb-1">Gender: {v.gender}</p>
+          <p className="text-gray-600 mb-1">CYS: {v.course_year_section}</p>
+
+          {/* DESCRIPTION (truncated to prevent overflow) */}
+          <p className="text-gray-600 mb-1 truncate" title={v.violation_text}>
+            Admin Note: {v.violation_text}
+          </p>
+
+          {/* SECTION */}
+          <p className="text-gray-600 mb-1">Section: {v.predicted_section || "—"}</p>
+
+          {/* VIOLATION */}
+          <p className="text-gray-600 mb-2">Violation: {v.predicted_violation || "—"}</p>
+
+          <p className="text-sm text-gray-400">Date: {formattedDate}</p>
+        </div>
+      );
+    })
 
       )}
     </div>
@@ -1564,15 +1791,23 @@ useEffect(() => {
           />
         </div>
       </div>
+<div className="flex justify-end gap-2 mt-6">
+  <button
+    onClick={() => downloadViolationDoc(currentViolation)}
+    className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+  >
+    Download as DOCX
+  </button>
 
-      <div className="flex justify-end gap-2 mt-6">
-        <button
-          onClick={() => setShowViolationDetailsModal(false)}
-          className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
-        >
-          Close
-        </button>
-      </div>
+<button
+  onClick={() => setShowViolationDetailsModal(false)}
+  className="px-4 py-2 rounded-lg border border-red-500 text-white bg-red-500 hover:bg-red-600 transition-colors"
+>
+  Close
+</button>
+
+</div>
+
     </div>
   </div>
 )}
@@ -1580,256 +1815,296 @@ useEffect(() => {
   </div>
 )}
 
-                 {/* ===== Upload File Section ===== */}
-                  {activePage === "uploadFileFormat" && (
-                    <div className="flex flex-col items-center space-y-6">
+   {/* ===== Upload File Section ===== */}
+{activePage === "uploadFileFormat" && (
+  <div className="flex flex-col items-center space-y-6">
 
-                      {/* SIDE-BY-SIDE WRAPPER */}
-                      <div className="w-full flex justify-center gap-6">
+    {/* SIDE-BY-SIDE WRAPPER */}
+    <div className="w-full flex justify-center gap-6">
 
-                        {/* Good Moral Certificate */}
-                        <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
-                          <h3 className="text-lg font-semibold text-center">Good Moral Certificate</h3>
+      {/* Good Moral Certificate */}
+      <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
+        <h3 className="text-lg font-semibold text-center">Good Moral Certificate</h3>
 
-                          {currentGoodMoral ? (
-                            <div className="flex flex-col gap-4 w-full">
-                              <div className="flex flex-col gap-2 border p-2 rounded">
+        {/* View Request List Button with notification */}
+        <button
+          className="relative bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 self-end"
+          onClick={() => setShowRequestList(true)}
+        >
+          View Request List
+          {pendingRequests.length > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">
+              {pendingRequests.length}
+            </span>
+          )}
+        </button>
 
-                                <div className="flex items-center gap-3">
-                                  {(() => {
-                                    const ext = currentGoodMoral.name?.split(".").pop().toLowerCase();
-                                    switch (ext) {
-                                      case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
-                                      case "doc":
-                                      case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
-                                      case "jpg":
-                                      case "jpeg":
-                                      case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
-                                      default: return <span className="text-gray-600 text-5xl">📁</span>;
-                                    }
-                                  })()}
-                                  {/* ONLY FILENAME IS CLICKABLE */}
-                                  <span
-                                    className="truncate font-medium cursor-pointer hover:underline"
-                                    onClick={() => setPreviewFile(currentGoodMoral)}
-                                  >
-                                    {currentGoodMoral.name || "Uploaded File"}
-                                  </span>
-                                </div>
+        {/* File Display */}
+        {currentGoodMoral ? (
+          <div className="flex flex-col gap-4 w-full">
+            <div className="flex flex-col gap-2 border p-2 rounded">
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const ext = currentGoodMoral.name?.split(".").pop().toLowerCase();
+                  switch (ext) {
+                    case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
+                    case "doc":
+                    case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
+                    case "jpg":
+                    case "jpeg":
+                    case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
+                    default: return <span className="text-gray-600 text-5xl">📁</span>;
+                  }
+                })()}
+                <span
+                  className="truncate font-medium cursor-pointer hover:underline"
+                  onClick={() => setPreviewFile(currentGoodMoral)}
+                >
+                  {currentGoodMoral.name || "Uploaded File"}
+                </span>
+              </div>
+              <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
+                {currentGoodMoral.name.endsWith(".pdf") ? (
+                  <embed src={currentGoodMoral.url} type="application/pdf" className="w-full h-full" />
+                ) : (
+                  <img src={currentGoodMoral.url} className="w-full h-auto object-contain" />
+                )}
+              </div>
+            </div>
 
-                                {/* Small Scrollable Preview */}
-                                <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
-                                  {currentGoodMoral.name.endsWith(".pdf") ? (
-                                    <embed
-                                      src={currentGoodMoral.url}
-                                      type="application/pdf"
-                                      className="w-full h-full"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={currentGoodMoral.url}
-                                      className="w-full h-auto object-contain"
-                                    />
-                                  )}
-                                </div>
+            {/* Change File Button */}
+            <label className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2">
+              Change File
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
 
-                              </div>
+                  setCurrentGoodMoral({ name: file.name, file });
 
-                              {/* Change File Button */}
-                              <label
-                                className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Change File
-                                <input
-                                  type="file"
-                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                  className="hidden"
-                                  onChange={async (e) => {
-                                    const file = e.target.files[0];
-                                    if (!file) return;
+                  const uploaded = await uploadFile(file, "good_moral");
+                  if (uploaded?.url) {
+                    setCurrentGoodMoral((prev) => ({ ...prev, url: uploaded.url }));
+                  }
+                }}
+              />
+            </label>
+          </div>
+        ) : (
+          <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-green-500 transition-colors text-center">
+            <span className="text-6xl mb-2">📁</span>
+            <span className="text-gray-500 mb-2">Click here to upload</span>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
 
-                                    setCurrentGoodMoral({ name: file.name, file });
+                setCurrentGoodMoral({ name: file.name, file });
 
-                                    const uploaded = await uploadFile(file, "good_moral");
-                                    if (uploaded?.url) {
-                                      setCurrentGoodMoral((prev) => ({
-                                        ...prev,
-                                        url: uploaded.url,
-                                      }));
-                                    }
-                                  }}
-                                />
-                              </label>
-                            </div>
-                          ) : (
-                            <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-green-500 transition-colors text-center">
-                              <span className="text-6xl mb-2">📁</span>
-                              <span className="text-gray-500 mb-2">Click here to upload</span>
-                              <input
-                                type="file"
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files[0];
-                                  if (!file) return;
+                const uploaded = await uploadFile(file, "good_moral");
+                if (uploaded?.url) {
+                  setCurrentGoodMoral((prev) => ({ ...prev, url: uploaded.url }));
+                }
+              }}
+            />
+            <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
+          </label>
+        )}
+      </div>
 
-                                  setCurrentGoodMoral({ name: file.name, file });
+      {/* ===== CVSU Rules & Regulations ===== */}
+      <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
+        <h3 className="text-lg font-semibold text-center">CVSU Rules and Regulations</h3>
+        {currentRules ? (
+          <div className="flex flex-col gap-4 w-full">
+            <div className="flex flex-col gap-2 border p-2 rounded">
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const ext = currentRules.name?.split(".").pop().toLowerCase();
+                  switch (ext) {
+                    case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
+                    case "doc":
+                    case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
+                    case "jpg":
+                    case "jpeg":
+                    case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
+                    default: return <span className="text-gray-600 text-5xl">📁</span>;
+                  }
+                })()}
+                <span
+                  className="truncate font-medium cursor-pointer hover:underline"
+                  onClick={() => setPreviewFile(currentRules)}
+                >
+                  {currentRules.name}
+                </span>
+              </div>
+              <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
+                {currentRules.name.endsWith(".pdf") ? (
+                  <embed src={currentRules.url} type="application/pdf" className="w-full h-full" />
+                ) : (
+                  <img src={currentRules.url} className="w-full h-auto object-contain" />
+                )}
+              </div>
+            </div>
 
-                                  const uploaded = await uploadFile(file, "good_moral");
-                                  if (uploaded?.url) {
-                                    setCurrentGoodMoral((prev) => ({
-                                      ...prev,
-                                      url: uploaded.url,
-                                    }));
-                                  }
-                                }}
-                              />
-                              <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
-                            </label>
-                          )}
-                        </div>
+            <label
+              className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Change File
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
 
-                        {/* CVSU Rules and Regulations */}
-                        <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
-                          <h3 className="text-lg font-semibold text-center">CVSU Rules and Regulations</h3>
+                  setCurrentRules({ name: file.name, file });
 
-                          {currentRules ? (
-                            <div className="flex flex-col gap-4 w-full">
-                              <div className="flex flex-col gap-2 border p-2 rounded">
+                  const uploaded = await uploadFile(file, "rules");
+                  if (uploaded?.url) {
+                    setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
+                  }
+                }}
+              />
+            </label>
+          </div>
+        ) : (
+          <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 transition-colors text-center">
+            <span className="text-6xl mb-2">📁</span>
+            <span className="text-gray-500 mb-2">Click here to upload</span>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
 
-                                <div className="flex items-center gap-3">
-                                  {(() => {
-                                    const ext = currentRules.name?.split(".").pop().toLowerCase();
-                                    switch (ext) {
-                                      case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
-                                      case "doc":
-                                      case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
-                                      case "jpg":
-                                      case "jpeg":
-                                      case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
-                                      default: return <span className="text-gray-600 text-5xl">📁</span>;
-                                    }
-                                  })()}
-                                  {/* ONLY FILENAME IS CLICKABLE */}
-                                  <span
-                                    className="truncate font-medium cursor-pointer hover:underline"
-                                    onClick={() => setPreviewFile(currentRules)}
-                                  >
-                                    {currentRules.name}
-                                  </span>
-                                </div>
+                setCurrentRules({ name: file.name, file });
 
-                                {/* Small Scrollable Preview */}
-                                <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
-                                  {currentRules.name.endsWith(".pdf") ? (
-                                    <embed
-                                      src={currentRules.url}
-                                      type="application/pdf"
-                                      className="w-full h-full"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={currentRules.url}
-                                      className="w-full h-auto object-contain"
-                                    />
-                                  )}
-                                </div>
+                const uploaded = await uploadFile(file, "rules");
+                if (uploaded?.url) {
+                  setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
+                }
+              }}
+            />
+            <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
+          </label>
+        )}
+      </div>
+    </div>
 
-                              </div>
+    {/* ===== Fullscreen File Preview ===== */}
+    {previewFile && (
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
 
-                              {/* Change File Button */}
-                              <label
-                                className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Change File
-                                <input
-                                  type="file"
-                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                  className="hidden"
-                                  onChange={async (e) => {
-                                    const file = e.target.files[0];
-                                    if (!file) return;
+          <button
+            onClick={() => setPreviewFile(null)}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
+          >
+            ✕
+          </button>
 
-                                    setCurrentRules({ name: file.name, file });
+          <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+            {previewFile.name.endsWith(".pdf") ? (
+              <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px] md:min-h-[600px]" />
+            ) : (
+              <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" />
+            )}
+          </div>
+        </div>
+      </div>
+    )}
 
-                                    const uploaded = await uploadFile(file, "rules");
-                                    if (uploaded?.url) {
-                                      setCurrentRules((prev) => ({
-                                        ...prev,
-                                        url: uploaded.url,
-                                      }));
-                                    }
-                                  }}
-                                />
-                              </label>
-                            </div>
-                          ) : (
-                            <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 transition-colors text-center">
-                              <span className="text-6xl mb-2">📁</span>
-                              <span className="text-gray-500 mb-2">Click here to upload</span>
-                              <input
-                                type="file"
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files[0];
-                                  if (!file) return;
+    {/* ===== REQUEST LIST MODAL ===== */}
+    {showRequestList && (
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
 
-                                  setCurrentRules({ name: file.name, file });
+          <button
+            onClick={() => setShowRequestList(false)}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
+          >
+            ✕
+          </button>
 
-                                  const uploaded = await uploadFile(file, "rules");
-                                  if (uploaded?.url) {
-                                    setCurrentRules((prev) => ({
-                                      ...prev,
-                                      url: uploaded.url,
-                                    }));
-                                  }
-                                }}
-                              />
-                              <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
-                            </label>
-                          )}
-                        </div>
+          <h3 className="text-xl font-semibold text-center mt-4">Pending Requests</h3>
 
-                      </div>
+          <div className="flex-1 overflow-auto p-4 space-y-2">
+            {pendingRequests.length === 0 ? (
+              <p className="text-center text-gray-500">No pending requests</p>
+            ) : (
+              pendingRequests.map((req, idx) => (
+                <button
+                  key={idx}
+                  className="w-full text-left border p-2 rounded hover:bg-gray-100"
+                  onClick={() => {
+                    setSelectedRequest(req);
+                    setShowRequestDetails(true);
+                  }}
+                >
+                  Student Number: {req.student_number}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    )}
 
-                      {/* ===== Fullscreen Modal ===== */}
-                      {previewFile && (
-                        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                          <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
+    {/* ===== REQUEST DETAILS MODAL ===== */}
+    {showRequestDetails && selectedRequest && (
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
 
-                            {/* Close Button */}
-                            <button
-                              onClick={() => setPreviewFile(null)}
-                              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
-                            >
-                              ✕
-                            </button>
+          <button
+            onClick={() => setShowRequestDetails(false)}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
+          >
+            ✕
+          </button>
 
-                            {/* Scrollable Content */}
-                            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-                              {previewFile.name.endsWith(".pdf") ? (
-                                <embed
-                                  src={previewFile.url}
-                                  type="application/pdf"
-                                  className="w-full min-h-[500px] md:min-h-[600px]"
-                                />
-                              ) : (
-                                <img
-                                  src={previewFile.url}
-                                  className="max-w-full max-h-[80vh] object-contain"
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+          <h3 className="text-lg font-semibold mb-4">Request Details</h3>
 
-                    </div>
-                  )}
-                {/* ================= Student Records ================= */}
+          <div className="space-y-2">
+            <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
+            <p><strong>Section:</strong> {selectedRequest.section}</p>
+            <p><strong>Violation:</strong> {selectedRequest.violation}</p>
+            <p><strong>Status:</strong> {selectedRequest.status}</p>
+
+            {selectedRequest.status === "Pending" && (
+              <div className="flex gap-2 mt-4">
+                <button
+                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                  onClick={() => handleApprove(selectedRequest)}
+                >
+                  Approve
+                </button>
+                <button
+                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                  onClick={() => handleReject(selectedRequest)}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+  </div>
+)}
+         {/*========== Student Records ================= */}
                 {activePage === "records" && (
                   <div className="bg-white p-6 rounded-xl shadow-lg space-y-6">
                     <h3 className="text-xl font-semibold text-gray-700">Student Records</h3>
