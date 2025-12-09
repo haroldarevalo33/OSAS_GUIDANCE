@@ -1,34 +1,52 @@
 import React, { useState, useEffect } from "react";
-import { Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon} from "@heroicons/react/24/solid";
+import {
+  Squares2X2Icon,
+  UserCircleIcon,
+  ArrowRightOnRectangleIcon,
+  NewspaperIcon,
+  DocumentCheckIcon,
+  BellIcon,
+  BookOpenIcon,
+  Bars3Icon,
+  XMarkIcon,
+} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
-import html2pdf from "html2pdf.js";
 
 export default function StudentHome() {
+  // Page + data states
   const [activePage, setActivePage] = useState("Info");
   const [studentRecord, setStudentRecord] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Small states
   const [violation, setViolation] = useState("—");
   const [section, setSection] = useState("—");
   const [lastVisit, setLastVisit] = useState("—");
   const [visits, setVisits] = useState(0);
 
+  // Modals / previews
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [violationHistory, setViolationHistory] = useState([]);
-
   const [accountModal, setAccountModal] = useState(false);
   const [profilePreview, setProfilePreview] = useState(null);
 
-  // Good Moral / Notifications state
+  // Good moral / notifications
   const [goodMoralRequested, setGoodMoralRequested] = useState(false);
   const [goodMoralApproved, setGoodMoralApproved] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  
-  //Preview Rules and Regulations
+
+  // Rules preview
   const [currentRules, setCurrentRules] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
 
-  // Load student from localStorage
+  // Responsive sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // News
+  const [newsArticles, setNewsArticles] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
+  // load student from localstorage
   const rawStudent = localStorage.getItem("student");
   let studentData = {};
   try {
@@ -36,28 +54,20 @@ export default function StudentHome() {
   } catch {
     studentData = {};
   }
-
   const studentNumber = studentData.student_number || null;
   const fallbackName = studentData.student_name || "Student";
 
-  // News state
-  const [newsArticles, setNewsArticles] = useState([]);
-  const [newsLoading, setNewsLoading] = useState(false);
-
-  
-
-  // Fetch news every 60s when News tab is active
+  // ---------------------------
+  // Effects: fetch news (when News active)
   useEffect(() => {
     if (activePage !== "News") return;
-
     let intervalId;
-
     const fetchNews = async () => {
       setNewsLoading(true);
       try {
         const res = await fetch("http://localhost:5000/api/news");
         const data = await res.json();
-        if (data.status === "ok") setNewsArticles(data.articles);
+        if (data.status === "ok") setNewsArticles(data.articles || []);
         else setNewsArticles([]);
       } catch (err) {
         console.error("Error fetching news:", err);
@@ -66,20 +76,17 @@ export default function StudentHome() {
         setNewsLoading(false);
       }
     };
-
     fetchNews();
     intervalId = setInterval(fetchNews, 60000);
-
     return () => clearInterval(intervalId);
   }, [activePage]);
 
-  // FETCH STUDENT RECORD
+  // Fetch student record
   useEffect(() => {
     if (!studentNumber) {
       setLoading(false);
       return;
     }
-
     setLoading(true);
     fetch(`http://localhost:5000/students/by-number/${studentNumber}`)
       .then((res) => res.json())
@@ -89,7 +96,6 @@ export default function StudentHome() {
         }
         setStudentRecord(data);
         setLoading(false);
-
         localStorage.setItem(
           "student",
           JSON.stringify({ ...studentData, profile_pic: data.profile_pic })
@@ -98,17 +104,15 @@ export default function StudentHome() {
       .catch(() => setLoading(false));
   }, [activePage, studentNumber]);
 
-  // FETCH SUMMARY
+  // Fetch summary
   useEffect(() => {
     if (!studentNumber) return;
-
     async function fetchSummary() {
       try {
         const res = await fetch(
           `http://localhost:5000/violations/summary/${studentNumber}`
         );
         const data = await res.json();
-
         setViolation(data.predicted_violation ?? "—");
         setSection(data.predicted_section ?? "—");
         setLastVisit(data.violation_date ?? "—");
@@ -117,11 +121,10 @@ export default function StudentHome() {
         console.error(err);
       }
     }
-    
-
     fetchSummary();
   }, [studentNumber]);
 
+  // History modal loader
   async function openHistoryModal() {
     try {
       const res = await fetch(
@@ -135,11 +138,10 @@ export default function StudentHome() {
     }
   }
 
-  // HANDLE PROFILE UPLOAD
+  // Profile upload
   async function handleProfileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = () => setProfilePreview(reader.result);
     reader.readAsDataURL(file);
@@ -156,7 +158,6 @@ export default function StudentHome() {
 
       if (res.ok) {
         setAccountModal(false);
-
         Swal.fire({
           toast: true,
           position: "top-end",
@@ -171,11 +172,7 @@ export default function StudentHome() {
           ? `http://localhost:5000/uploads/${data.profile_pic}`
           : studentRecord?.profile_pic;
 
-        setStudentRecord((prev) => ({
-          ...prev,
-          profile_pic: updatedProfilePic,
-        }));
-
+        setStudentRecord((prev) => ({ ...prev, profile_pic: updatedProfilePic }));
         localStorage.setItem(
           "student",
           JSON.stringify({ ...studentData, profile_pic: updatedProfilePic })
@@ -214,56 +211,54 @@ export default function StudentHome() {
     return null;
   };
 
- // Use the global object
+  // Good moral download (kept as-is)
   const downloadPDF = () => {
-  const element = document.getElementById("goodmoral-certificate");
-  if (!element) return;
-
-  setLoading(true);
-
-  const opt = {
-    margin: 0.5,
-    filename: "GoodMoralCertificate.pdf",
-    image: { type: "jpeg", quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, logging: true, ignoreElements: (el) => el.tagName === 'STYLE' },
-    jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+    const element = document.getElementById("goodmoral-certificate");
+    if (!element) return;
+    const opt = {
+      margin: 0.5,
+      filename: "GoodMoralCertificate.pdf",
+      image: { type: "jpeg", quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, logging: true, ignoreElements: (el) => el.tagName === 'STYLE' },
+      jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+    };
+    setTimeout(() => {
+      import("html2pdf.js").then((html2pdf) => {
+        html2pdf.default().set(opt).from(element).save();
+      });
+    }, 100);
   };
 
-  setTimeout(() => {
-    import("html2pdf.js").then((html2pdf) => {
-      html2pdf.default().set(opt).from(element).save().finally(() => setLoading(false));
-    });
-  }, 100);
-};
-
-useEffect(() => {
-  async function fetchRules() {
-    try {
-      const res = await fetch("http://localhost:5000/file/list");
-      const data = await res.json();
-
-      // find RULES file only
-      const rulesFile = data.files.find(f => f.file_type === "rules");
-
-      if (rulesFile) {
-        setCurrentRules({
-          name: rulesFile.original,
-          url: `http://localhost:5000/file/download/${rulesFile.stored}`
-        });
+  // Fetch rules file from backend on mount
+  useEffect(() => {
+    async function fetchRules() {
+      try {
+        const res = await fetch("http://localhost:5000/file/list");
+        const data = await res.json();
+        const rulesFile = (data.files || []).find((f) => f.file_type === "rules");
+        if (rulesFile) {
+          setCurrentRules({
+            name: rulesFile.original,
+            url: `http://localhost:5000/file/download/${rulesFile.stored}`,
+          });
+        } else {
+          setCurrentRules(null);
+        }
+      } catch (err) {
+        console.error("Error fetching rules:", err);
+        setCurrentRules(null);
       }
-    } catch (err) {
-      console.error("Error fetching rules:", err);
     }
-  }
+    fetchRules();
+  }, []);
 
-  fetchRules();
-}, []);
-
-
+  // ---------------------------
+  // Render
   return (
-    <div className="w-screen h-screen flex bg-[#eefbe9] overflow-hidden">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-[#1f2937] text-white flex flex-col py-6 shadow-xl border-r border-gray-800">
+    <div className="min-h-screen flex bg-[#eefbe9]">
+
+      {/* SIDEBAR - desktop */}
+      <aside className="hidden md:flex md:w-64 bg-[#1f2937] text-white flex-col py-6 shadow-xl border-r border-gray-800">
         <div className="flex items-center gap-3 px-4 mb-8">
           <img
             src="/cvsu-logo.png"
@@ -306,6 +301,7 @@ useEffect(() => {
             <DocumentCheckIcon className="w-5 h-5" />
             <span className="font-medium">Good Moral</span>
           </button>
+
           <button
             onClick={() => setActivePage("Rules")}
             className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
@@ -316,7 +312,7 @@ useEffect(() => {
             <span className="font-medium">Rules & Regulations</span>
           </button>
 
-         <button
+          <button
             onClick={() => setActivePage("Notifications")}
             className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
               activePage === "Notifications" ? "bg-green-600" : "hover:bg-gray-700/60"
@@ -326,17 +322,14 @@ useEffect(() => {
               <BellIcon className="w-5 h-5" />
               <span className="font-medium">Notifications</span>
             </div>
-
             {notifications.length > 0 && (
               <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                 {notifications.length}
               </span>
             )}
-       </button>
-
+          </button>
         </nav>
 
-        {/* LOGOUT BUTTON */}
         <div className="px-4 mt-auto pb-4">
           <button
             onClick={() => {
@@ -351,17 +344,8 @@ useEffect(() => {
                 cancelButtonColor: "#d33",
               }).then((result) => {
                 if (result.isConfirmed) {
-                  Swal.fire({
-                    title: "Logged out",
-                    text: "You have been successfully logged out.",
-                    icon: "success",
-                    timer: 1500,
-                    showConfirmButton: false,
-                    position: "center",
-                  }).then(() => {
-                    localStorage.removeItem("student");
-                    window.location.href = "/";
-                  });
+                  localStorage.removeItem("student");
+                  window.location.href = "/";
                 }
               });
             }}
@@ -373,11 +357,81 @@ useEffect(() => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col relative">
-        <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-6">
-          <div></div>
-          {/* USER DROPDOWN */}
+      {/* Sidebar drawer for mobile */}
+      <div className={`fixed inset-0 z-40 md:hidden ${sidebarOpen ? "" : "pointer-events-none"}`}>
+        {/* overlay */}
+        <div
+          className={`absolute inset-0 bg-black/40 transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-0"}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+        {/* drawer */}
+        <div className={`absolute left-0 top-0 bottom-0 w-72 bg-[#1f2937] text-white p-6 transform transition-transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <img src="/cvsu-logo.png" className="w-10 h-10 rounded-md border" />
+              <div>
+                <div className="font-bold">GUIDANCE OFFICE</div>
+                <div className="text-xs text-gray-300">CvSU — Student</div>
+              </div>
+            </div>
+            <button onClick={() => setSidebarOpen(false)} className="p-2 rounded hover:bg-white/10">
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          <nav className="space-y-2">
+            <button onClick={() => { setActivePage("Info"); setSidebarOpen(false); }} className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${activePage === "Info" ? "bg-green-600" : "hover:bg-white/10"}`}>
+              <Squares2X2Icon className="w-5 h-5" />
+              <span className="font-medium">Student Dashboard</span>
+            </button>
+            <button onClick={() => { setActivePage("News"); setSidebarOpen(false); }} className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${activePage === "News" ? "bg-green-600" : "hover:bg-white/10"}`}>
+              <NewspaperIcon className="w-5 h-5" />
+              <span className="font-medium">News</span>
+            </button>
+            <button onClick={() => { setActivePage("GoodMoral"); setSidebarOpen(false); }} className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${activePage === "GoodMoral" ? "bg-green-600" : "hover:bg-white/10"}`}>
+              <DocumentCheckIcon className="w-5 h-5" />
+              <span className="font-medium">Good Moral</span>
+            </button>
+            <button onClick={() => { setActivePage("Rules"); setSidebarOpen(false); }} className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${activePage === "Rules" ? "bg-green-600" : "hover:bg-white/10"}`}>
+              <BookOpenIcon className="w-5 h-5" />
+              <span className="font-medium">Rules & Regulations</span>
+            </button>
+            <button onClick={() => { setActivePage("Notifications"); setSidebarOpen(false); }} className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg ${activePage === "Notifications" ? "bg-green-600" : "hover:bg-white/10"}`}>
+              <div className="flex items-center gap-3">
+                <BellIcon className="w-5 h-5" />
+                <span className="font-medium">Notifications</span>
+              </div>
+              {notifications.length > 0 && <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{notifications.length}</span>}
+            </button>
+          </nav>
+
+          <div className="mt-auto">
+            <button onClick={() => { localStorage.removeItem("student"); window.location.href = "/"; }} className="w-full bg-red-600 py-2 rounded-lg mt-4">
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* HEADER */}
+        <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-4 md:px-6">
+          <div className="flex items-center gap-3">
+            {/* mobile burger */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 rounded hover:bg-white/10"
+              aria-label="Open menu"
+            >
+              <Bars3Icon className="w-6 h-6" />
+            </button>
+            <div className="hidden md:block ml-0">
+              {/* placeholder so header spacing matches desktop */}
+            </div>
+          </div>
+
+          {/* Right: user avatar */}
           <div className="relative">
             <div
               onClick={() => setAccountModal(!accountModal)}
@@ -393,8 +447,9 @@ useEffect(() => {
                 <UserCircleIcon className="w-10 h-10 text-white" />
               )}
             </div>
+
             {accountModal && (
-              <div className="absolute top-full right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
+              <div className="absolute right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
                 <div className="flex flex-col items-center">
                   <div className="relative">
                     {getProfileImage() ? (
@@ -435,18 +490,16 @@ useEffect(() => {
           </div>
         </header>
 
-        {/* CONTENT SECTION */}
-        <section className="p-10 overflow-auto">
-          {/* INFO DASHBOARD */}
+        {/* CONTENT */}
+        <main className="flex-1 overflow-auto p-4 md:p-10">
+          {/* INFO */}
           {activePage === "Info" && (
             <>
-              <h2 className="text-4xl font-extrabold text-green-800 mb-10">
+              <h2 className="text-3xl md:text-4xl font-extrabold text-green-800 mb-6 md:mb-10">
                 Welcome, {studentRecord?.student_name || fallbackName}!
               </h2>
-
-              <div className="grid grid-cols-4 gap-8">
-                {/* VISITS */}
-                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition flex flex-col justify-between">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-4xl">📋</span>
@@ -454,85 +507,56 @@ useEffect(() => {
                         Guidance Visits
                       </h3>
                     </div>
-                    <p className="text-5xl font-extrabold text-green-900 mt-3">
+                    <p className="text-4xl md:text-5xl font-extrabold text-green-900 mt-3">
                       {visits}
                     </p>
                   </div>
-                  <button
-                    onClick={openHistoryModal}
-                    className="mt-4 w-full bg-green-600 cursor-pointer text-white py-2 rounded-lg hover:bg-green-700"
-                  >
+                  <button onClick={openHistoryModal} className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
                     View Visit History
                   </button>
                 </div>
 
-                {/* LAST VISIT */}
-                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
+                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-4xl">📅</span>
-                    <h3 className="text-xl font-semibold text-green-700">
-                      Last Visit
-                    </h3>
+                    <h3 className="text-xl font-semibold text-green-700">Last Visit</h3>
                   </div>
-                  <p className="text-3xl font-extrabold text-green-900 mt-4">
-                    {lastVisit}
-                  </p>
+                  <p className="text-2xl md:text-3xl font-extrabold text-green-900 mt-4">{lastVisit}</p>
                 </div>
 
-                {/* VIOLATION */}
-                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
+                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-4xl">⚠️</span>
-                    <h3 className="text-xl font-semibold text-green-700">
-                      Latest Concern
-                    </h3>
+                    <h3 className="text-xl font-semibold text-green-700">Latest Concern</h3>
                   </div>
-                  <p className="text-3xl font-bold text-green-900 mt-4 break-words">
-                    {violation}
-                  </p>
+                  <p className="text-2xl md:text-3xl font-bold text-green-900 mt-4">{violation}</p>
                 </div>
 
-                {/* SECTION */}
-                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
+                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-4xl">📌</span>
-                    <h3 className="text-xl font-semibold text-green-700">
-                      Recommendation
-                    </h3>
+                    <h3 className="text-xl font-semibold text-green-700">Recommendation</h3>
                   </div>
-                  <p className="text-3xl font-bold text-green-900 mt-4 break-words">
-                    {section}
-                  </p>
+                  <p className="text-2xl md:text-3xl font-bold text-green-900 mt-4">{section}</p>
                 </div>
               </div>
             </>
           )}
 
-          {/* NEWS TAB */}
+          {/* NEWS */}
           {activePage === "News" && (
             <>
-              <h2 className="text-4xl font-bold text-green-800 mb-6">Latest News</h2>
-
+              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">Latest News</h2>
               {newsLoading ? (
                 <p className="text-gray-700">Loading news...</p>
               ) : newsArticles.length === 0 ? (
                 <p className="text-gray-700">No news available at the moment.</p>
               ) : (
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {newsArticles.map((article, idx) => (
-                    <a
-                      key={idx}
-                      href={article.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-white p-6 rounded-2xl shadow-md border-2 border-green-600 hover:shadow-xl transition"
-                    >
-                      <h3 className="font-bold text-xl text-green-900 mb-2">
-                        {article.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-1">
-                        Source: {article.source}
-                      </p>
+                    <a key={idx} href={article.link} target="_blank" rel="noopener noreferrer" className="bg-white p-6 rounded-2xl shadow-md border-2 border-green-600">
+                      <h3 className="font-bold text-xl text-green-900 mb-2">{article.title}</h3>
+                      <p className="text-sm text-gray-500 mb-1">Source: {article.source}</p>
                       <p className="text-sm text-gray-400">Click to read more...</p>
                     </a>
                   ))}
@@ -541,166 +565,81 @@ useEffect(() => {
             </>
           )}
 
-          {/* GOOD MORAL PAGE */}
-        {activePage === "GoodMoral" && (
-          <div className="flex flex-col items-center mt-8">
-            <h2 className="text-4xl font-bold text-green-800 mb-8 text-center">
-              Good Moral Certificate
-            </h2>
-
-          {!goodMoralRequested ? (
-          <div className="bg-white p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
-            <p className="text-gray-700 mb-6">
-              Request your Good Moral Certificate here.
-            </p>
-            <button
-              onClick={() => {
-                setGoodMoralRequested(true);
-                setGoodMoralApproved(true);
-                setNotifications(prev => [
-                  ...prev,
-                  { type: "Good Moral", status: "Approved" },
-                ]);
-
-                Swal.fire({
-                  toast: true,                // small toast
-                  position: "top-end",        // top-right corner
-                  icon: "success",            // success icon
-                  title: "Good Moral request submitted",
-                  showConfirmButton: false,   // no "OK" button
-                  timer: 2000,                // disappears after 2 seconds
-                  timerProgressBar: true,     // shows progress bar
-                });
-              }}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
-            >
-              Request Good Moral
-            </button>
-
-              </div>
-            ) : (
-              <div className="flex flex-col items-center w-full">
-                {/* PDF Container */}
-                <div
-                  id="goodmoral-certificate"
-                  className="bg-white p-10 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-lg"
-                  style={{ textAlign: "center" }} // center all text horizontally
-                >
-                  {/* Logo */}
-                  <img
-                    src="/cvsu-logo.png"
-                    alt="CvSU Logo"
-                    className="mx-auto w-24 h-24 mb-6"
-                  />
-
-                  {/* Certificate Heading */}
-                  <h3 className="text-2xl font-bold text-green-700 mb-6">
-                    Certificate of Good Moral
-                  </h3>
-
-                  {/* Certificate Body */}
-                  <p className="text-gray-700 mb-4">
-                    This is to certify that{" "}
-                    <span className="font-semibold">{studentRecord?.student_name || fallbackName}</span>{" "}
-                    of student number{" "}
-                    <span className="font-semibold">{studentNumber}</span>{" "}
-                    has demonstrated good moral character.
-                  </p>
-                  <p className="mt-6 text-gray-700">
-                    Issued by CvSU Guidance Office.
-                  </p>
-                </div>
-
-                {/* Download Button - HINDI kasama sa PDF */}
-                {goodMoralApproved && (
-                  <button
-                    onClick={downloadPDF}
-                    className="mt-6 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
-                  >
-                    Download PDF
+          {/* GOOD MORAL */}
+          {activePage === "GoodMoral" && (
+            <div className="flex flex-col items-center">
+              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">Good Moral Certificate</h2>
+              {!goodMoralRequested ? (
+                <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
+                  <p className="text-gray-700 mb-4">Request your Good Moral Certificate here.</p>
+                  <button onClick={() => { setGoodMoralRequested(true); setGoodMoralApproved(true); setNotifications(prev => [...prev, { type: "Good Moral", status: "Approved" }]); Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Good Moral request submitted", showConfirmButton: false, timer: 2000 }); }} className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">
+                    Request Good Moral
                   </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-         {/*rules and regulations*/}
+                </div>
+              ) : (
+                <div className="w-full max-w-lg">
+                  <div id="goodmoral-certificate" className="bg-white p-6 md:p-10 rounded-2xl shadow-md border-2 border-green-600 text-center">
+                    <img src="/cvsu-logo.png" alt="CvSU Logo" className="mx-auto w-20 h-20 mb-4" />
+                    <h3 className="text-xl font-bold text-green-700 mb-3">Certificate of Good Moral</h3>
+                    <p className="text-gray-700">This is to certify that <span className="font-semibold">{studentRecord?.student_name || fallbackName}</span> of student number <span className="font-semibold">{studentNumber}</span> has demonstrated good moral character.</p>
+                    <p className="mt-4 text-gray-700">Issued by CvSU Guidance Office.</p>
+                  </div>
+                  {goodMoralApproved && <button onClick={downloadPDF} className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg">Download PDF</button>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* RULES */}
           {activePage === "Rules" && (
             <div className="flex flex-col items-center">
+              <h2 className="text-2xl md:text-3xl font-bold text-green-800 mb-4 text-center">CvSU Rules and Regulations</h2>
 
-              <h2 className="text-3xl font-bold text-green-800 mb-6 text-center">
-                CvSU Rules and Regulations
-              </h2>
-
-              {/* CARD CONTAINER */}
-              <div className="bg-white p-6 rounded-2xl shadow-md border w-[420px]">
-
+              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border w-full max-w-md">
                 {currentRules ? (
                   <div className="flex flex-col gap-4">
-
-                    {/* FILE HEADER — REMOVED BLACK BOX LINE, FILENAME NOT CLICKABLE */}
-                    <div className="flex items-center gap-3 rounded-xl p-4 bg-gray-50 shadow">
-
-                      {/* File Icon */}
+                    {/* file header with icon + filename (NOT clickable) */}
+                    <div className="flex items-center gap-3 rounded-xl p-3 bg-gray-50 shadow">
                       {(() => {
-                        const ext = currentRules.name.split(".").pop().toLowerCase();
+                        const ext = (currentRules.name || "").split(".").pop().toLowerCase();
                         switch (ext) {
-                          case "pdf": return <span className="text-red-600 text-4xl">📄</span>;
+                          case "pdf": return <span className="text-red-600 text-3xl">📄</span>;
                           case "doc":
-                          case "docx": return <span className="text-blue-600 text-4xl">📝</span>;
+                          case "docx": return <span className="text-blue-600 text-3xl">📝</span>;
                           case "jpg":
                           case "jpeg":
-                          case "png": return <span className="text-green-600 text-4xl">🖼️</span>;
-                          default: return <span className="text-gray-600 text-4xl">📁</span>;
+                          case "png": return <span className="text-green-600 text-3xl">🖼️</span>;
+                          default: return <span className="text-gray-600 text-3xl">📁</span>;
                         }
                       })()}
-
-                      {/* Filename (NOT CLICKABLE ANYMORE) */}
-                      <span className="font-semibold text-green-800">
-                        {currentRules.name}
-                      </span>
+                      <span className="font-semibold text-green-800">{currentRules.name}</span>
                     </div>
 
-                    {/* PREVIEW AREA (square) */}
-                    <div className="mt-1 border rounded-xl h-[300px] overflow-auto flex items-center justify-center p-2 bg-white shadow-inner">
-                      {currentRules.name.endsWith(".pdf") ? (
-                        <embed
-                          src={currentRules.url}
-                          type="application/pdf"
-                          className="w-full h-full"
-                        />
+                    {/* preview square */}
+                    <div className="border rounded-xl h-64 md:h-72 overflow-auto flex items-center justify-center p-2 bg-white shadow-inner">
+                      {currentRules.url && currentRules.name.endsWith(".pdf") ? (
+                        <embed src={currentRules.url} type="application/pdf" className="w-full h-full" />
                       ) : (
-                        <img
-                          src={currentRules.url}
-                          className="max-h-full object-contain"
-                        />
+                        <img src={currentRules?.url} className="max-h-full object-contain" alt="rules" />
                       )}
                     </div>
 
-                    {/* View File button */}
-                    <a
-                      href={currentRules.url}
-                      target="_blank"
-                      className="bg-yellow-500 text-white px-5 py-2 rounded-xl text-center hover:bg-yellow-600 transition shadow w-full"
-                    >
+                    {/* view button */}
+                    <a href={currentRules.url} target="_blank" rel="noreferrer" className="bg-yellow-500 text-white px-5 py-2 rounded-xl text-center hover:bg-yellow-600 transition shadow w-full">
                       View File
                     </a>
                   </div>
                 ) : (
-                  <div className="text-center py-10 text-gray-500 text-lg">
-                    ⚠️ No Rules and Regulations found.
-                  </div>
+                  <div className="text-center py-10 text-gray-500 text-lg">⚠️ No Rules and Regulations found.</div>
                 )}
               </div>
             </div>
           )}
 
-
-
-          {/* NOTIFICATIONS PAGE */}
+          {/* NOTIFICATIONS */}
           {activePage === "Notifications" && (
             <div>
-              <h2 className="text-4xl font-bold text-green-800 mb-6">Notifications</h2>
+              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">Notifications</h2>
               {notifications.length === 0 ? (
                 <p className="text-gray-700">No notifications at the moment.</p>
               ) : (
@@ -716,46 +655,44 @@ useEffect(() => {
             </div>
           )}
 
-        </section>
-      </main>
+        </main>
+      </div>
 
       {/* HISTORY MODAL */}
       {historyModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-[100]">
-          <div className="w-[550px] bg-white rounded-xl shadow-xl p-6">
-            <h2 className="text-2xl font-bold text-gray-700 mb-4">
-              Visit History
-            </h2>
-
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
+            <h2 className="text-2xl font-bold text-gray-700 mb-4">Visit History</h2>
             <div className="max-h-80 overflow-auto border rounded-lg p-3 bg-gray-50">
               {violationHistory.length === 0 ? (
-                <p className="text-gray-500 text-center py-6">
-                  No visit history found.
-                </p>
+                <p className="text-gray-500 text-center py-6">No visit history found.</p>
               ) : (
                 violationHistory.map((item, index) => (
-                  <div
-                    key={index}
-                    className="p-3 bg-white rounded-lg shadow mb-3 border"
-                  >
+                  <div key={index} className="p-3 bg-white rounded-lg shadow mb-3 border">
                     <p className="font-semibold">{item.predicted_violation}</p>
-                    <p className="text-sm text-gray-600">
-                      Section: {item.predicted_section}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Date: {item.violation_date || "—"}
-                    </p>
+                    <p className="text-sm text-gray-600">Section: {item.predicted_section}</p>
+                    <p className="text-sm text-gray-600">Date: {item.violation_date || "—"}</p>
                   </div>
                 ))
               )}
             </div>
+            <button onClick={() => setHistoryModalOpen(false)} className="mt-5 w-full bg-green-600 text-white py-2 rounded-lg">Close</button>
+          </div>
+        </div>
+      )}
 
-            <button
-              onClick={() => setHistoryModalOpen(false)}
-              className="mt-5 w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
-            >
-              Close
-            </button>
+      {/* FULLSCREEN PREVIEW */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-4xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
+            <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg">✕</button>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+              {previewFile.name.endsWith(".pdf") ? (
+                <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px]" />
+              ) : (
+                <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" alt="preview" />
+              )}
+            </div>
           </div>
         </div>
       )}
