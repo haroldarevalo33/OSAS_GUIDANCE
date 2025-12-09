@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Squares2X2Icon, 
-  UserCircleIcon, 
-  ArrowRightOnRectangleIcon, 
-  NewspaperIcon 
-} from "@heroicons/react/24/solid";
+import { Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
+import html2pdf from "html2pdf.js";
 
 export default function StudentHome() {
   const [activePage, setActivePage] = useState("Info");
@@ -23,6 +19,15 @@ export default function StudentHome() {
   const [accountModal, setAccountModal] = useState(false);
   const [profilePreview, setProfilePreview] = useState(null);
 
+  // Good Moral / Notifications state
+  const [goodMoralRequested, setGoodMoralRequested] = useState(false);
+  const [goodMoralApproved, setGoodMoralApproved] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  
+  //Preview Rules and Regulations
+  const [currentRules, setCurrentRules] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+
   // Load student from localStorage
   const rawStudent = localStorage.getItem("student");
   let studentData = {};
@@ -38,6 +43,8 @@ export default function StudentHome() {
   // News state
   const [newsArticles, setNewsArticles] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
+
+  
 
   // Fetch news every 60s when News tab is active
   useEffect(() => {
@@ -60,10 +67,10 @@ export default function StudentHome() {
       }
     };
 
-    fetchNews(); // initial fetch
-    intervalId = setInterval(fetchNews, 60000); // re-fetch every 60s
+    fetchNews();
+    intervalId = setInterval(fetchNews, 60000);
 
-    return () => clearInterval(intervalId); // cleanup
+    return () => clearInterval(intervalId);
   }, [activePage]);
 
   // FETCH STUDENT RECORD
@@ -110,6 +117,7 @@ export default function StudentHome() {
         console.error(err);
       }
     }
+    
 
     fetchSummary();
   }, [studentNumber]);
@@ -206,6 +214,52 @@ export default function StudentHome() {
     return null;
   };
 
+ // Use the global object
+  const downloadPDF = () => {
+  const element = document.getElementById("goodmoral-certificate");
+  if (!element) return;
+
+  setLoading(true);
+
+  const opt = {
+    margin: 0.5,
+    filename: "GoodMoralCertificate.pdf",
+    image: { type: "jpeg", quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, logging: true, ignoreElements: (el) => el.tagName === 'STYLE' },
+    jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+  };
+
+  setTimeout(() => {
+    import("html2pdf.js").then((html2pdf) => {
+      html2pdf.default().set(opt).from(element).save().finally(() => setLoading(false));
+    });
+  }, 100);
+};
+
+useEffect(() => {
+  async function fetchRules() {
+    try {
+      const res = await fetch("http://localhost:5000/file/list");
+      const data = await res.json();
+
+      // find RULES file only
+      const rulesFile = data.files.find(f => f.file_type === "rules");
+
+      if (rulesFile) {
+        setCurrentRules({
+          name: rulesFile.original,
+          url: `http://localhost:5000/file/download/${rulesFile.stored}`
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching rules:", err);
+    }
+  }
+
+  fetchRules();
+}, []);
+
+
   return (
     <div className="w-screen h-screen flex bg-[#eefbe9] overflow-hidden">
       {/* SIDEBAR */}
@@ -242,6 +296,44 @@ export default function StudentHome() {
             <NewspaperIcon className="w-5 h-5" />
             <span className="font-medium">News</span>
           </button>
+
+          <button
+            onClick={() => setActivePage("GoodMoral")}
+            className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+              activePage === "GoodMoral" ? "bg-green-600" : "hover:bg-gray-700/60"
+            }`}
+          >
+            <DocumentCheckIcon className="w-5 h-5" />
+            <span className="font-medium">Good Moral</span>
+          </button>
+          <button
+            onClick={() => setActivePage("Rules")}
+            className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+              activePage === "Rules" ? "bg-green-600" : "hover:bg-gray-700/60"
+            }`}
+          >
+            <BookOpenIcon className="w-5 h-5" />
+            <span className="font-medium">Rules & Regulations</span>
+          </button>
+
+         <button
+            onClick={() => setActivePage("Notifications")}
+            className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+              activePage === "Notifications" ? "bg-green-600" : "hover:bg-gray-700/60"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <BellIcon className="w-5 h-5" />
+              <span className="font-medium">Notifications</span>
+            </div>
+
+            {notifications.length > 0 && (
+              <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {notifications.length}
+              </span>
+            )}
+       </button>
+
         </nav>
 
         {/* LOGOUT BUTTON */}
@@ -301,7 +393,6 @@ export default function StudentHome() {
                 <UserCircleIcon className="w-10 h-10 text-white" />
               )}
             </div>
-
             {accountModal && (
               <div className="absolute top-full right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
                 <div className="flex flex-col items-center">
@@ -449,6 +540,182 @@ export default function StudentHome() {
               )}
             </>
           )}
+
+          {/* GOOD MORAL PAGE */}
+        {activePage === "GoodMoral" && (
+          <div className="flex flex-col items-center mt-8">
+            <h2 className="text-4xl font-bold text-green-800 mb-8 text-center">
+              Good Moral Certificate
+            </h2>
+
+          {!goodMoralRequested ? (
+          <div className="bg-white p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
+            <p className="text-gray-700 mb-6">
+              Request your Good Moral Certificate here.
+            </p>
+            <button
+              onClick={() => {
+                setGoodMoralRequested(true);
+                setGoodMoralApproved(true);
+                setNotifications(prev => [
+                  ...prev,
+                  { type: "Good Moral", status: "Approved" },
+                ]);
+
+                Swal.fire({
+                  toast: true,                // small toast
+                  position: "top-end",        // top-right corner
+                  icon: "success",            // success icon
+                  title: "Good Moral request submitted",
+                  showConfirmButton: false,   // no "OK" button
+                  timer: 2000,                // disappears after 2 seconds
+                  timerProgressBar: true,     // shows progress bar
+                });
+              }}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
+            >
+              Request Good Moral
+            </button>
+
+              </div>
+            ) : (
+              <div className="flex flex-col items-center w-full">
+                {/* PDF Container */}
+                <div
+                  id="goodmoral-certificate"
+                  className="bg-white p-10 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-lg"
+                  style={{ textAlign: "center" }} // center all text horizontally
+                >
+                  {/* Logo */}
+                  <img
+                    src="/cvsu-logo.png"
+                    alt="CvSU Logo"
+                    className="mx-auto w-24 h-24 mb-6"
+                  />
+
+                  {/* Certificate Heading */}
+                  <h3 className="text-2xl font-bold text-green-700 mb-6">
+                    Certificate of Good Moral
+                  </h3>
+
+                  {/* Certificate Body */}
+                  <p className="text-gray-700 mb-4">
+                    This is to certify that{" "}
+                    <span className="font-semibold">{studentRecord?.student_name || fallbackName}</span>{" "}
+                    of student number{" "}
+                    <span className="font-semibold">{studentNumber}</span>{" "}
+                    has demonstrated good moral character.
+                  </p>
+                  <p className="mt-6 text-gray-700">
+                    Issued by CvSU Guidance Office.
+                  </p>
+                </div>
+
+                {/* Download Button - HINDI kasama sa PDF */}
+                {goodMoralApproved && (
+                  <button
+                    onClick={downloadPDF}
+                    className="mt-6 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
+                  >
+                    Download PDF
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+         {/*rules and regulations*/}
+          {activePage === "Rules" && (
+            <div className="flex flex-col items-center">
+
+              <h2 className="text-3xl font-bold text-green-800 mb-6 text-center">
+                CvSU Rules and Regulations
+              </h2>
+
+              {/* CARD CONTAINER */}
+              <div className="bg-white p-6 rounded-2xl shadow-md border w-[420px]">
+
+                {currentRules ? (
+                  <div className="flex flex-col gap-4">
+
+                    {/* FILE HEADER — REMOVED BLACK BOX LINE, FILENAME NOT CLICKABLE */}
+                    <div className="flex items-center gap-3 rounded-xl p-4 bg-gray-50 shadow">
+
+                      {/* File Icon */}
+                      {(() => {
+                        const ext = currentRules.name.split(".").pop().toLowerCase();
+                        switch (ext) {
+                          case "pdf": return <span className="text-red-600 text-4xl">📄</span>;
+                          case "doc":
+                          case "docx": return <span className="text-blue-600 text-4xl">📝</span>;
+                          case "jpg":
+                          case "jpeg":
+                          case "png": return <span className="text-green-600 text-4xl">🖼️</span>;
+                          default: return <span className="text-gray-600 text-4xl">📁</span>;
+                        }
+                      })()}
+
+                      {/* Filename (NOT CLICKABLE ANYMORE) */}
+                      <span className="font-semibold text-green-800">
+                        {currentRules.name}
+                      </span>
+                    </div>
+
+                    {/* PREVIEW AREA (square) */}
+                    <div className="mt-1 border rounded-xl h-[300px] overflow-auto flex items-center justify-center p-2 bg-white shadow-inner">
+                      {currentRules.name.endsWith(".pdf") ? (
+                        <embed
+                          src={currentRules.url}
+                          type="application/pdf"
+                          className="w-full h-full"
+                        />
+                      ) : (
+                        <img
+                          src={currentRules.url}
+                          className="max-h-full object-contain"
+                        />
+                      )}
+                    </div>
+
+                    {/* View File button */}
+                    <a
+                      href={currentRules.url}
+                      target="_blank"
+                      className="bg-yellow-500 text-white px-5 py-2 rounded-xl text-center hover:bg-yellow-600 transition shadow w-full"
+                    >
+                      View File
+                    </a>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-gray-500 text-lg">
+                    ⚠️ No Rules and Regulations found.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+
+
+          {/* NOTIFICATIONS PAGE */}
+          {activePage === "Notifications" && (
+            <div>
+              <h2 className="text-4xl font-bold text-green-800 mb-6">Notifications</h2>
+              {notifications.length === 0 ? (
+                <p className="text-gray-700">No notifications at the moment.</p>
+              ) : (
+                <div className="space-y-4">
+                  {notifications.map((note, idx) => (
+                    <div key={idx} className="p-4 bg-white rounded-2xl shadow-md border-2 border-green-600">
+                      <p className="font-semibold">{note.type}</p>
+                      <p className="text-gray-600">Status: {note.status}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </section>
       </main>
 
