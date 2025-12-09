@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/solid";
+import { 
+  Squares2X2Icon, 
+  UserCircleIcon, 
+  ArrowRightOnRectangleIcon, 
+  NewspaperIcon 
+} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 
 export default function StudentHome() {
@@ -29,6 +34,37 @@ export default function StudentHome() {
 
   const studentNumber = studentData.student_number || null;
   const fallbackName = studentData.student_name || "Student";
+
+  // News state
+  const [newsArticles, setNewsArticles] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
+  // Fetch news every 60s when News tab is active
+  useEffect(() => {
+    if (activePage !== "News") return;
+
+    let intervalId;
+
+    const fetchNews = async () => {
+      setNewsLoading(true);
+      try {
+        const res = await fetch("http://localhost:5000/api/news");
+        const data = await res.json();
+        if (data.status === "ok") setNewsArticles(data.articles);
+        else setNewsArticles([]);
+      } catch (err) {
+        console.error("Error fetching news:", err);
+        setNewsArticles([]);
+      } finally {
+        setNewsLoading(false);
+      }
+    };
+
+    fetchNews(); // initial fetch
+    intervalId = setInterval(fetchNews, 60000); // re-fetch every 60s
+
+    return () => clearInterval(intervalId); // cleanup
+  }, [activePage]);
 
   // FETCH STUDENT RECORD
   useEffect(() => {
@@ -186,7 +222,7 @@ export default function StudentHome() {
           </div>
         </div>
 
-        <nav className="px-3 flex-1">
+        <nav className="px-3 flex-1 space-y-2">
           <button
             onClick={() => setActivePage("Info")}
             className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
@@ -196,7 +232,18 @@ export default function StudentHome() {
             <Squares2X2Icon className="w-5 h-5" />
             <span className="font-medium">Student Dashboard</span>
           </button>
+
+          <button
+            onClick={() => setActivePage("News")}
+            className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+              activePage === "News" ? "bg-green-600" : "hover:bg-gray-700/60"
+            }`}
+          >
+            <NewspaperIcon className="w-5 h-5" />
+            <span className="font-medium">News</span>
+          </button>
         </nav>
+
         {/* LOGOUT BUTTON */}
         <div className="px-4 mt-auto pb-4">
           <button
@@ -233,11 +280,11 @@ export default function StudentHome() {
           </button>
         </div>
       </aside>
+
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col relative">
         <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-6">
           <div></div>
-
           {/* USER DROPDOWN */}
           <div className="relative">
             <div
@@ -297,73 +344,111 @@ export default function StudentHome() {
           </div>
         </header>
 
-        {/* DASHBOARD */}
+        {/* CONTENT SECTION */}
         <section className="p-10 overflow-auto">
-          <h2 className="text-4xl font-extrabold text-green-800 mb-10">
-            Welcome, {studentRecord?.student_name || fallbackName}!
-          </h2>
+          {/* INFO DASHBOARD */}
+          {activePage === "Info" && (
+            <>
+              <h2 className="text-4xl font-extrabold text-green-800 mb-10">
+                Welcome, {studentRecord?.student_name || fallbackName}!
+              </h2>
 
-          <div className="grid grid-cols-4 gap-8">
-            {/* VISITS */}
-            <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-4xl">📋</span>
-                  <h3 className="text-xl font-semibold text-green-700">
-                    Guidance Visits
-                  </h3>
+              <div className="grid grid-cols-4 gap-8">
+                {/* VISITS */}
+                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-4xl">📋</span>
+                      <h3 className="text-xl font-semibold text-green-700">
+                        Guidance Visits
+                      </h3>
+                    </div>
+                    <p className="text-5xl font-extrabold text-green-900 mt-3">
+                      {visits}
+                    </p>
+                  </div>
+                  <button
+                    onClick={openHistoryModal}
+                    className="mt-4 w-full bg-green-600 cursor-pointer text-white py-2 rounded-lg hover:bg-green-700"
+                  >
+                    View Visit History
+                  </button>
                 </div>
-                <p className="text-5xl font-extrabold text-green-900 mt-3">
-                  {visits}
-                </p>
-              </div>
-              <button
-                onClick={openHistoryModal}
-                className="mt-4 w-full bg-green-600 cursor-pointer text-white py-2 rounded-lg hover:bg-green-700"
-              >
-                View Visit History
-              </button>
-            </div>
 
-            {/* LAST VISIT */}
-            <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">📅</span>
-                <h3 className="text-xl font-semibold text-green-700">
-                  Last Visit
-                </h3>
-              </div>
-              <p className="text-3xl font-extrabold text-green-900 mt-4">
-                {lastVisit}
-              </p>
-            </div>
+                {/* LAST VISIT */}
+                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-4xl">📅</span>
+                    <h3 className="text-xl font-semibold text-green-700">
+                      Last Visit
+                    </h3>
+                  </div>
+                  <p className="text-3xl font-extrabold text-green-900 mt-4">
+                    {lastVisit}
+                  </p>
+                </div>
 
-            {/* VIOLATION */}
-            <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">⚠️</span>
-                <h3 className="text-xl font-semibold text-green-700">
-                  Latest Concern
-                </h3>
-              </div>
-              <p className="text-3xl font-bold text-green-900 mt-4 break-words">
-                {violation}
-              </p>
-            </div>
+                {/* VIOLATION */}
+                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-4xl">⚠️</span>
+                    <h3 className="text-xl font-semibold text-green-700">
+                      Latest Concern
+                    </h3>
+                  </div>
+                  <p className="text-3xl font-bold text-green-900 mt-4 break-words">
+                    {violation}
+                  </p>
+                </div>
 
-            {/* SECTION */}
-            <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">📌</span>
-                <h3 className="text-xl font-semibold text-green-700">
-                  Recommendation
-                </h3>
+                {/* SECTION */}
+                <div className="p-6 min-h-64 bg-white border-2 border-green-600 rounded-2xl shadow-md hover:shadow-xl transition">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-4xl">📌</span>
+                    <h3 className="text-xl font-semibold text-green-700">
+                      Recommendation
+                    </h3>
+                  </div>
+                  <p className="text-3xl font-bold text-green-900 mt-4 break-words">
+                    {section}
+                  </p>
+                </div>
               </div>
-              <p className="text-3xl font-bold text-green-900 mt-4 break-words">
-                {section}
-              </p>
-            </div>
-          </div>
+            </>
+          )}
+
+          {/* NEWS TAB */}
+          {activePage === "News" && (
+            <>
+              <h2 className="text-4xl font-bold text-green-800 mb-6">Latest News</h2>
+
+              {newsLoading ? (
+                <p className="text-gray-700">Loading news...</p>
+              ) : newsArticles.length === 0 ? (
+                <p className="text-gray-700">No news available at the moment.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-6">
+                  {newsArticles.map((article, idx) => (
+                    <a
+                      key={idx}
+                      href={article.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white p-6 rounded-2xl shadow-md border-2 border-green-600 hover:shadow-xl transition"
+                    >
+                      <h3 className="font-bold text-xl text-green-900 mb-2">
+                        {article.title}
+                      </h3>
+                      <p className="text-sm text-gray-500 mb-1">
+                        Source: {article.source}
+                      </p>
+                      <p className="text-sm text-gray-400">Click to read more...</p>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </section>
       </main>
 
