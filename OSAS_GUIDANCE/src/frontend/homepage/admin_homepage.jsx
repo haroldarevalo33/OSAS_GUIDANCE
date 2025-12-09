@@ -10,6 +10,7 @@ export default function AdminHome() {
   const [query, setQuery] = useState("");
   const [rssItems, setRssItems] = useState([]);
   const [loadingRss, setLoadingRss] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // sa taas ng AdminHome component
 const [predictedViolation, setPredictedViolation] = useState("");
@@ -858,166 +859,200 @@ const handleReject = (req) => {
   // ------------------ Render ------------------
   return (
     <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#1f2937] text-white flex flex-col py-6 shadow-xl border-r border-gray-800">
-        <div className="flex items-center gap-3 px-4 mb-8">
-          <img
-            src="/cvsu-logo.png"
-            alt="logo"
-            className="w-11 h-11 rounded-md object-cover shadow-sm border border-gray-700"
-          />
-          <div>
-            <h1 className="text-lg font-semibold">GUIDANCE OFFICE</h1>
-            <p className="text-xs text-gray-300">CvSU — Admin</p>
-          </div>
-        </div>
 
-        <nav className="px-3 flex-1">
-          <div className="flex flex-col space-y-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActivePage(item.id)}
-                  className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg transition-all ${
-                    activePage === item.id ? "bg-green-600 shadow-inner" : "hover:bg-gray-700/60"
-                  }`}
-                >
-                  <Icon className="w-5 h-5 text-white" />
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+  {/* ================= BURGER BUTTON (MOBILE) ================= */}
+  <button
+    onClick={() => setSidebarOpen(true)}
+    className="lg:hidden absolute top-4 left-4 z-50 p-2 bg-[#1f2937] rounded-md text-white"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none"
+      viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
 
-        <div className="px-4 mt-auto pb-4">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-red-600 transition-colors"
-          >
-            <ArrowRightOnRectangleIcon className="w-5 h-5" />
-            <span className="font-medium">Logout</span>
-          </button>
-        </div>
-      </aside>
- 
-     <main className="flex-1 flex flex-col">
-     {/* Updated Header with Account Dropdown */}
-      <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-6 relative">
-        <div></div>
-
-      {/* USER ICON (TOP RIGHT) */}
-  <div className="relative">
-
-  {user.profile_pic && user.profile_pic !== "default.png" ? (
-    <img
-      src={
-        typeof user.profile_pic === "string"
-          ? user.profile_pic
-          : URL.createObjectURL(user.profile_pic)
-        }
-      alt="Profile"
-      className="w-10 h-10 rounded-full object-cover cursor-pointer"
-      onClick={() => setShowAccountDropdown((prev) => !prev)}
-      onError={(e) => {
-        e.target.src = ""; // clear broken image
-        setUser((prev) => ({ ...prev, profile_pic: null })); // fallback to icon
-      }}
-    />
-  ) : (
-    <UserCircleIcon
-      className="w-10 h-10 text-gray-300 cursor-pointer"
-      onClick={() => setShowAccountDropdown((prev) => !prev)}
+  {/* ================= BACKDROP (Mobile Only) ================= */}
+  {sidebarOpen && (
+    <div
+      className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+      onClick={() => setSidebarOpen(false)}
     />
   )}
 
-  {/* DROPDOWN */}
-  {showAccountDropdown && (
-    <div
-      id="account-dropdown"
-      className="absolute right-0 mt-2 w-64 bg-[#1f2937] text-white rounded-xl shadow-lg overflow-hidden z-50"
-    >
-      <div className="p-4 flex flex-col items-center space-y-2">
+  {/* ================= SIDEBAR ================= */}
+  <aside
+    className={`
+      w-64 bg-[#1f2937] text-white flex flex-col py-6 shadow-xl border-r border-gray-800
+      fixed lg:static inset-y-0 left-0 z-50 transform
+      transition-transform duration-300
+      ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+    `}
+  >
 
-        {/* DROPDOWN PROFILE PREVIEW */}
-        <div className="relative">
-          {profilePicPreview ||
-          (user.profile_pic && user.profile_pic !== "default.png") ? (
-            <img
-              src={
-                profilePicPreview ||
-                (typeof user.profile_pic === "string"
-                  ? user.profile_pic
-                  : URL.createObjectURL(user.profile_pic))
-              }
-              alt="Profile"
-              className="rounded-full w-16 h-16 object-cover"
-              onError={(e) => {
-                e.target.src = "";
-                setUser((prev) => ({ ...prev, profile_pic: null }));
+
+    {/* LOGO */}
+    <div className="flex items-center gap-3 px-4 mb-8">
+      <img
+        src="/cvsu-logo.png"
+        alt="logo"
+        className="w-11 h-11 rounded-md object-cover shadow-sm border border-gray-700"
+      />
+      <div>
+        <h1 className="text-lg font-semibold">GUIDANCE OFFICE</h1>
+        <p className="text-xs text-gray-300">CvSU — Admin</p>
+      </div>
+    </div>
+
+    {/* MENU */}
+    <nav className="px-3 flex-1 overflow-y-auto">
+      <div className="flex flex-col space-y-2">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActivePage(item.id);
+                setSidebarOpen(false); // auto close mobile
               }}
-            />
-          ) : (
-            <UserCircleIcon className="w-16 h-16 text-gray-400" />
-          )}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg transition-all ${
+                activePage === item.id ? "bg-green-600 shadow-inner" : "hover:bg-gray-700/60"
+              }`}
+            >
+              <Icon className="w-5 h-5 text-white" />
+              <span className="font-medium">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
 
-          {/* UPLOAD BUTTON */}
-          <label className="absolute bottom-0 right-0 w-6 h-6 bg-green-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-green-700 border-2 border-white">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+    {/* LOGOUT */}
+    <div className="px-4 mt-auto pb-4">
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-red-600 transition-colors"
+      >
+        <ArrowRightOnRectangleIcon className="w-5 h-5" />
+        <span className="font-medium">Logout</span>
+      </button>
+    </div>
+  </aside>
 
-                setProfilePicPreview(URL.createObjectURL(file));
+  {/* ================= MAIN CONTENT ================= */}
+  <main className="flex-1 flex flex-col lg:ml-0 ml-0">
 
-                const formData = new FormData();
-                formData.append("profile_pic", file);
-                formData.append("admin_id", user.id);
+    {/* HEADER */}
+    <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-6 relative">
+      <div></div>
+      {/* USER ICON (TOP RIGHT) */}
+      <div className="relative">
+        {user.profile_pic && user.profile_pic !== "default.png" ? (
+          <img
+            src={
+              typeof user.profile_pic === "string"
+                ? user.profile_pic
+                : URL.createObjectURL(user.profile_pic)
+            }
+            alt="Profile"
+            className="w-10 h-10 rounded-full object-cover cursor-pointer"
+            onClick={() => setShowAccountDropdown((prev) => !prev)}
+            onError={(e) => {
+              e.target.src = "";
+              setUser((prev) => ({ ...prev, profile_pic: null }));
+            }}
+          />
+        ) : (
+          <UserCircleIcon
+            className="w-10 h-10 text-gray-300 cursor-pointer"
+            onClick={() => setShowAccountDropdown((prev) => !prev)}
+          />
+        )}
 
-                try {
-                  const res = await fetch(
-                    "http://localhost:5000/admin/upload_profile",
-                    { method: "POST", body: formData }
-                  );
+        {showAccountDropdown && (
+          <div
+            id="account-dropdown"
+            className="absolute right-0 mt-2 w-64 bg-[#1f2937] text-white rounded-xl shadow-lg overflow-hidden z-50"
+          >
+            <div className="p-4 flex flex-col items-center space-y-2">
 
-                  const data = await res.json();
-                  if (res.ok) {
-                    setUser((prev) => ({
-                      ...prev,
-                      profile_pic: data.profile_pic,
-                    }));
-                  }
-                } catch (err) {
-                  console.error("Upload error:", err);
-                }
-              }}
-            />
-            <span className="text-white text-sm font-bold">+</span>
-          </label>
-        </div>
-            {/* Email */}
-            <p className="font-bold">Hi, Admin!</p>
-            <p className="text-sm text-gray-300">{user.email}</p>
-          </div>
-          </div>
+              <div className="relative">
+                {profilePicPreview ||
+                (user.profile_pic && user.profile_pic !== "default.png") ? (
+                  <img
+                    src={
+                      profilePicPreview ||
+                      (typeof user.profile_pic === "string"
+                        ? user.profile_pic
+                        : URL.createObjectURL(user.profile_pic))
+                    }
+                    alt="Profile"
+                    className="rounded-full w-16 h-16 object-cover"
+                    onError={(e) => {
+                      e.target.src = "";
+                      setUser((prev) => ({ ...prev, profile_pic: null }));
+                    }}
+                  />
+                ) : (
+                  <UserCircleIcon className="w-16 h-16 text-gray-400" />
                 )}
-          </div>
-        </header>
-        <section className="p-8 overflow-auto h-[calc(100vh-4rem)]">
-          <h2 className="text-3xl font-bold text-gray-700 mb-6">
-            {activePage === "trends" && "Behavioral Trends"}
-            {activePage === "records" && "Students Records"}
-            {activePage === "search" && "Students Violation"}
-            {activePage === "violation" && "Encode Violation (NLP)"}
-            {activePage === "uploadFileFormat" && "Upload File Format"}
-            {activePage === "news" && "News Management"}
-          </h2>
 
+                <label className="absolute bottom-0 right-0 w-6 h-6 bg-green-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-green-700 border-2 border-white">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+
+                      setProfilePicPreview(URL.createObjectURL(file));
+
+                      const formData = new FormData();
+                      formData.append("profile_pic", file);
+                      formData.append("admin_id", user.id);
+
+                      try {
+                        const res = await fetch(
+                          "http://localhost:5000/admin/upload_profile",
+                          { method: "POST", body: formData }
+                        );
+
+                        const data = await res.json();
+                        if (res.ok) {
+                          setUser((prev) => ({
+                            ...prev,
+                            profile_pic: data.profile_pic,
+                          }));
+                        }
+                      } catch (err) {
+                        console.error("Upload error:", err);
+                      }
+                    }}
+                  />
+                  <span className="text-white text-sm font-bold">+</span>
+                </label>
+              </div>
+
+              <p className="font-bold">Hi, Admin!</p>
+              <p className="text-sm text-gray-300">{user.email}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </header>
+
+    {/* PAGE CONTENT */}
+    <section className="p-8 overflow-auto h-[calc(100vh-4rem)]">
+      <h2 className="text-3xl font-bold text-gray-700 mb-6">
+        {activePage === "trends" && "Behavioral Trends"}
+        {activePage === "records" && "Students Records"}
+        {activePage === "search" && "Students Violation"}
+        {activePage === "violation" && "Encode Violation (NLP)"}
+        {activePage === "uploadFileFormat" && "Upload File Format"}
+        {activePage === "news" && "News Management"}
+      </h2>
     {/* Trends */}
       {activePage === "trends" && (
         <div className="space-y-8">
