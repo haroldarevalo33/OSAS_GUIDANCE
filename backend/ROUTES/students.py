@@ -6,6 +6,7 @@ from flask_cors import cross_origin
 import traceback
 import os
 import uuid
+from sqlalchemy import func
 
 # ===========================
 # Blueprint
@@ -25,14 +26,6 @@ def allowed_file(filename):
 
 
 # ===========================
-# Serve uploaded files
-# ===========================
-@student_bp.route("/uploads/<filename>")
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
-
-# ===========================
 # Helpers
 # ===========================
 def hash_password(pw):
@@ -47,6 +40,14 @@ def profile_url(filename):
     if not filename:
         return None
     return f"http://localhost:5000/students/uploads/{filename}?t={uuid.uuid4().hex}"
+
+
+# ===========================
+# Serve uploaded files
+# ===========================
+@student_bp.route("/uploads/<filename>")
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 # ===========================
@@ -68,7 +69,6 @@ def register_student():
         course = data.get("course", "")
         password = data.get("password")
 
-        # VALIDATIONS
         if not all([student_number, student_name, email, password]):
             return jsonify({"message": "Missing required fields"}), 400
 
@@ -78,14 +78,12 @@ def register_student():
         if phone and not phone.isdigit():
             return jsonify({"message": "Phone must contain only digits"}), 400
 
-        # CONFLICT CHECKS
         if Student.query.filter_by(student_number=student_number).first():
             return jsonify({"message": "Student number already exists"}), 409
 
         if Student.query.filter_by(email=email).first():
             return jsonify({"message": "Email already exists"}), 409
 
-        # OPTIONAL PHONE UNIQUE CHECK (if your DB enforces it)
         existing_phone = Student.query.filter_by(phone=phone).first()
         if phone and existing_phone:
             return jsonify({"message": "Phone already used"}), 409
@@ -107,13 +105,12 @@ def register_student():
 
     except Exception as e:
         db.session.rollback()
-        print("REGISTER ERROR:", e)
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500
 
 
 # ===========================
-# LOGIN STUDENT
+# LOGIN
 # ===========================
 @student_bp.route("/login", methods=["POST", "OPTIONS"])
 @cross_origin(origin="http://localhost:5173", supports_credentials=True)
@@ -156,13 +153,14 @@ def login_student():
 
 
 # ===========================
-# GET STUDENT BY QUERY
+# GET STUDENT BY ID OR NAME
 # ===========================
 @student_bp.route("/student", methods=["GET"])
 @cross_origin(origin="http://localhost:5173", supports_credentials=True)
 def get_student():
     try:
         query = request.args.get("query", "").strip()
+
         if not query:
             return jsonify({"student": None}), 200
 
@@ -207,6 +205,7 @@ def get_all_students():
         } for s in students]
 
         return jsonify(result), 200
+
     except Exception:
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500
@@ -236,7 +235,7 @@ def delete_student(id):
 
 
 # ===========================
-# GET STUDENT BY STUDENT NUMBER
+# GET STUDENT BY NUMBER
 # ===========================
 @student_bp.route("/by-number/<student_number>", methods=["GET"])
 @cross_origin(origin="http://localhost:5173", supports_credentials=True)
@@ -267,7 +266,7 @@ def get_student_by_number(student_number):
 
 
 # ===========================
-# UPDATE PROFILE PICTURE
+# UPDATE PROFILE PIC
 # ===========================
 @student_bp.route("/<student_number>/profile-pic", methods=["POST"])
 @cross_origin(origin="http://localhost:5173", supports_credentials=True)
@@ -288,13 +287,11 @@ def update_profile_pic(student_number):
         if not allowed_file(file.filename):
             return jsonify({"message": "Invalid file type"}), 400
 
-        # Delete old file
         if student.profile_pic:
             old_file = os.path.join(UPLOAD_FOLDER, student.profile_pic)
             if os.path.exists(old_file):
                 os.remove(old_file)
 
-        # Save new
         ext = os.path.splitext(file.filename)[1].lower()
         filename = f"{uuid.uuid4().hex}{ext}"
         file.save(os.path.join(UPLOAD_FOLDER, filename))
@@ -309,5 +306,63 @@ def update_profile_pic(student_number):
 
     except Exception:
         db.session.rollback()
+        traceback.print_exc()
+        return jsonify({"message": "Internal Server Error"}), 500
+
+# ===========================
+# FILTERED STUDENT RECORDS (FIXED)
+# ===========================
+@student_bp.route("/records", methods=["GET"])
+@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+def get_filtered_records():
+    try:
+        search = request.args.get("search", "").lower()
+        course = request.args.get("course", "ALL")
+        start_date = request.args.get("startDate")
+        end_date = request.args.get("endDate")
+        sort = request.args.get("sort", "DESC")
+
+        query = Student.query
+
+        concat_field = func.lower(
+            func.concat(
+                Student.student_name, " ",
+                Student.email, " ",
+                Student.phone, " ",
+                Student.course, " ",
+                Student.student_number
+            )
+        )
+
+        if search:
+            query = query.filter(concat_field.like(f"%{search}%"))
+
+        if course != "ALL":
+            query = query.filter(Student.course == course)
+
+        if start_date and end_date:
+            query = query.filter(
+                func.date(Student.created_at).between(start_date, end_date)
+            )
+
+        if sort == "ASC":
+            query = query.order_by(Student.created_at.asc())
+        else:
+            query = query.order_by(Student.created_at.desc())
+
+        results = [{
+            "id": s.id,
+            "student_number": s.student_number,
+            "student_name": s.student_name,
+            "email": s.email,
+            "phone": s.phone,
+            "course": s.course,
+            "created_at": s.created_at.strftime("%Y-%m-%d") if s.created_at else None,
+            "profile_pic": profile_url(s.profile_pic)
+        } for s in query.all()]
+
+        return jsonify(results), 200
+
+    except Exception:
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500

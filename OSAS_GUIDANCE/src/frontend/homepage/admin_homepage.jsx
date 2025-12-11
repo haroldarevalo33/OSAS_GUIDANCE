@@ -136,6 +136,9 @@ const [lineData, setLineData] = useState([]);
 const [sectionData, setSectionData] = useState([]);
 const chartColors = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6", "#14b8a6"];
 const [sections, setSections] = useState([]); // to track unique section names for bars/legend
+const [courseData, setCourseData] = useState([]);
+
+
 
 // FETCH CHART DATA
 useEffect(() => {
@@ -160,17 +163,37 @@ useEffect(() => {
         sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
       });
 
-      // Convert to array for Recharts
       const sectionArray = Object.keys(sectionCounts).map((sec) => ({
         section: sec,
         value: sectionCounts[sec],
       }));
 
       setSectionData(sectionArray);
-      setSections(Object.keys(sectionCounts)); // store unique section names
+      setSections(Object.keys(sectionCounts));
+
+      // 3️⃣ COURSE CHART (Case count per COURSE)
+      const courseCounts = {};
+
+      data.forEach((v) => {
+        if (!v.course_year_section) return;
+
+        // extract course = first word only
+        const course = v.course_year_section.split(" ")[0].toUpperCase().trim();
+
+        courseCounts[course] = (courseCounts[course] || 0) + 1;
+      });
+
+      const courseArray = Object.keys(courseCounts).map((course) => ({
+        course,
+        value: courseCounts[course],
+      }));
+
+      setCourseData(courseArray);  // <-- MAKE SURE you declared this state
+
     })
     .catch((err) => console.error("Failed to fetch violations:", err));
 }, []);
+
 
 
   //email
@@ -421,7 +444,7 @@ const handlePreviewFile = (file) => {
 
   const menuItems = [
     { id: "trends", label: "View Trends", icon: ChartBarIcon },
-    { id: "records", label: "Students Record", icon: UserGroupIcon},
+    { id: "records", label: "Accounts Record", icon: UserGroupIcon},
     { id: "search", label: "Students Violation", icon: MagnifyingGlassIcon },
     { id: "violation", label: "Encode Violation", icon: PencilSquareIcon },
     { id: "uploadFileFormat", label: "Upload File Format", icon: DocumentPlusIcon }, // updated icon
@@ -584,12 +607,9 @@ async function handleSubmitViolation() {
   } catch (err) {
     // Handle any unexpected errors
     console.error(err);
-    Swal.fire({ icon: "error", title: "Error", text: "Failed to submit violation." });
+    Swal.fire({ icon: "error", title: "Error", text: "Invalid or Wrong Student Number." });
   }
 }
-
-
-
 
   // ------------------ View Student Info (opens modal) ------------------
   function viewStudentInfo(student) {
@@ -856,6 +876,172 @@ const handleReject = (req) => {
   setShowRequestDetails(false);
 };
 
+// ===================== STATES ===================== //
+const [courseFilter, setCourseFilter] = useState("ALL");
+const [dateFrom, setDateFrom] = useState("");
+const [dateTo, setDateTo] = useState("");
+const [sortOrder, setSortOrder] = useState("ASC");
+
+
+// ===================== FETCH WHEN FILTERS CHANGE ===================== //
+useEffect(() => {
+  const fetchRecords = async () => {
+    try {
+      const params = new URLSearchParams({
+        search: query || "",
+        course: courseFilter.toUpperCase(),
+        startDate: dateFrom || "",
+        endDate: dateTo || "",
+        sort: sortOrder.toUpperCase(),
+      });
+
+      const res = await fetch(`http://localhost:5000/students/records?${params}`);
+      const data = await res.json();
+
+      setStudents(data);
+      setFilteredStudents(data);
+
+    } catch (err) {
+      console.error("Error fetching records:", err);
+    }
+  };
+
+  fetchRecords();
+}, [query, courseFilter, dateFrom, dateTo, sortOrder]);
+
+
+// ===================== FETCH WHEN OPENING PAGE ===================== //
+useEffect(() => {
+  if (activePage !== "records") return;
+
+  const load = async () => {
+    const params = new URLSearchParams({
+      search: query || "",
+      course: courseFilter.toUpperCase(),
+      startDate: dateFrom || "",
+      endDate: dateTo || "",
+      sort: sortOrder.toUpperCase(),
+    });
+
+    const res = await fetch(`http://localhost:5000/students/records?${params}`);
+    const data = await res.json();
+
+    setStudents(data);
+    setFilteredStudents(data);
+  };
+
+  load();
+}, [activePage]);
+
+
+// ===================== RESET WHEN LEAVING ===================== //
+useEffect(() => {
+  if (activePage === "records") return;
+
+  setQuery("");
+  setCourseFilter("ALL");
+  setDateFrom("");
+  setDateTo("");
+  setSortOrder("ASC");
+
+  handleViewStudent(null);
+  handleDeleteStudent(null);
+
+}, [activePage]);
+
+// ===================== SWEETALERT: VIEW ===================== //
+useEffect(() => {
+  if (!viewStudent) return;
+
+  Swal.fire({
+    title: `<strong>${viewStudent.student_name}</strong>`,
+    html: `
+      <div style="text-align:left; font-size:16px; line-height:1.6;">
+        <p><strong>Student Number:</strong> ${viewStudent.student_number}</p>
+        <p><strong>Email:</strong> ${viewStudent.email}</p>
+        <p><strong>Phone:</strong> ${viewStudent.phone}</p>
+        <p><strong>Course:</strong> ${viewStudent.course}</p>
+        <p><strong>Date Registered:</strong> ${
+          viewStudent.created_at?.slice(0,10) || "—"
+        }</p>
+      </div>
+    `,
+    width: 450,
+    confirmButtonText: "Close",
+  }).then(() => setViewStudent(null));
+}, [viewStudent]);
+
+// ===================== SWEETALERT: DELETE ===================== //
+useEffect(() => {
+  if (!deleteStudent) return;
+
+  Swal.fire({
+    title: "Confirm Delete",
+    html: `Are you sure you want to delete <strong>${deleteStudent.student_name}</strong>?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#6c757d",
+    confirmButtonText: "Delete",
+    cancelButtonText: "Cancel",
+  }).then((res) => {
+    if (res.isConfirmed) {
+      handleConfirmDelete(deleteStudent);
+
+      Swal.fire({
+        title: "Deleted!",
+        text: `${deleteStudent.student_name} has been removed.`,
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    }
+
+    setDeleteStudent(null);
+  });
+}, [deleteStudent]);
+
+//-----------------Filter Search Violation---------------//
+// ========================
+// FETCH FILTERED RESULTS
+// ========================
+const fetchFilteredViolations = async () => {
+  try {
+    const params = new URLSearchParams();
+
+    // q (search text)
+    if (query.trim() !== "") {
+      params.append("q", query.trim());
+    }
+
+    // course
+    if (courseFilter !== "ALL") {
+      params.append("course", courseFilter);
+    }
+
+    // date range
+    if (dateFrom) params.append("startDate", dateFrom);
+    if (dateTo) params.append("endDate", dateTo);
+
+    // sort (ASC or DESC)
+    params.append("sort", sortOrder);
+
+    const response = await fetch(
+      `http://localhost:5000/violations/search?${params.toString()}`
+    );
+
+    const data = await response.json();
+
+    setViolations(data); // UPDATE TABLE
+  } catch (error) {
+    console.error("Filter fetch error:", error);
+  }
+};
+useEffect(() => {
+  fetchFilteredViolations();
+}, [query, courseFilter, dateFrom, dateTo, sortOrder]);
+
+
   // ------------------ Render ------------------
   return (
     <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
@@ -1047,7 +1233,7 @@ const handleReject = (req) => {
     <section className="p-8 overflow-auto h-[calc(100vh-4rem)]">
       <h2 className="text-3xl font-bold text-gray-700 mb-6">
         {activePage === "trends" && "Behavioral Trends"}
-        {activePage === "records" && "Students Records"}
+        {activePage === "records" && "Student Account Records"}
         {activePage === "search" && "Students Violation"}
         {activePage === "violation" && "Encode Violation (NLP)"}
         {activePage === "uploadFileFormat" && "Upload File Format"}
@@ -1079,55 +1265,55 @@ const handleReject = (req) => {
             </ResponsiveContainer>
           </div>
           {/* BAR CHART */}
-<div className="bg-white p-6 rounded-xl shadow-lg">
-  <h3 className="text-xl font-semibold text-gray-700 mb-4">
-    Case Count Per Section
-  </h3>
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <h3 className="text-xl font-semibold text-gray-700 mb-4">
+              Case Count Per Section
+            </h3>
 
-  <ResponsiveContainer width="100%" height={350}>
-    <BarChart data={sectionData} barCategoryGap="30%">
-      <CartesianGrid stroke="#e5e7eb" />
-      <XAxis dataKey="section" />
-      <YAxis />
-      <Tooltip />
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={sectionData} barCategoryGap="30%">
+                <CartesianGrid stroke="#e5e7eb" />
+                <XAxis dataKey="section" />
+                <YAxis />
+                <Tooltip />
 
-      {/* Centered legend */}
-      <Legend
-        verticalAlign="bottom"
-        align="center"
-        height={60} // adjust spacing if needed
-        content={() => (
-          <div className="flex flex-wrap justify-center gap-4 mt-2">
-            {sectionData.map((entry, index) => (
-              <div key={entry.section} className="flex items-center gap-1">
-                <span
-                  className="w-4 h-4 block"
-                  style={{ backgroundColor: chartColors[index % chartColors.length] }}
-                ></span>
-                <span className="text-gray-700">{entry.section}</span>
-              </div>
-            ))}
+                {/* Centered legend */}
+                <Legend
+                  verticalAlign="bottom"
+                  align="center"
+                  height={60} // adjust spacing if needed
+                  content={() => (
+                    <div className="flex flex-wrap justify-center gap-4 mt-2">
+                      {sectionData.map((entry, index) => (
+                        <div key={entry.section} className="flex items-center gap-1">
+                          <span
+                            className="w-4 h-4 block"
+                            style={{ backgroundColor: chartColors[index % chartColors.length] }}
+                          ></span>
+                          <span className="text-gray-700">{entry.section}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                />
+
+                {/* Single Bar with per-cell colors */}
+                <Bar dataKey="value">
+                  {sectionData.map((entry, index) => (
+                    <Cell
+                      key={entry.section}
+                      fill={chartColors[index % chartColors.length]}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        )}
-      />
-
-      {/* Single Bar with per-cell colors */}
-      <Bar dataKey="value">
-        {sectionData.map((entry, index) => (
-          <Cell
-            key={entry.section}
-            fill={chartColors[index % chartColors.length]}
-          />
-        ))}
-      </Bar>
-    </BarChart>
-  </ResponsiveContainer>
-</div>
 
             {/* PIE CHART */}
             <div className="bg-white p-6 rounded-xl shadow-lg">
               <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                Case Distribution by Section
+                Case Distribution by Course
               </h3>
 
               <ResponsiveContainer width="100%" height={350}>
@@ -1135,21 +1321,25 @@ const handleReject = (req) => {
                   <Tooltip />
                   <Legend />
                   <Pie
-                    data={sectionData}
-                    dataKey="value"
-                    nameKey="section"
+                    data={courseData}          // <-- course data
+                    dataKey="value"            // <-- number of cases per course
+                    nameKey="course"           // <-- label = course (BSIT, BSBA...)
                     cx="50%"
                     cy="50%"
                     outerRadius={120}
                     label
                   >
-                    {sectionData.map((entry, index) => (
-                      <Cell key={index} fill={chartColors[index % chartColors.length]} />
+                    {courseData.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={chartColors[index % chartColors.length]}
+                      />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
             </div>
+
           </div>
             )}
 
@@ -1177,676 +1367,685 @@ const handleReject = (req) => {
             </div>
           )}
 
-  {/* Search Students */}
-{activePage === "search" && (
-  <div className="space-y-6">
+        {/* Search Students */}
+        {activePage === "search" && (
+          <div className="space-y-6">
 
-    {/* Search Section (Side) */}
-    <div className="flex items-center space-x-4 w-full p-4">
+            {/* Search Section (Aligned to Backend Filters) */}
+              <div className="flex flex-wrap items-center gap-4 w-full p-4 bg-blue-50 rounded-lg shadow">
 
-      {/* Search Input */}
-      <div className="flex items-center space-x-2 w-3/8">
-        {/* Search Icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-5 w-5 text-gray-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-4.35-4.35M5 11a6 6 0 1112 0 6 6 0 01-12 0z"
-          />
-        </svg>
-
-        {/* Search Input */}
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search student..."
-          className="w-full pl-3 pr-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
-      </div>
-
-      {/* Category Dropdown */}
-      <select
-        value={filterCategory}
-        onChange={(e) => setFilterCategory(e.target.value)}
-        className="border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-      >
-        <option value="all">All</option>
-        <option value="name">Name</option>
-        <option value="id">ID</option>
-        <option value="course">Course</option>
-        <option value="violation">Violation</option>
-        <option value="gender">Gender</option>
-        <option value="date">Date</option>
-      </select>
-    </div>
-
-    {/* TABLE */}
-    <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-      <table className="w-full text-left">
-        <thead className="bg-gray-200 text-gray-700">
-          <tr>
-            {(filterCategory === "all" || filterCategory === "id") && <th className="py-3 px-4">Student Number</th>}
-            {(filterCategory === "all" || filterCategory === "name") && <th className="py-3 px-4">Student Name</th>}
-            {(filterCategory === "all" || filterCategory === "gender") && <th className="py-3 px-4">Gender</th>}
-            {(filterCategory === "all" || filterCategory === "course") && <th className="py-3 px-4">Course/Year/Section</th>}
-            {(filterCategory === "all" || filterCategory === "date") && <th className="py-3 px-4">Date</th>}
-            {(filterCategory === "all" || filterCategory === "violation") && <th className="py-3 px-4">Violation</th>}
-            <th className="py-3 px-10">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {(() => {
-            const filtered = violations.filter((v) => {
-              const q = (query || "").toLowerCase();
-              if (!q) return true;
-
-              const studentName = (v.student_name || "").toLowerCase();
-              const studentId = String(v.student_id || "");
-              const course = (v.course_year_section || "").toLowerCase();
-              const violationText = (v.violation_text || "").toLowerCase();
-              const dateStr = v.violation_date
-                ? new Date(v.violation_date).toLocaleDateString("en-US")
-                : "";
-              const gender = v.gender?.toLowerCase() || "";
-
-              switch (filterCategory) {
-                case "name":
-                  return studentName.includes(q);
-                case "id":
-                  return studentId.includes(q);
-                case "course":
-                  return course.includes(q);
-                case "violation":
-                  return violationText.includes(q);
-                case "date":
-                  return dateStr.includes(q);
-                case "gender":
-                  return gender.includes(q); // Searching gender filter
-                case "all":
-                default:
-                  return (
-                    studentName.includes(q) ||
-                    studentId.includes(q) ||
-                    course.includes(q) ||
-                    violationText.includes(q) ||
-                    dateStr.includes(q) ||
-                    gender.includes(q)
-                  );
-              }
-            });
-
-            if (filtered.length === 0) {
-              return (
-                <tr>
-                  <td colSpan="7" className="text-center py-6 text-gray-500">
-                    No results found. Type to search...
-                  </td>
-                </tr>
-              );
-            }
-
-            const formatDate = (dateStr) => {
-              if (!dateStr) return "";
-              const date = new Date(dateStr);
-              const mm = String(date.getMonth() + 1).padStart(2, "0");
-              const dd = String(date.getDate()).padStart(2, "0");
-              const yy = String(date.getFullYear()).slice(-2);
-              return `${mm}/${dd}/${yy}`;
-            };
-
-            return filtered.map((v, idx) => (
-              <tr key={idx} className="border-b last:border-b-0">
-                {(filterCategory === "all" || filterCategory === "id") && <td className="py-3 px-4">{v.student_id}</td>}
-                {(filterCategory === "all" || filterCategory === "name") && <td className="py-3 px-4">{v.student_name}</td>}
-                {(filterCategory === "all" || filterCategory === "gender") && <td className="py-3 px-4">{v.gender}</td>}
-                {(filterCategory === "all" || filterCategory === "course") && <td className="py-3 px-4">{v.course_year_section}</td>}
-                {(filterCategory === "all" || filterCategory === "date") && <td className="py-3 px-4">{formatDate(v.violation_date)}</td>}
-                {(filterCategory === "all" || filterCategory === "violation") && <td className="py-3 px-4">{v.violation_text}</td>}
-
-                <td className="py-3 px-4">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setCurrentViolation(v); // Set the clicked violation details
-                        setShowViolationDetailsModal(true); // Open modal
-                      }}
-                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => handleDeleteViolation(v)}
-                      className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ));
-          })()}
-        </tbody>
-      </table>
-    </div>
-  </div>
-)}
-
-{/* Modal for Viewing Violation Details */}
-{showViolationDetailsModal && currentViolation && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center">
-    <div className="absolute inset-0 bg-black opacity-50"></div>
-
-    <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 z-10 overflow-y-auto max-h-[80vh]">
-      <button
-        onClick={() => setShowViolationDetailsModal(false)}
-        className="absolute top-4 right-4 text-gray-600 hover:text-gray-800"
-      >
-        ✕
-      </button>
-
-      <h3 className="text-2xl font-semibold text-gray-800 mb-4">Violation Details</h3>
-
-      <div className="space-y-4">
-        {/* Student Info */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Student Name</label>
-            <p className="text-lg text-gray-900">{currentViolation.student_name}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Student ID</label>
-            <p className="text-lg text-gray-900">{currentViolation.student_id}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Course/Year/Section</label>
-            <p className="text-lg text-gray-900">{currentViolation.course_year_section}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Gender</label>
-            <p className="text-lg text-gray-900">{currentViolation.gender}</p>
-          </div>
-        </div>
-
-        {/* Violation Info */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Violation</label>
-            <input
-              type="text"
-              value={currentViolation.predicted_violation || "—"}
-              readOnly
-              className="w-full p-3 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-700 focus:ring-2 focus:ring-green-500 text-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Section</label>
-            <input
-              type="text"
-              value={currentViolation.predicted_section || "—"}
-              readOnly
-              className="w-full p-3 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-700 focus:ring-2 focus:ring-green-500 text-lg"
-            />
-          </div>
-        </div>
-
-        {/* Admin Note */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Violation Text (Admin Note)</label>
-          <textarea
-            value={currentViolation.violation_text || "No violation text available."}
-            readOnly
-            className="w-full p-3 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-700 resize-none"
-            rows={4}
-          />
-        </div>
-
-        {/* Standard Model Text */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Standard Model-Generated Text</label>
-          <textarea
-            value={currentViolation.standard_text || "No standard violation text available."}
-            readOnly
-            className="w-full p-3 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-700 resize-none"
-            rows={4}
-          />
-        </div>
-
-        {/* Date */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-          <input
-            type="text"
-            value={currentViolation.violation_date || "—"}
-            readOnly
-            className="w-full p-3 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-700 focus:ring-2 focus:ring-green-500 text-lg"
-          />
-        </div>
-      </div>
-
-      {/* Actions: Close (red) + Download */}
-      <div className="flex justify-end gap-4 mt-6">
-        <button
-          onClick={() => setShowViolationDetailsModal(false)}
-          className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-        >
-          Close
-        </button>
-
-        <button
-          onClick={async () => {
-            const doc = new Document({
-              sections: [
-                {
-                  properties: {},
-                  children: [
-                    new Paragraph({ children: [new TextRun({ text: "Student Violation Record", bold: true, size: 28 })] }),
-                    new Paragraph({ children: [new TextRun("")] }),
-                    new Paragraph({ children: [new TextRun(`Student Name: ${currentViolation.student_name}`)] }),
-                    new Paragraph({ children: [new TextRun(`Student ID: ${currentViolation.student_id}`)] }),
-                    new Paragraph({ children: [new TextRun(`Course/Year/Section: ${currentViolation.course_year_section}`)] }),
-                    new Paragraph({ children: [new TextRun(`Gender: ${currentViolation.gender}`)] }),
-                    new Paragraph({ children: [new TextRun(`Violation: ${currentViolation.predicted_violation || "—"}`)] }),
-                    new Paragraph({ children: [new TextRun(`Section: ${currentViolation.predicted_section || "—"}`)] }),
-                    new Paragraph({ children: [new TextRun(`Admin Note: ${currentViolation.violation_text || "—"}`)] }),
-                    new Paragraph({ children: [new TextRun(`Standard Model Text: ${currentViolation.standard_text || "—"}`)] }),
-                    new Paragraph({ children: [new TextRun(`Date: ${currentViolation.violation_date || "—"}`)] }),
-                  ],
-                },
-              ],
-            });
-
-            const blob = await Packer.toBlob(doc);
-            saveAs(blob, `${currentViolation.student_name}_Violation.docx`);
-          }}
-          className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          Download as DOCX
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-    {/* Encode Violation Section */}
-    {activePage === "violation" && (
-      <div className="space-y-4">
-        {/* Button to open modal */}
-        <div className="mb-6">
-          <button
-            onClick={() => setShowViolationModal(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-          >
-            Encode New Violation
-          </button>
-        </div>
-
-        {/* Violation Modal for Submission */}
-        {showViolationModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Full-screen solid black overlay */}
-            <div className="absolute inset-0 bg-black opacity-70"></div>
-
-            {/* Modal content */}
-            <div className="relative bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 z-10 overflow-y-auto max-h-[90vh]">
-              <button
-                onClick={() => {
-                  setShowViolationModal(false);
-                  setStudentInfo(null);
-                }}
-                className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
-
-              <h3 className="text-2xl font-semibold text-gray-700 mb-6">Encode Student Violation</h3>
-
-              {/* Form Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-                  <input
-                    type="text"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="Enter student full name"
-                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Student Number</label>
-                  <input
-                    type="number"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    placeholder="Enter student number"
-                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Course/Year/Section</label>
-                  <input
-                    type="text"
-                    value={courseYearSection}
-                    onChange={(e) => setCourseYearSection(e.target.value)}
-                    placeholder="Enter Course/Year/Section"
-                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                {/* Search Input (q) */}
+                <div className="flex items-center space-x-2 flex-1 min-w-[250px] bg-white px-3 py-2 rounded-lg shadow-inner border border-blue-300">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 text-blue-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
                   >
-                    <option value="">Select gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
-                </div>
-              </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-4.35-4.35M5 11a6 6 0 1112 0 6 6 0 01-12 0z"
+                    />
+                  </svg>
 
-              {/* Violation Text */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Interview Text</label>
-                <textarea
-                  value={violationText}
-                  onChange={async (e) => {
-                    const value = e.target.value;
-                    setViolationText(value);
-
-                    if (value.trim() !== "") {
-                      try {
-                        const res = await fetch("http://127.0.0.1:5000/predict", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ text: value }),
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          setPredictedViolation(data.predicted_violation || "—");
-                          setPredictedSection(data.predicted_section || "—");
-                          setPredictiveText(data.predictive_text || "—");
-                          setStandardText(data.standard_text || "No standard violation text available.");
-                        }
-                      } catch (err) {
-                        console.error("Prediction error:", err);
-                        setPredictedViolation("—");
-                        setPredictedSection("—");
-                        setPredictiveText("—");
-                        setStandardText("No standard violation text available.");
-                      }
-                    } else {
-                      setPredictedViolation("—");
-                      setPredictedSection("—");
-                      setPredictiveText("—");
-                      setStandardText("No standard violation text available.");
-                    }
-                  }}
-                  placeholder="Write interview details or violation text…"
-                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  rows={5}
-                />
-              </div>
-
-              {/* Display Predicted Violation & Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Predicted Violation</label>
                   <input
                     type="text"
-                    readOnly
-                    value={predictedViolation || "—"}
-                    className="w-full p-2 border rounded-lg bg-gray-100"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search anything (name, id, text...)"
+                    className="w-full bg-transparent focus:outline-none text-gray-700"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Predicted Section</label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={predictedSection || "—"}
-                    className="w-full p-2 border rounded-lg bg-gray-100"
-                  />
-                </div>
-              </div>
 
-              {/* Display Predictive Text */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Predictive Text (Top-3)</label>
-                <textarea
-                  value={predictiveText || "—"}
-                  readOnly
-                  className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
-                  rows={3}
-                />
-              </div>
+                {/* Course Filter */}
+                <select
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(e.target.value)}
+                  className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">All Courses</option>
+                  <option value="BEED">BEED</option>
+                  <option value="BSED">BSED</option>
+                  <option value="BSBM">BSBM</option>
+                  <option value="BSCS">BSCS</option>
+                  <option value="BSHM">BSHM</option>
+                  <option value="BSIT">BSIT</option>
+                  <option value="BSFAS">BSFAS</option>
+                </select>
 
-              {/* Display Standard Text */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Standard Model-Generated Text</label>
-                <textarea
-                  value={standardText || "No standard violation text available."}
-                  readOnly
-                  className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Date (auto-filled to current date) */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                {/* Date Range */}
                 <input
                   type="date"
-                  value={violationDate}
-                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  onChange={(e) => setViolationDate(e.target.value)}
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
                 />
+
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
+                />
+
+                {/* Sort ASC / DESC */}
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
+                >
+                  <option value="ASC">A → Z</option>
+                  <option value="DESC">Z → A</option>
+                </select>
               </div>
 
-              {/* Buttons */}
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setShowViolationModal(false);
-                    setStudentInfo(null);
-                  }}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitViolation}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Submit Violation
-                </button>
-              </div>
+            {/* TABLE */}
+            <div className="bg-white shadow-xl rounded-lg overflow-hidden border border-blue-300">
+              <table className="w-full text-left">
+                <thead className="bg-blue-600 text-white">
+                  <tr>
+                    {(filterCategory === "all" || filterCategory === "id") && (
+                      <th className="py-[11px] px-3 text-sm font-semibold">Student Number</th>
+                    )}
+                    {(filterCategory === "all" || filterCategory === "name") && (
+                      <th className="py-[11px] px-3 text-sm font-semibold">Student Name</th>
+                    )}
+                    {(filterCategory === "all" || filterCategory === "gender") && (
+                      <th className="py-[11px] px-3 text-sm font-semibold">Gender</th>
+                    )}
+                    {(filterCategory === "all" || filterCategory === "course") && (
+                      <th className="py-[11px] px-3 text-sm font-semibold">Course/Year/Section</th>
+                    )}
+                    {(filterCategory === "all" || filterCategory === "date") && (
+                      <th className="py-[11px] px-3 text-sm font-semibold">Date</th>
+                    )}
+                    {(filterCategory === "all" || filterCategory === "violation") && (
+                      <th className="py-[11px] px-3 text-sm font-semibold">Violation</th>
+                    )}
+                    <th className="py-[11px] px-6 text-sm font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const filtered = violations.filter((v) => {
+                      const q = (query || "").toLowerCase();
+                      if (!q) return true;
+
+                      const studentName = (v.student_name || "").toLowerCase();
+                      const studentId = String(v.student_id || "");
+                      const course = (v.course_year_section || "").toLowerCase();
+                      const violationText = (v.violation_text || "").toLowerCase();
+                      const dateStr = v.violation_date
+                        ? new Date(v.violation_date).toLocaleDateString("en-US")
+                        : "";
+                      const gender = v.gender?.toLowerCase() || "";
+
+                      switch (filterCategory) {
+                        case "name":
+                          return studentName.includes(q);
+                        case "id":
+                          return studentId.includes(q);
+                        case "course":
+                          return course.includes(q);
+                        case "violation":
+                          return violationText.includes(q);
+                        case "date":
+                          return dateStr.includes(q);
+                        case "gender":
+                          return gender.includes(q);
+                        case "all":
+                        default:
+                          return (
+                            studentName.includes(q) ||
+                            studentId.includes(q) ||
+                            course.includes(q) ||
+                            violationText.includes(q) ||
+                            dateStr.includes(q) ||
+                            gender.includes(q)
+                          );
+                      }
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="7" className="text-center py-6 text-gray-500">
+                            No results found. Type to search...
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const formatDate = (dateStr) => {
+                      if (!dateStr) return "";
+                      const date = new Date(dateStr);
+                      const mm = String(date.getMonth() + 1).padStart(2, "0");
+                      const dd = String(date.getDate()).padStart(2, "0");
+                      const yy = String(date.getFullYear()).slice(-2);
+                      return `${mm}/${dd}/${yy}`;
+                    };
+
+                    return filtered.map((v, idx) => (
+                      <tr
+                        key={idx}
+                        className="border-b border-blue-200 last:border-b-0 hover:bg-blue-100 transition"
+                      >
+                        {(filterCategory === "all" || filterCategory === "id") && (
+                          <td className="py-3 px-4">{v.student_id}</td>
+                        )}
+                        {(filterCategory === "all" || filterCategory === "name") && (
+                          <td className="py-3 px-4">{v.student_name}</td>
+                        )}
+                        {(filterCategory === "all" || filterCategory === "gender") && (
+                          <td className="py-3 px-4">{v.gender}</td>
+                        )}
+                        {(filterCategory === "all" || filterCategory === "course") && (
+                          <td className="py-3 px-4">{v.course_year_section}</td>
+                        )}
+                        {(filterCategory === "all" || filterCategory === "date") && (
+                          <td className="py-3 px-4">{formatDate(v.violation_date)}</td>
+                        )}
+                        {(filterCategory === "all" || filterCategory === "violation") && (
+                          <td className="py-3 px-4">{v.violation_text}</td>
+                        )}
+
+                        <td className="py-3 px-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setCurrentViolation(v);
+                                setShowViolationDetailsModal(true);
+                              }}
+                              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+                            >
+                              View
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteViolation(v)}
+                              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* Violation Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-          {violations.length === 0 ? (
-            <p className="text-gray-500 col-span-full">No violation records yet.</p>
-          ) : (
-          violations.map((v, idx) => {
-        // Format violation date to MM/DD/YY
-        const date = new Date(v.violation_date);
-        const mm = String(date.getMonth() + 1).padStart(2, "0");
-        const dd = String(date.getDate()).padStart(2, "0");
-        const yy = String(date.getFullYear()).slice(-2);
-        const formattedDate = `${mm}/${dd}/${yy}`;
+  {showViolationDetailsModal && currentViolation && (() => {
+  const v = currentViolation;
 
-      return (
-        <div
-          key={idx}
-          className="bg-white p-5 rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-          onClick={() => {
-            // Pass formattedDate with the violation
-            setCurrentViolation({ ...v, formattedDate });
-            setShowViolationDetailsModal(true); // Open modal
-          }}
-        >
-          <p className="font-semibold text-gray-700 text-lg mb-2">
-            {v.student_name} (Number: {v.student_id})
-          </p>
-          <p className="text-gray-600 mb-1">Gender: {v.gender}</p>
-          <p className="text-gray-600 mb-1">CYS: {v.course_year_section}</p>
+  // ===== DOCX DOWNLOAD FUNCTION ===== //
+  const downloadDocx = async () => {
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Student Violation Record",
+                  bold: true,
+                  size: 32,
+                }),
+              ],
+            }),
+            new Paragraph(""),
 
-          {/* DESCRIPTION (truncated to prevent overflow) */}
-          <p className="text-gray-600 mb-1 truncate" title={v.violation_text}>
-            Admin Note: {v.violation_text}
-          </p>
+            new Paragraph(`Student Name: ${v.student_name}`),
+            new Paragraph(`Student ID: ${v.student_id}`),
+            new Paragraph(`Course/Year/Section: ${v.course_year_section}`),
+            new Paragraph(`Gender: ${v.gender}`),
+            new Paragraph(`Violation: ${v.predicted_violation || "—"}`),
+            new Paragraph(`Section: ${v.predicted_section || "—"}`),
+            new Paragraph(`Admin Note: ${v.violation_text || "—"}`),
+            new Paragraph(`Standard Model Text: ${v.standard_text || "—"}`),
+            new Paragraph(`Date: ${v.violation_date || "—"}`),
+          ],
+        },
+      ],
+    });
 
-          {/* SECTION */}
-          <p className="text-gray-600 mb-1">Section: {v.predicted_section || "—"}</p>
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `${v.student_name}_Violation.docx`);
+  };
 
-          {/* VIOLATION */}
-          <p className="text-gray-600 mb-2">Violation: {v.predicted_violation || "—"}</p>
+  // ===== SWEETALERT POPUP ===== //
+  Swal.fire({
+    title: `<strong style="font-size:22px;">Violation Details</strong>`,
+    width: 750,
+    background: "#ffffff",
+    showCloseButton: true,
+    confirmButtonText: "Close",
+    confirmButtonColor: "#d33",
 
-          <p className="text-sm text-gray-400">Date: {formattedDate}</p>
+    showDenyButton: true,
+    denyButtonText: "Download DOCX",
+    denyButtonColor: "#3085d6",
+
+    html: `
+      <div style="text-align:left; font-size:15px;">
+
+        <div style="font-size:20px; font-weight:bold; margin-bottom:10px; text-align:center;">
+          ${v.student_name}
         </div>
-      );
-    })
 
-      )}
+        <hr style="margin:10px 0;">
+
+        <p><b>Student ID:</b> ${v.student_id}</p>
+        <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
+        <p><b>Gender:</b> ${v.gender}</p>
+
+        <hr style="margin:10px 0;">
+
+        <p><b>Violation:</b> ${v.predicted_violation || "—"}</p>
+        <p><b>Section:</b> ${v.predicted_section || "—"}</p>
+
+        <p style="margin-top:10px;"><b>Admin Note:</b><br>
+        ${v.violation_text || "No violation text available."}</p>
+
+        <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
+        ${v.standard_text || "No standard violation text available."}</p>
+
+        <p style="margin-top:10px;"><b>Date:</b> ${v.violation_date || "—"}</p>
+
+      </div>
+    `,
+  }).then((result) => {
+    if (result.isDenied) {
+      downloadDocx();
+    }
+  });
+
+  setShowViolationDetailsModal(false);
+})()}
+{/* ======================= VIOLATION SECTION ======================= */}
+{activePage === "violation" && (
+  <div className="space-y-4">
+
+    {/* Open Modal Button */}
+    <div className="mb-6">
+      <button
+        onClick={() => setShowViolationModal(true)}
+        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+      >
+        Encode New Violation
+      </button>
     </div>
 
-  {/* Modal for Viewing Violation Details */}
-{showViolationDetailsModal && currentViolation && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center">
-    {/* Full-screen solid black overlay */}
-    <div className="absolute inset-0 bg-black opacity-70"></div>
+   {/* ======================= VIOLATION FORM MODAL ======================= */}
+{showViolationModal && (
+<div className="fixed inset-0 z-[100] flex items-center justify-center">
 
-    {/* Modal content */}
-    <div className="relative bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 z-10 overflow-y-auto max-h-[90vh]">
+  {/* Dark Background (NO BLUR) */}
+  <div className="absolute inset-0 bg-black/70"></div>
+  
+
+    {/* FORM MODAL */}
+      <div
+        className="w-full h-full max-w-4xl max-h-[90vh] overflow-y-auto
+        bg-[#e8f5e9] border border-green-300 rounded-2xl shadow-2xl
+        p-5 relative"
+      >
+      {/* Close Button */}
       <button
-        onClick={() => setShowViolationDetailsModal(false)}
-        className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+        onClick={() => {
+          setShowViolationModal(false);
+          setStudentInfo(null);
+        }}
+        className="absolute top-4 right-4 text-gray-600 hover:text-black text-xl"
       >
         ✕
       </button>
 
-      <h3 className="text-2xl font-semibold text-gray-700 mb-6">Violation Details</h3>
+      <h3 className="text-2xl font-semibold text-green-700 mb-6">
+        Encode Student Violation
+      </h3>
 
-      <div className="space-y-4">
-        {/* Display Student Info in a Formal Layout */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-            <p className="text-gray-700">{currentViolation.student_name}</p>
-          </div>
+      {/* ================= FORM FIELDS ================ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
-            <p className="text-gray-700">{currentViolation.student_id}</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Course/Year/Section</label>
-            <p className="text-gray-700">{currentViolation.course_year_section}</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-            <p className="text-gray-700">{currentViolation.gender}</p>
-          </div>
-        </div>
-
-        {/* Display Violation Info (Editable or Read-Only Fields) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Violation</label>
-            <input
-              type="text"
-              value={currentViolation.predicted_violation || "—"}
-              readOnly
-              className="w-full p-2 border rounded-lg bg-gray-100"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-            <input
-              type="text"
-              value={currentViolation.predicted_section || "—"}
-              readOnly
-              className="w-full p-2 border rounded-lg bg-gray-100"
-            />
-          </div>
-        </div>
-
-        {/* Violation Text (Admin Note) */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Violation Text (Admin Note)</label>
-          <textarea
-            value={currentViolation.violation_text || "No violation text available."}
-            readOnly
-            className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
-            rows={3}
-          />
-        </div>
-
-        {/* Standard Model-Generated Text */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Standard Model-Generated Text</label>
-          <textarea
-            value={currentViolation.standard_text || "No standard violation text available."}
-            readOnly
-            className="w-full p-2 border rounded-lg bg-gray-100 resize-none"
-            rows={3}
-          />
-        </div>
-
-        {/* Date (Editable) */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+        {/* FIELD */}
+        <div>
+          <label className="block text-sm font-medium text-green-700 mb-1">
+            Student Name
+          </label>
           <input
             type="text"
-            value={currentViolation.formattedDate || "—"}
+            value={studentName}
+            onChange={(e) => setStudentName(e.target.value)}
+            placeholder="Enter student full name"
+            className="w-full p-2 border border-green-400 rounded-lg bg-white
+              focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-green-700 mb-1">
+            Student Number
+          </label>
+          <input
+            type="number"
+            value={studentId}
+            onChange={(e) => setStudentId(e.target.value)}
+            placeholder="Enter student number"
+            className="w-full p-2 border border-green-400 rounded-lg bg-white
+              focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-green-700 mb-1">
+            Course/Year/Section
+          </label>
+          <input
+            type="text"
+            value={courseYearSection}
+            onChange={(e) => setCourseYearSection(e.target.value)}
+            placeholder="Enter Course/Year/Section"
+            className="w-full p-2 border border-green-400 rounded-lg bg-white
+              focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-green-700 mb-1">
+            Gender
+          </label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="w-full p-2 border border-green-400 rounded-lg bg-white
+              focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">Select gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+
+      </div>
+
+      {/* INTERVIEW TEXT */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Interview Text
+        </label>
+        <textarea
+          value={violationText}
+          onChange={async (e) => {
+            const value = e.target.value;
+            setViolationText(value);
+
+            if (value.trim() !== "") {
+              try {
+                const res = await fetch("http://127.0.0.1:5000/predict", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ text: value }),
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                  setPredictedViolation(data.predicted_violation || "—");
+                  setPredictedSection(data.predicted_section || "—");
+                  setPredictiveText(data.predictive_text || "—");
+                  setStandardText(data.standard_text || "No standard violation text available.");
+                }
+              } catch (err) {
+                console.error("Prediction error:", err);
+                setPredictedViolation("—");
+                setPredictedSection("—");
+                setPredictiveText("—");
+                setStandardText("No standard violation text available.");
+              }
+            } else {
+              setPredictedViolation("—");
+              setPredictedSection("—");
+              setPredictiveText("—");
+              setStandardText("No standard violation text available.");
+            }
+          }}
+          placeholder="Write interview details or violation text…"
+          className="w-full p-2 border border-green-400 rounded-lg bg-white
+            focus:ring-2 focus:ring-green-500"
+          rows={5}
+        />
+      </div>
+
+      {/* Predictions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="block text-sm font-medium text-green-700 mb-1">
+            Predicted Violation
+          </label>
+          <input
+            type="text"
             readOnly
-            className="w-full p-2 border rounded-lg bg-gray-100"
+            value={predictedViolation || "—"}
+            className="w-full p-2 border border-green-300 rounded-lg bg-gray-100"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-green-700 mb-1">
+            Predicted Section
+          </label>
+          <input
+            type="text"
+            readOnly
+            value={predictedSection || "—"}
+            className="w-full p-2 border border-green-300 rounded-lg bg-gray-100"
           />
         </div>
       </div>
-<div className="flex justify-end gap-2 mt-6">
-  <button
-    onClick={() => downloadViolationDoc(currentViolation)}
-    className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
-  >
-    Download as DOCX
-  </button>
 
-<button
-  onClick={() => setShowViolationDetailsModal(false)}
-  className="px-4 py-2 rounded-lg border border-red-500 text-white bg-red-500 hover:bg-red-600 transition-colors"
->
-  Close
-</button>
+      {/* Predictive Text */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Predictive Text (Top-3)
+        </label>
+        <textarea
+          value={predictiveText || "—"}
+          readOnly
+          className="w-full p-2 border border-green-300 rounded-lg bg-gray-100 resize-none"
+          rows={3}
+        />
+      </div>
 
-</div>
+      {/* Standard Text */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Standard Model-Generated Text
+        </label>
+        <textarea
+          value={standardText || "No standard violation text available."}
+          readOnly
+          className="w-full p-2 border border-green-300 rounded-lg bg-gray-100 resize-none"
+          rows={3}
+        />
+      </div>
+
+      {/* Date */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Date
+        </label>
+        <input
+          type="date"
+          value={violationDate}
+          onChange={(e) => setViolationDate(e.target.value)}
+          className="w-full p-2 border border-green-400 rounded-lg bg-white
+            focus:ring-2 focus:ring-green-500"
+        />
+      </div>
+
+      {/* Buttons */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => {
+            setShowViolationModal(false);
+            setStudentInfo(null);
+          }}
+          className="px-4 py-2 rounded-lg border border-green-300 text-green-700 bg-white
+            hover:bg-green-50 transition"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleSubmitViolation}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+        >
+          Submit Violation
+        </button>
+      </div>
 
     </div>
-  </div>
-)}
 
   </div>
 )}
 
+    {/* ======================= VIOLATION CARDS ======================= */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+      {violations.length === 0 ? (
+        <p className="text-gray-500 col-span-full">No violation records yet.</p>
+      ) : (
+        violations.map((v, idx) => {
+          const date = new Date(v.violation_date);
+          const mm = String(date.getMonth() + 1).padStart(2, "0");
+          const dd = String(date.getDate()).padStart(2, "0");
+          const yy = String(date.getFullYear()).slice(-2);
+          const formattedDate = `${mm}/${dd}/${yy}`;
+
+          return (
+            <div
+              key={idx}
+              className="bg-white p-5 rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => {
+                setCurrentViolation({ ...v, formattedDate });
+                setShowViolationDetailsModal(true);
+              }}
+            >
+              <p className="font-semibold text-gray-700 text-lg mb-2">
+                {v.student_name} (Number: {v.student_id})
+              </p>
+              <p className="text-gray-600 mb-1">Gender: {v.gender}</p>
+              <p className="text-gray-600 mb-1">CYS: {v.course_year_section}</p>
+
+              <p className="text-gray-600 mb-1 truncate" title={v.violation_text}>
+                Admin Note: {v.violation_text}
+              </p>
+
+              <p className="text-gray-600 mb-1">Section: {v.predicted_section || "—"}</p>
+              <p className="text-gray-600 mb-2">Violation: {v.predicted_violation || "—"}</p>
+
+              <p className="text-sm text-gray-400">Date: {formattedDate}</p>
+            </div>
+          );
+        })
+      )}
+    </div>
+
+    {/* ======================= SWEETALERT VIEW DETAILS ======================= */}
+    {showViolationDetailsModal && currentViolation && (() => {
+      const v = currentViolation;
+
+      const downloadDocx = async () => {
+        const doc = new Document({
+          sections: [
+            {
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: "Student Violation Record",
+                      bold: true,
+                      size: 32,
+                    }),
+                  ],
+                }),
+                new Paragraph(""),
+
+                new Paragraph(`Student Name: ${v.student_name}`),
+                new Paragraph(`Student ID: ${v.student_id}`),
+                new Paragraph(`Course/Year/Section: ${v.course_year_section}`),
+                new Paragraph(`Gender: ${v.gender}`),
+                new Paragraph(`Violation: ${v.predicted_violation}`),
+                new Paragraph(`Section: ${v.predicted_section}`),
+                new Paragraph(`Admin Note: ${v.violation_text}`),
+                new Paragraph(`Standard Model Text: ${v.standard_text}`),
+                new Paragraph(`Date: ${v.formattedDate}`),
+              ],
+            },
+          ],
+        });
+
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `${v.student_name}_Violation.docx`);
+      };
+
+      Swal.fire({
+        title: `<strong style="font-size:22px;">Violation Details</strong>`,
+        width: 750,
+        background: "#ffffff",
+        showCloseButton: true,
+        confirmButtonText: "Close",
+        confirmButtonColor: "#d33",
+
+        showDenyButton: true,
+        denyButtonText: "Download DOCX",
+        denyButtonColor: "#3085d6",
+
+        html: `
+          <div style="text-align:left; font-size:15px;">
+
+            <div style="font-size:20px; font-weight:bold; margin-bottom:10px; text-align:center;">
+              ${v.student_name}
+            </div>
+
+            <hr style="margin:10px 0;">
+
+            <p><b>Student ID:</b> ${v.student_id}</p>
+            <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
+            <p><b>Gender:</b> ${v.gender}</p>
+
+            <hr style="margin:10px 0;">
+
+            <p><b>Violation:</b> ${v.predicted_violation}</p>
+            <p><b>Section:</b> ${v.predicted_section}</p>
+
+            <p style="margin-top:10px;"><b>Admin Note:</b><br>
+            ${v.violation_text}</p>
+
+            <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
+            ${v.standard_text}</p>
+
+            <p style="margin-top:10px;"><b>Date:</b> ${v.formattedDate}</p>
+
+          </div>
+        `,
+      }).then((result) => {
+        if (result.isDenied) downloadDocx();
+      });
+
+      setShowViolationDetailsModal(false);
+    })()}
+  </div>
+)}
+ 
    {/* ===== Upload File Section ===== */}
-{activePage === "uploadFileFormat" && (
+  {activePage === "uploadFileFormat" && (
   <div className="flex flex-col items-center space-y-6">
 
     {/* SIDE-BY-SIDE WRAPPER */}
@@ -2032,265 +2231,236 @@ const handleReject = (req) => {
       </div>
     </div>
 
-    {/* ===== Fullscreen File Preview ===== */}
-    {previewFile && (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
+        {/* ===== Fullscreen File Preview ===== */}
+        {previewFile && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
 
-          <button
-            onClick={() => setPreviewFile(null)}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
-          >
-            ✕
-          </button>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
+              >
+                ✕
+              </button>
 
-          <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-            {previewFile.name.endsWith(".pdf") ? (
-              <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px] md:min-h-[600px]" />
-            ) : (
-              <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" />
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* ===== REQUEST LIST MODAL ===== */}
-    {showRequestList && (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
-
-          <button
-            onClick={() => setShowRequestList(false)}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
-          >
-            ✕
-          </button>
-
-          <h3 className="text-xl font-semibold text-center mt-4">Pending Requests</h3>
-
-          <div className="flex-1 overflow-auto p-4 space-y-2">
-            {pendingRequests.length === 0 ? (
-              <p className="text-center text-gray-500">No pending requests</p>
-            ) : (
-              pendingRequests.map((req, idx) => (
-                <button
-                  key={idx}
-                  className="w-full text-left border p-2 rounded hover:bg-gray-100"
-                  onClick={() => {
-                    setSelectedRequest(req);
-                    setShowRequestDetails(true);
-                  }}
-                >
-                  Student Number: {req.student_number}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* ===== REQUEST DETAILS MODAL ===== */}
-    {showRequestDetails && selectedRequest && (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
-
-          <button
-            onClick={() => setShowRequestDetails(false)}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
-          >
-            ✕
-          </button>
-
-          <h3 className="text-lg font-semibold mb-4">Request Details</h3>
-
-          <div className="space-y-2">
-            <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
-            <p><strong>Section:</strong> {selectedRequest.section}</p>
-            <p><strong>Violation:</strong> {selectedRequest.violation}</p>
-            <p><strong>Status:</strong> {selectedRequest.status}</p>
-
-            {selectedRequest.status === "Pending" && (
-              <div className="flex gap-2 mt-4">
-                <button
-                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                  onClick={() => handleApprove(selectedRequest)}
-                >
-                  Approve
-                </button>
-                <button
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                  onClick={() => handleReject(selectedRequest)}
-                >
-                  Reject
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-
-  </div>
-)}
-         {/*========== Student Records ================= */}
-                {activePage === "records" && (
-                  <div className="bg-white p-6 rounded-xl shadow-lg space-y-6">
-                    <h3 className="text-xl font-semibold text-gray-700">Student Records</h3>
-
-                    {/* Search Input + Category */}
-                    <div className="flex items-center space-x-2 max-w-xl">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 text-gray-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-4.35-4.35M5 11a6 6 0 1112 0 6 6 0 01-12 0z"
-                        />
-                      </svg>
-
-                      <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search student..."
-                        className="w-full pl-2 pr-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-
-                      <select
-                        value={filterCategory}
-                        onChange={(e) => setFilterCategory(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
-                        <option value="all">All</option>
-                        <option value="name">Name</option>
-                        <option value="id">ID</option>
-                        <option value="course">Course</option>
-                        <option value="email">Email</option>
-                        <option value="phone">Phone</option>
-                      </select>
-                    </div>
-
-                    {/* Students Table */}
-                    <div className="overflow-x-auto border rounded">
-                      <table className="min-w-full text-left">
-                        <thead className="bg-gray-200 text-gray-700">
-                          <tr>
-                            {(filterCategory === "all" || filterCategory === "id") && <th className="px-4 py-2">ID</th>}
-                            {(filterCategory === "all" || filterCategory === "name") && <th className="px-4 py-2">Student Name</th>}
-                            {(filterCategory === "all" || filterCategory === "id") && <th className="px-4 py-2">Student Number</th>}
-                            {(filterCategory === "all" || filterCategory === "email") && <th className="px-4 py-2">Email</th>}
-                            {(filterCategory === "all" || filterCategory === "phone") && <th className="px-4 py-2">Phone Number</th>}
-                            {(filterCategory === "all" || filterCategory === "course") && <th className="px-4 py-2">Course</th>}
-                            <th className="px-4 py-2">Actions</th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {filteredStudents.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="text-center py-6 text-gray-500">
-                                No students found.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredStudents.map((s) => (
-                              <tr key={s.id} className="border-b last:border-b-0">
-                                {(filterCategory === "all" || filterCategory === "id") && <td className="py-3 px-4">{s.id}</td>}
-                                {(filterCategory === "all" || filterCategory === "name") && <td className="py-3 px-4">{s.student_name}</td>}
-                                {(filterCategory === "all" || filterCategory === "id") && <td className="py-3 px-4">{s.student_number}</td>}
-                                {(filterCategory === "all" || filterCategory === "email") && <td className="py-3 px-4">{s.email}</td>}
-                                {(filterCategory === "all" || filterCategory === "phone") && <td className="py-3 px-4">{s.phone}</td>}
-                                {(filterCategory === "all" || filterCategory === "course") && <td className="py-3 px-4">{s.course}</td>}
-                                <td className="py-3 px-4 flex gap-2">
-                                  <button
-                                    onClick={() => setViewStudent(s)}
-                                    className="text-blue-600 hover:underline flex items-center gap-1"
-                                  >
-                                    <EyeIcon className="w-4 h-4" /> View
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteStudent(s)}
-                                    className="text-red-600 hover:underline flex items-center gap-1"
-                                  >
-                                    <TrashIcon className="w-4 h-4" /> Delete
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* View Modal */}
-                    {viewStudent && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center">
-                        <div
-                          className="absolute inset-0 bg-black opacity-70"
-                          onClick={() => handleViewStudent(null)}
-                        ></div>
-                        <div className="relative bg-white rounded-xl shadow-lg w-full max-w-md p-6 z-10">
-                          <button
-                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-                            onClick={() => handleViewStudent(null)}
-                          >
-                            <XMarkIcon className="w-6 h-6" />
-                          </button>
-                          <h3 className="text-lg font-semibold mb-4">Student Details</h3>
-                          <p><strong>Name:</strong> {viewStudent.student_name}</p>
-                          <p><strong>Number:</strong> {viewStudent.student_number}</p>
-                          <p><strong>Email:</strong> {viewStudent.email}</p>
-                          <p><strong>Phone:</strong> {viewStudent.phone}</p>
-                          <p><strong>Course:</strong> {viewStudent.course}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Delete Modal */}
-                    {deleteStudent && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center">
-                        <div
-                          className="absolute inset-0 bg-black opacity-70"
-                          onClick={() => handleDeleteStudent(null)}
-                        ></div>
-                        <div className="relative bg-white rounded-xl shadow-lg w-full max-w-sm p-6 z-10">
-                          <button
-                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-                            onClick={() => handleDeleteStudent(null)}
-                          >
-                            <XMarkIcon className="w-6 h-6" />
-                          </button>
-                          <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
-                          <p>
-                            Are you sure you want to delete <strong>{deleteStudent.id}</strong>?
-                          </p>
-                          <div className="mt-4 flex justify-end gap-2">
-                            <button
-                              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                              onClick={() => handleDeleteStudent(null)}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                              onClick={handleConfirmDelete}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                {previewFile.name.endsWith(".pdf") ? (
+                  <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px] md:min-h-[600px]" />
+                ) : (
+                  <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" />
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== REQUEST LIST MODAL ===== */}
+        {showRequestList && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
+
+              <button
+                onClick={() => setShowRequestList(false)}
+                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
+              >
+                ✕
+              </button>
+
+              <h3 className="text-xl font-semibold text-center mt-4">Pending Requests</h3>
+
+              <div className="flex-1 overflow-auto p-4 space-y-2">
+                {pendingRequests.length === 0 ? (
+                  <p className="text-center text-gray-500">No pending requests</p>
+                ) : (
+                  pendingRequests.map((req, idx) => (
+                    <button
+                      key={idx}
+                      className="w-full text-left border p-2 rounded hover:bg-gray-100"
+                      onClick={() => {
+                        setSelectedRequest(req);
+                        setShowRequestDetails(true);
+                      }}
+                    >
+                      Student Number: {req.student_number}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+          {/* ===== REQUEST DETAILS MODAL ===== */}
+          {showRequestDetails && selectedRequest && (
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
+
+                <button
+                  onClick={() => setShowRequestDetails(false)}
+                  className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
+                >
+                  ✕
+                </button>
+
+                <h3 className="text-lg font-semibold mb-4">Request Details</h3>
+
+                <div className="space-y-2">
+                  <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
+                  <p><strong>Section:</strong> {selectedRequest.section}</p>
+                  <p><strong>Violation:</strong> {selectedRequest.violation}</p>
+                  <p><strong>Status:</strong> {selectedRequest.status}</p>
+
+                  {selectedRequest.status === "Pending" && (
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                        onClick={() => handleApprove(selectedRequest)}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                        onClick={() => handleReject(selectedRequest)}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+        )}
+            {activePage === "records" && (
+          <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
+
+            {/* ================= FILTER BAR ================= */}
+            <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-lg 
+            border border-green-300 shadow-sm">
+
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search student..."
+                className="flex-1 min-w-[200px] px-3 py-2 border border-green-300 rounded-lg 
+                focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+
+              <select
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="px-3 py-2 border border-green-300 rounded-lg bg-white 
+                focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="all">All Courses</option>
+                <option value="BEED">BEED</option>
+                <option value="BSED">BSED</option>
+                <option value="BSBM">BSBM</option>
+                <option value="BSCS">BSCS</option>
+                <option value="BSHM">BSHM</option>
+                <option value="BSIT">BSIT</option>
+                <option value="BSFAS">BSFAS</option>
+              </select>
+
+              <div className="flex items-center gap-2">
+                <span className="text-green-700 font-medium">From:</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="px-2 py-2 border border-green-300 rounded-lg 
+                  focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-green-700 font-medium">To:</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="px-2 py-2 border border-green-300 rounded-lg 
+                  focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="px-3 py-2 border border-green-300 rounded-lg bg-white 
+                focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="asc">Sort A → Z</option>
+                <option value="desc">Sort Z → A</option>
+              </select>
+
+            </div>
+
+            {/* ================= TABLE ================= */}
+            <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
+              <table className="min-w-full text-left">
+                <thead className="bg-green-600 text-white">
+                  <tr>
+                    <th className="px-4 py-3">ID</th>
+                    <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3">Student Number</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Phone</th>
+                    <th className="px-4 py-3">Course</th>
+                    <th className="px-4 py-3">Date Registered</th>
+                    <th className="px-4 py-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-6 text-green-700">
+                        No students found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStudents.map((s) => (
+                      <tr
+                        key={s.id}
+                        className="border-b border-green-200 hover:bg-green-100 transition-colors"
+                      >
+                        <td className="py-3 px-4">{s.id}</td>
+                        <td className="py-3 px-4">{s.student_name}</td>
+                        <td className="py-3 px-4">{s.student_number}</td>
+                        <td className="py-3 px-4">{s.email}</td>
+                        <td className="py-3 px-4">{s.phone}</td>
+                        <td className="py-3 px-4">{s.course}</td>
+                        <td className="py-3 px-4">
+                          {s.created_at ? s.created_at.slice(0, 10) : "—"}
+                        </td>
+
+                        <td className="py-3 px-4 flex gap-2 justify-center">
+                          <button
+                            className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            onClick={() => setViewStudent(s)}
+                          >
+                            View
+                          </button>
+
+                          <button
+                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            onClick={() => setDeleteStudent(s)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
             </section>
               </main>

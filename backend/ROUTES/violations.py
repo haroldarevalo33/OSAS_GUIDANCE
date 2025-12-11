@@ -219,3 +219,70 @@ def get_student_history(student_number):
 
     return jsonify(output), 200
 
+# ---------------- ADVANCED SEARCH (WITH FILTERS) ----------------
+@violation_bp.get("/search")
+def search_violations():
+    q = request.args.get("q", "").strip().upper()
+    course = request.args.get("course", "ALL").strip().upper()
+    start_date = request.args.get("startDate", "")
+    end_date = request.args.get("endDate", "")
+    sort = request.args.get("sort", "ASC").upper()
+
+    sort = "ASC" if sort not in ["ASC", "DESC"] else sort
+
+    # Base query
+    query = Violation.query
+
+    # MAIN TEXT QUERY
+    if q:
+        like_q = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                db.func.upper(Violation.student_name).like(like_q),
+                db.func.upper(Violation.student_id.cast(db.String)).like(like_q),
+                db.func.upper(Violation.course_year_section).like(like_q),
+                db.func.upper(Violation.violation_text).like(like_q),
+                db.func.upper(Violation.gender).like(like_q)
+            )
+        )
+
+    # COURSE FILTER
+    if course != "ALL":
+        query = query.filter(db.func.upper(Violation.course_year_section).like(f"%{course}%"))
+
+    # DATE RANGE
+    if start_date and end_date:
+        try:
+            start = parse_date_flexible(start_date)
+            end = parse_date_flexible(end_date)
+            query = query.filter(Violation.violation_date.between(start, end))
+        except:
+            pass
+
+    # SORT
+    if sort == "ASC":
+        query = query.order_by(Violation.student_name.asc())
+    else:
+        query = query.order_by(Violation.student_name.desc())
+
+    results = query.all()
+    output = []
+
+    for r in results:
+        dt = r.violation_date or date.today()
+        standard_text = violation_to_standard_text.get(r.predicted_violation, "No standard text available")
+
+        output.append({
+            "id": r.id,
+            "student_name": r.student_name,
+            "student_id": r.student_id,
+            "course_year_section": r.course_year_section,
+            "gender": r.gender,
+            "violation_text": r.violation_text,
+            "violation_date": dt.strftime("%Y-%m-%d"),
+            "predicted_violation": r.predicted_violation,
+            "predicted_section": r.predicted_section,
+            "standard_text": standard_text
+        })
+
+    return jsonify(output), 200
