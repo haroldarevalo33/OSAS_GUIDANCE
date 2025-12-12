@@ -1687,7 +1687,7 @@ useEffect(() => {
 {showViolationModal && (
 <div className="fixed inset-0 z-[100] flex items-center justify-center">
 
-  {/* Dark Background (NO BLUR) */}
+  {/* Dark Background (NO BLUR) */}+
   <div className="absolute inset-0 bg-black/70"></div>
   
 

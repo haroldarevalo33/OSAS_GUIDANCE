@@ -13,8 +13,8 @@ import numpy as np
 df = pd.read_excel(r"C:\Users\Harold Arevalo\Downloads\cvsu_violation_updated_dataset.xlsx")
 
 # Handle missing values and ensure 'violation' is in string format
-df = df.dropna(subset=['violation'])  # Drop rows where 'violation' is NaN
-df['violation'] = df['violation'].astype(str)  # Ensure 'violation' is string type
+df = df.dropna(subset=['violation'])
+df['violation'] = df['violation'].astype(str)
 
 # Extract texts and labels
 texts = df['text']
@@ -28,10 +28,9 @@ print(f"Total rows: {df.shape[0]}\n")
 # 4️⃣ Preprocessing function
 def preprocess(text):
     """Lowercase and remove punctuation, handle non-string values"""
-    if isinstance(text, str):  # Ensure the text is a string
+    if isinstance(text, str):
         return text.lower().translate(str.maketrans('', '', string.punctuation))
-    else:
-        return ''  # Return empty string for non-string values
+    return ''
 
 # Apply preprocessing
 texts = texts.apply(preprocess)
@@ -41,14 +40,19 @@ X_train, X_test, y_train, y_test = train_test_split(
     texts, labels, test_size=0.2, random_state=42
 )
 
-# 6️⃣ TF-IDF Vectorizer
-vectorizer = TfidfVectorizer()
+# 6️⃣ TF-IDF Vectorizer (UNIGRAM + BIGRAM + TRIGRAM)
+vectorizer = TfidfVectorizer(
+    ngram_range=(1, 3),       # 🔥 UNIGRAM + BIGRAM + TRIGRAM
+    min_df=2,                # remove rare words
+    strip_accents='unicode'  # normalize accents
+)
+
 X_train_tfidf = vectorizer.fit_transform(X_train)
 X_test_tfidf = vectorizer.transform(X_test)
 
 # 7️⃣ Train Linear SVM (with probabilities)
 base_model = LinearSVC()
-model = CalibratedClassifierCV(base_model)  # Enable predict_proba for probability outputs
+model = CalibratedClassifierCV(base_model)  # Enable predict_proba
 model.fit(X_train_tfidf, y_train)
 
 # 8️⃣ Evaluation
@@ -71,7 +75,6 @@ joblib.dump(violation_to_section, "violation_to_section.pkl")
 print("✅ Violation → Section mapping saved successfully!")
 
 # 1️⃣1️⃣ Save violation → standard text
-# Get FIRST example text for each violation
 violation_to_standard_text = df.groupby("violation")["text"].first().to_dict()
 
 joblib.dump(violation_to_standard_text, "violation_to_standard_text.pkl")
@@ -79,20 +82,19 @@ print("✅ Violation → Standard Text mapping saved successfully!")
 
 # 1️⃣2️⃣ Prediction Function
 def predict_violation(sentence, top_n=3):
-    sentence_proc = preprocess(sentence)  # Preprocess the input sentence
-    vectorized = vectorizer.transform([sentence_proc])  # Vectorize the input sentence
-    pred = model.predict(vectorized)[0]  # Predict the violation label
+    sentence_proc = preprocess(sentence)
+    vectorized = vectorizer.transform([sentence_proc])
+    pred = model.predict(vectorized)[0]
 
     # Predictive text (top N)
     if hasattr(model, "predict_proba"):
-        probs = model.predict_proba(vectorized)[0]  # Get probability scores
+        probs = model.predict_proba(vectorized)[0]
         classes = model.classes_
-        top_indices = np.argsort(probs)[::-1][:top_n]  # Get top N predictions
+        top_indices = np.argsort(probs)[::-1][:top_n]
         predictive_text = ", ".join([f"{classes[i]} ({probs[i]*100:.1f}%)" for i in top_indices])
     else:
         predictive_text = pred
 
-    # Get the predicted section and standard text
     predicted_section = violation_to_section.get(pred, "Unknown")
     standard_text = violation_to_standard_text.get(pred, "No sample text available")
 
@@ -104,12 +106,5 @@ def predict_violation(sentence, top_n=3):
         "standard_text": standard_text
     }
 
-# 🔁 Test predictive function
-test_sentences = [
-    "Binato ang bintana sa classroom",
-    "Student copied answers from classmate",
-    "Uminom sa loob ng classroom"
-]
-
-for s in test_sentences:
-    print(predict_violation(s))
+print("Total features generated:", len(vectorizer.get_feature_names_out()))
+print("Sample n-grams:", vectorizer.get_feature_names_out()[:50])

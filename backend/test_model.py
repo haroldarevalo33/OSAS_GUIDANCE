@@ -1,5 +1,6 @@
 import joblib
 import string
+import numpy as np
 
 # ---------------------
 # 1. Load saved model
@@ -13,7 +14,9 @@ violation_to_standard_text = joblib.load("violation_to_standard_text.pkl")
 # 2. Preprocess function
 # ---------------------
 def preprocess(text):
-    return text.lower().translate(str.maketrans('', '', string.punctuation))
+    if isinstance(text, str):
+        return text.lower().translate(str.maketrans('', '', string.punctuation))
+    return ""
 
 # ---------------------
 # 3. Prediction function
@@ -29,7 +32,6 @@ def predict_violation(sentence, top_n=3):
         probs = model.predict_proba(vectorized)[0]
         classes = model.classes_
 
-        import numpy as np
         top_idx = np.argsort(probs)[::-1][:top_n]
         predictive_text = ", ".join([
             f"{classes[i]} ({probs[i]*100:.1f}%)" for i in top_idx
