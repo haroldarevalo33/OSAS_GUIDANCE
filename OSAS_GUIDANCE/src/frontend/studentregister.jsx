@@ -14,7 +14,7 @@ export default function StudentRegister() {
   const [studentNumber, setStudentNumber] = useState("");
   const [studentName, setStudentName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");  // phone as string
+  const [phone, setPhone] = useState("");
   const [course, setCourse] = useState("");
   const [password, setPassword] = useState("");
 
@@ -41,19 +41,32 @@ export default function StudentRegister() {
       return;
     }
 
+    // ✅ CvSU EMAIL VALIDATION (ONLY @cvsu.edu.ph)
+    const cvsuEmailRegex = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
+    const normalizedEmail = email.toLowerCase();
+
+    if (!cvsuEmailRegex.test(normalizedEmail)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid Email",
+        text: "Only CvSU Email Account are Allowed.",
+      });
+      return;
+    }
+
     try {
       const res = await fetch("http://127.0.0.1:5000/students/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        student_number: studentNumber,
-        student_name: studentName,
-        email,
-        phone,
-        course,
-        password,
-      }),
-    });
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_number: studentNumber,
+          student_name: studentName,
+          email: normalizedEmail, // ✅ lowercase email
+          phone,
+          course,
+          password,
+        }),
+      });
 
       const data = await res.json();
 
@@ -90,8 +103,12 @@ export default function StudentRegister() {
           alt="School Logo"
           className="w-20 md:w-28 h-20 md:h-28 mb-1"
         />
-        <h2 className="text-base md:text-xl font-medium">Cavite State University Naic</h2>
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Guidance Student Record</h1>
+        <h2 className="text-base md:text-xl font-medium">
+          Cavite State University Naic
+        </h2>
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">
+          Guidance Student Record
+        </h1>
 
         <div className="flex flex-col items-center mb-6">
           <div className="relative w-18 h-18 flex items-center justify-center">
@@ -110,7 +127,9 @@ export default function StudentRegister() {
               />
             </svg>
           </div>
-          <p className="text-xl font-bold text-gray-800 -mt-1">Create Student Account</p>
+          <p className="text-xl font-bold text-gray-800 -mt-1">
+            Create Student Account
+          </p>
         </div>
 
         {/* Student Form */}
@@ -121,7 +140,7 @@ export default function StudentRegister() {
             placeholder="Enter your student number"
             value={studentNumber}
             onChange={(e) => setStudentNumber(e.target.value)}
-            className="border p-3 rounded-full w-full placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
           <label className="text-gray-700 font-medium">Student Name</label>
@@ -130,16 +149,16 @@ export default function StudentRegister() {
             placeholder="Enter your student name"
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
-            className="border p-3 rounded-full w-full placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
           <label className="text-gray-700 font-medium">CvSU Email</label>
           <input
             type="email"
-            placeholder="Enter your CvSU email"
+            placeholder="example@cvsu.edu.ph"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="border p-3 rounded-full w-full placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
           <label className="text-gray-700 font-medium">Phone Number</label>
@@ -148,7 +167,7 @@ export default function StudentRegister() {
             placeholder="Enter your phone number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="border p-3 rounded-full w-full placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
           <label className="text-gray-700 font-medium">Course</label>
@@ -157,7 +176,7 @@ export default function StudentRegister() {
             placeholder="Enter your course"
             value={course}
             onChange={(e) => setCourse(e.target.value)}
-            className="border p-3 rounded-full w-full placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
           <label className="text-gray-700 font-medium">Password</label>
@@ -167,20 +186,24 @@ export default function StudentRegister() {
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="border p-3 rounded-full w-full placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 pr-10"
+              className="border p-3 rounded-full w-full pr-10 focus:ring-2 focus:ring-green-500"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-3 text-gray-500"
             >
-              {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+              {showPassword ? (
+                <EyeSlashIcon className="w-5 h-5" />
+              ) : (
+                <EyeIcon className="w-5 h-5" />
+              )}
             </button>
           </div>
 
           <button
             onClick={handleRegister}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold mt-1"
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold"
           >
             Register
           </button>
@@ -206,11 +229,15 @@ export default function StudentRegister() {
         />
         <div className="absolute inset-0 p-10 text-white flex flex-col justify-between">
           <p className="text-2xl leading-relaxed font-semibold text-justify tracking-wide drop-shadow-lg max-w-3xl mx-auto mt-70 animate-fadein">
-            Cavite State University - Naic (CvSU) is required by law to process your personal information and sensitive personal information in order to safeguard academic freedom, uphold your right to quality education, and protect your right to data privacy in conformity with Republic Act No. 10173.
+            Cavite State University - Naic (CvSU) is required by law to process your
+            personal information and sensitive personal information in order to
+            safeguard academic freedom, uphold your right to quality education,
+            and protect your right to data privacy in conformity with Republic Act
+            No. 10173.
           </p>
 
           <div
-            className={`absolute bottom-10 right-10 text-5xl font-bold tracking-widest drop-shadow-md uppercase transition-all duration-1000 ease-in-out`}
+            className="absolute bottom-10 right-10 text-5xl font-bold tracking-widest uppercase transition-all duration-1000"
             style={{
               opacity: fade ? 0.5 : 1,
               transform: fade ? "translateX(20px)" : "translateX(0)",
