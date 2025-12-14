@@ -140,11 +140,14 @@ const [courseData, setCourseData] = useState([]);
 
 
 
-// FETCH CHART DATA
 useEffect(() => {
-  fetch("/violations")
-    .then((res) => res.json())
-    .then((data) => {
+  let intervalId;
+
+  const fetchViolations = async () => {
+    try {
+      const res = await fetch("/violations");
+      const data = await res.json();
+
       // 1️⃣ LINE CHART (Monthly Cases)
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const monthlyCounts = months.map((m, i) => ({
@@ -156,45 +159,47 @@ useEffect(() => {
       }));
       setLineData(monthlyCounts);
 
-      // 2️⃣ SECTION CHART (Case count per section)
+      // 2️⃣ SECTION CHART
       const sectionCounts = {};
       data.forEach((v) => {
         const sec = v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown";
         sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
       });
-
       const sectionArray = Object.keys(sectionCounts).map((sec) => ({
         section: sec,
         value: sectionCounts[sec],
       }));
-
       setSectionData(sectionArray);
       setSections(Object.keys(sectionCounts));
 
-      // 3️⃣ COURSE CHART (Case count per COURSE)
+      // 3️⃣ COURSE CHART
       const courseCounts = {};
-
       data.forEach((v) => {
         if (!v.course_year_section) return;
-
-        // extract course = first word only
         const course = v.course_year_section.split(" ")[0].toUpperCase().trim();
-
         courseCounts[course] = (courseCounts[course] || 0) + 1;
       });
-
       const courseArray = Object.keys(courseCounts).map((course) => ({
         course,
         value: courseCounts[course],
       }));
+      setCourseData(courseArray);
 
-      setCourseData(courseArray);  // <-- MAKE SURE you declared this state
+    } catch (err) {
+      console.error("Failed to fetch violations:", err);
+    }
+  };
 
-    })
-    .catch((err) => console.error("Failed to fetch violations:", err));
-}, []);
+  // initial fetch
+  fetchViolations();
 
+  // poll every 5 seconds
+  intervalId = setInterval(fetchViolations, 5000);
 
+  // cleanup
+  return () => clearInterval(intervalId);
+
+}, [activePage]); // <-- refetch automatically if activePage changes
 
   //email
 const [profilePicPreview, setProfilePicPreview] = useState(null);
