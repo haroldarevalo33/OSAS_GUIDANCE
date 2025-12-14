@@ -1548,10 +1548,21 @@ useEffect(() => {
                         {(filterCategory === "all" || filterCategory === "date") && (
                           <td className="py-3 px-4">{formatDate(v.violation_date)}</td>
                         )}
-                        {(filterCategory === "all" || filterCategory === "violation") && (
-                          <td className="py-3 px-4">{v.violation_text}</td>
+                       {(filterCategory === "all" || filterCategory === "violation") && (
+                          <td className="py-3 px-4 w-[280px]">
+                            <div
+                              className="
+                                max-w-[260px]
+                                whitespace-nowrap
+                                overflow-hidden
+                                text-ellipsis
+                              "
+                              title={v.violation_text}
+                            >
+                              {v.violation_text}
+                            </div>
+                          </td>
                         )}
-
                         <td className="py-3 px-4">
                           <div className="flex gap-2">
                             <button
