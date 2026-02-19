@@ -47,6 +47,18 @@ def good_moral_request():
         "request_id": gm_request.request_id
     })
 
+@good_moral_bp.delete("/request/<int:request_id>")
+def cancel_request(request_id):
+    gm_request = GoodMoralRequest.query.get(request_id)
+    if not gm_request:
+        return jsonify({"message": "Request not found"}), 404
+    if gm_request.status != "Pending":
+        return jsonify({"message": "Only pending requests can be cancelled"}), 400
+
+    db.session.delete(gm_request)
+    db.session.commit()
+    return jsonify({"message": "Request cancelled successfully"})
+
 
 # -------------------------
 # Student views all their requests
