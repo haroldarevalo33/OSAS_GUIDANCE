@@ -1,4 +1,3 @@
-from app import db
 from datetime import date, datetime
 from extension import db  # Use the db instance from extension.py
 
@@ -29,6 +28,11 @@ class Admin(db.Model):
         back_populates="encoder",
         cascade="all, delete-orphan"
     )
+    good_moral_processed = db.relationship(
+        "GoodMoralRequest",
+        back_populates="processed_by_admin",
+        cascade="all, delete-orphan"
+    )
 
 
 # -----------------------------
@@ -55,8 +59,13 @@ class Student(db.Model):
     )
     encoder = db.relationship("Admin", back_populates="students_encoded")
 
-    # Relationship to violations
+    # Relationships
     violations = db.relationship("Violation", back_populates="student")
+    good_moral_requests = db.relationship(
+        "GoodMoralRequest",
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )
 
 
 # -----------------------------
@@ -77,7 +86,6 @@ class UploadedFile(db.Model):
     size_bytes = db.Column(db.BigInteger, nullable=False)
     path = db.Column(db.String(512), nullable=False)
 
-    # Foreign Key to Admin
     uploaded_by = db.Column(
         db.Integer,
         db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL"),
@@ -85,7 +93,6 @@ class UploadedFile(db.Model):
     )
     uploaded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-    # Relationship
     uploader = db.relationship("Admin", back_populates="uploads")
 
 
@@ -97,8 +104,6 @@ class Violation(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     student_name = db.Column(db.String(150), nullable=False)
-
-    # Reference students.student_number to match your SQL foreign key
     student_id = db.Column(
         db.Integer,
         db.ForeignKey("students.student_number", ondelete="CASCADE"),
@@ -108,20 +113,47 @@ class Violation(db.Model):
     gender = db.Column(db.String(20), nullable=False)
     violation_text = db.Column(db.Text, nullable=False)
     violation_date = db.Column(db.Date, nullable=False, default=date.today)
-
-    # ML prediction fields
     predicted_violation = db.Column(db.String(150), nullable=True)
     predicted_section = db.Column(db.String(100), nullable=True)
     predictive_text = db.Column(db.Text, nullable=True)
     standard_text = db.Column(db.Text, nullable=True)
-
-    # Foreign Key to Admin (who encoded)
     encoded_by = db.Column(
         db.Integer,
         db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL"),
         nullable=True
     )
 
-    # Relationships
     encoder = db.relationship("Admin", back_populates="violations_encoded")
     student = db.relationship("Student", back_populates="violations")
+
+
+# -----------------------------
+# Good Moral Requests Table
+# -----------------------------
+class GoodMoralRequest(db.Model):
+    __tablename__ = "good_moral_requests"
+
+    request_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    student_number = db.Column(
+        db.Integer,
+        db.ForeignKey("students.student_number", ondelete="CASCADE"),
+        nullable=False
+    )
+    filename_stored = db.Column(db.String(255), nullable=True)  # ✅ nullable
+    filename_original = db.Column(db.String(255), nullable=True) 
+    status = db.Column(
+        db.Enum("Pending", "Approved", "Rejected", name="gmr_status_enum"),
+        nullable=False,
+        default="Pending"
+    )
+    requested_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    processed_by = db.Column(
+        db.Integer,
+        db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL"),
+        nullable=True
+    )
+    processed_at = db.Column(db.DateTime, nullable=True)
+    remarks = db.Column(db.Text, nullable=True)
+
+    student = db.relationship("Student", back_populates="good_moral_requests")
+    processed_by_admin = db.relationship("Admin", back_populates="good_moral_processed")

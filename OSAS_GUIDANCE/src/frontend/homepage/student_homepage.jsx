@@ -56,6 +56,7 @@ export default function StudentHome() {
   }
   const studentNumber = studentData.student_number || null;
   const fallbackName = studentData.student_name || "Student";
+  
 
   // ---------------------------
   // Effects: fetch news (when News active)
@@ -211,23 +212,7 @@ export default function StudentHome() {
     return null;
   };
 
-  // Good moral download (kept as-is)
-  const downloadPDF = () => {
-    const element = document.getElementById("goodmoral-certificate");
-    if (!element) return;
-    const opt = {
-      margin: 0.5,
-      filename: "GoodMoralCertificate.pdf",
-      image: { type: "jpeg", quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: true, ignoreElements: (el) => el.tagName === 'STYLE' },
-      jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-    };
-    setTimeout(() => {
-      import("html2pdf.js").then((html2pdf) => {
-        html2pdf.default().set(opt).from(element).save();
-      });
-    }, 100);
-  };
+  
 
   // Fetch rules file from backend on mount
   useEffect(() => {
@@ -251,6 +236,105 @@ export default function StudentHome() {
     }
     fetchRules();
   }, []);
+  
+ // -------------------------
+// Good Moral Functions
+// -------------------------
+
+const API_BASE = "http://localhost:5000"; // <-- Flask backend URL
+
+// Submit Good Moral request
+const submitGoodMoralRequest = async (file) => {
+  try {
+    // Ensure studentNumber exists
+    if (!studentNumber) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Student number is missing"
+      });
+      return;
+    }
+
+    // Ensure a file is selected
+    if (!file) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Please select a file to upload"
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("student_number", studentNumber);
+    formData.append("certificate_file", file);
+
+    const res = await fetch(`${API_BASE}/good-moral/request`, {
+      method: "POST",
+      body: formData
+    });
+
+    // Parse JSON safely
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Good Moral request submitted",
+        showConfirmButton: false,
+        timer: 2000
+      });
+      fetchLatestGoodMoral(); // refresh after submission
+    } else {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: data.message || "Failed to submit request"
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Something went wrong"
+    });
+  }
+};
+
+// Fetch latest Good Moral request (real-time)
+const fetchLatestGoodMoral = async () => {
+  try {
+    if (!studentNumber) return;
+
+    const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
+    const requests = await res.json().catch(() => []);
+
+    if (requests.length > 0) {
+      setStudentRecord(prev => ({ ...prev, lastGoodMoralRequest: requests[0] }));
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+// Download approved Good Moral PDF
+const downloadPDF = () => {
+  if (!studentRecord?.lastGoodMoralRequest) return;
+  const requestId = studentRecord.lastGoodMoralRequest.request_id;
+  window.open(`${API_BASE}/good-moral/download/${requestId}`, "_blank");
+};
+
+// Polling every 5 seconds for real-time updates
+useEffect(() => {
+  fetchLatestGoodMoral(); // initial fetch
+  const interval = setInterval(fetchLatestGoodMoral, 5000);
+  return () => clearInterval(interval);
+}, []);
+
 
   // ---------------------------
   // Render
@@ -661,29 +745,87 @@ export default function StudentHome() {
           
 
           {/* GOOD MORAL */}
-          {activePage === "GoodMoral" && (
-            <div className="flex flex-col items-center">
-              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">Good Moral Certificate</h2>
-              {!goodMoralRequested ? (
-                <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
-                  <p className="text-gray-700 mb-4">Request your Good Moral Certificate here.</p>
-                  <button onClick={() => { setGoodMoralRequested(true); setGoodMoralApproved(true); setNotifications(prev => [...prev, { type: "Good Moral", status: "Approved" }]); Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Good Moral request submitted", showConfirmButton: false, timer: 2000 }); }} className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">
-                    Request Good Moral
-                  </button>
-                </div>
-              ) : (
-                <div className="w-full max-w-lg">
-                  <div id="goodmoral-certificate" className="bg-white p-6 md:p-10 rounded-2xl shadow-md border-2 border-green-600 text-center">
-                    <img src="/cvsu-logo.png" alt="CvSU Logo" className="mx-auto w-20 h-20 mb-4" />
-                    <h3 className="text-xl font-bold text-green-700 mb-3">Certificate of Good Moral</h3>
-                    <p className="text-gray-700">This is to certify that <span className="font-semibold">{studentRecord?.student_name || fallbackName}</span> of student number <span className="font-semibold">{studentNumber}</span> has demonstrated good moral character.</p>
-                    <p className="mt-4 text-gray-700">Issued by CvSU Guidance Office.</p>
-                  </div>
-                  {goodMoralApproved && <button onClick={downloadPDF} className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg">Download PDF</button>}
-                </div>
-              )}
-            </div>
+{activePage === "GoodMoral" && (
+  <div className="flex flex-col items-center">
+    <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
+      Good Moral Certificate
+    </h2>
+
+    {/* If student has not requested yet */}
+    {!studentRecord?.lastGoodMoralRequest ? (
+      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
+        <p className="text-gray-700 mb-4">
+          Request your Good Moral Certificate here.
+        </p>
+        <button
+          onClick={submitGoodMoralRequest} // Calls backend POST /good-moral/request
+          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700"
+        >
+          Request Good Moral
+        </button>
+      </div>
+    ) : (
+      // If student already requested
+      <div className="w-full max-w-lg">
+        <div
+          id="goodmoral-certificate"
+          className="bg-white p-6 md:p-10 rounded-2xl shadow-md border-2 border-green-600 text-center"
+        >
+          <img
+            src="/cvsu-logo.png"
+            alt="CvSU Logo"
+            className="mx-auto w-20 h-20 mb-4"
+          />
+          <h3 className="text-xl font-bold text-green-700 mb-3">
+            Certificate of Good Moral
+          </h3>
+
+          <p className="text-gray-700">
+            This is to certify that{" "}
+            <span className="font-semibold">
+              {studentRecord?.student_name || fallbackName}
+            </span>{" "}
+            of student number{" "}
+            <span className="font-semibold">{studentNumber}</span> has
+            demonstrated good moral character.
+          </p>
+
+          <p className="mt-4 text-gray-700">Issued by CvSU Guidance Office.</p>
+
+          {/* Show current status */}
+          <p className="mt-4 text-gray-700 font-semibold">
+            Status:{" "}
+            {studentRecord?.lastGoodMoralRequest.status || "Pending"}
+          </p>
+
+          {/* Optional remarks if rejected */}
+          {studentRecord?.lastGoodMoralRequest.status === "Rejected" && (
+            <p className="mt-2 text-red-700 font-medium">
+              Remarks: {studentRecord?.lastGoodMoralRequest.remarks || "No remarks"}
+            </p>
           )}
+
+          {/* Optional pending note */}
+          {studentRecord?.lastGoodMoralRequest.status === "Pending" && (
+            <p className="mt-2 text-yellow-700 font-medium">
+              Waiting for admin approval...
+            </p>
+          )}
+        </div>
+
+        {/* Only allow download if approved */}
+        {studentRecord?.lastGoodMoralRequest.status === "Approved" && (
+          <button
+            onClick={downloadPDF} // Calls GET /good-moral/download/<request_id>
+            className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg"
+          >
+            Download PDF
+          </button>
+        )}
+      </div>
+    )}
+  </div>
+)}
 
           {/* RULES */}
           {activePage === "Rules" && (
