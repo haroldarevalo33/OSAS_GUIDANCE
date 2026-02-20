@@ -134,26 +134,44 @@ class GoodMoralRequest(db.Model):
     __tablename__ = "good_moral_requests"
 
     request_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # Link to student
     student_number = db.Column(
         db.Integer,
         db.ForeignKey("students.student_number", ondelete="CASCADE"),
         nullable=False
     )
-    filename_stored = db.Column(db.String(255), nullable=True)  # ✅ nullable
+    
+    # Optional uploaded file
+    filename_stored = db.Column(db.String(255), nullable=True)
     filename_original = db.Column(db.String(255), nullable=True) 
+
+    # Request status
     status = db.Column(
         db.Enum("Pending", "Approved", "Rejected", name="gmr_status_enum"),
         nullable=False,
         default="Pending"
     )
+    
+    # Timestamps
     requested_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Admin who processed the request
     processed_by = db.Column(
         db.Integer,
         db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL"),
         nullable=True
     )
-    processed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Optional remarks by admin
     remarks = db.Column(db.Text, nullable=True)
 
+    # -----------------------------
+    # New column for notification tracking
+    # -----------------------------
+    is_notified = db.Column(db.Boolean, nullable=False, default=False)
+
+    # Relationships
     student = db.relationship("Student", back_populates="good_moral_requests")
     processed_by_admin = db.relationship("Admin", back_populates="good_moral_processed")

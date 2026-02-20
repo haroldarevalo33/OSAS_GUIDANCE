@@ -24,6 +24,7 @@ export default function StudentHome() {
   const [goodMoralRequested, setGoodMoralRequested] = useState(false);
   const [goodMoralApproved, setGoodMoralApproved] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [selectedNotification, setSelectedNotification] = useState(null); // for modal
 
   // Rules preview
   const [currentRules, setCurrentRules] = useState(null);
@@ -355,6 +356,69 @@ useEffect(() => {
 
 }, [studentNumber]);
 
+// -----------------------
+// FETCH NOTIFICATIONS
+// -----------------------
+const POLL_INTERVAL = 5000; // 5 seconds
+
+const fetchNotifications = async () => {
+  if (!studentNumber) return;
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/good-moral/history?student_number=${studentNumber}`,
+      { headers: { Accept: "application/json" } }
+    );
+
+    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+    const data = await res.json();
+
+    if (Array.isArray(data)) {
+      const formatted = data.map(n => ({
+        request_id: n.request_id,
+        message:
+          n.status === "Pending"
+            ? "Your Good Moral request is pending."
+            : n.status === "Approved"
+            ? "Your Good Moral request has been approved."
+            : "Your Good Moral request has been rejected.",
+        status: n.status,
+        is_new: !n.notified, // you can track notified field from backend
+        requested_at: n.requested_at,
+      }));
+
+      setNotifications(prev => {
+        // replace existing notifications with updated status
+        const updated = prev.map(p => {
+          const updatedItem = formatted.find(f => f.request_id === p.request_id);
+          return updatedItem ? { ...p, ...updatedItem } : p;
+        });
+
+        // add any new notifications
+        const newNotes = formatted.filter(
+          f => !prev.some(p => p.request_id === f.request_id)
+        );
+
+        return [...updated, ...newNotes];
+      });
+    }
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+  }
+};
+
+// -----------------------
+// Polling on mount
+// -----------------------
+useEffect(() => {
+  if (!studentNumber) return;
+
+  fetchNotifications();
+  const intervalId = setInterval(fetchNotifications, POLL_INTERVAL);
+
+  return () => clearInterval(intervalId);
+}, [studentNumber]);
 
   // ---------------------------
   // Render
@@ -434,41 +498,41 @@ useEffect(() => {
           </button>
         </nav><br></br>
 
- {/* DESKTOP LOGOUT BUTTON */}
-<div className="px-4 pb-6 mt-auto">
-  <button
-    onClick={() => {
-  Swal.fire({
-    title: "Logout",
-    text: "Are you sure you want to log out?",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Logout",
-    cancelButtonText: "Cancel",
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-  }).then((result) => {
-    if (result.isConfirmed) {
-
-      // SUCCESS TOAST BAGO MAG-REDIRECT
+    {/* DESKTOP LOGOUT BUTTON */}
+    <div className="px-4 pb-6 mt-auto">
+      <button
+        onClick={() => {
       Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Logged out successfully",
-        showConfirmButton: false,
-        timer: 500,
-        timerProgressBar: true,
-      });
+        title: "Logout",
+        text: "Are you sure you want to log out?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Logout",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+      }).then((result) => {
+        if (result.isConfirmed) {
 
-      // DELAY REDIRECT
-      setTimeout(() => {
-        localStorage.removeItem("student");
-        window.location.href = "/";
-      }, 500);
-    }
-  });
-}}
+          // SUCCESS TOAST BAGO MAG-REDIRECT
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            icon: "success",
+            title: "Logged out successfully",
+            showConfirmButton: false,
+            timer: 500,
+            timerProgressBar: true,
+          });
+
+          // DELAY REDIRECT
+          setTimeout(() => {
+            localStorage.removeItem("student");
+            window.location.href = "/";
+          }, 500);
+        }
+      });
+    }}
     className="
       flex items-center justify-center gap-3 
       w-full py-3
@@ -482,7 +546,7 @@ useEffect(() => {
     <span className="text-base font-semibold">Logout</span>
   </button>
 </div>
-      </aside>
+     </aside>
 
       {/* Sidebar drawer for mobile */}
       <div className={`fixed inset-0 z-40 md:hidden ${sidebarOpen ? "" : "pointer-events-none"}`}>
@@ -968,26 +1032,61 @@ useEffect(() => {
               </div>
             </div>
           )}
-
-          {/* NOTIFICATIONS */}
+          
+         {/*Notifications*/}
           {activePage === "Notifications" && (
             <div>
-              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">Notifications</h2>
+              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">
+                Notifications
+              </h2>
+
               {notifications.length === 0 ? (
                 <p className="text-gray-700">No notifications at the moment.</p>
               ) : (
                 <div className="space-y-4">
-                  {notifications.map((note, idx) => (
-                    <div key={idx} className="p-4 bg-white rounded-2xl shadow-md border-2 border-green-600">
-                      <p className="font-semibold">{note.type}</p>
-                      <p className="text-gray-600">Status: {note.status}</p>
-                    </div>
-                  ))}
+                  {notifications.map(note => {
+                    const { request_id, message, status, is_new } = note;
+
+                    let borderColor = "border-gray-400";
+                    let dotColor = "bg-gray-400";
+
+                    if (status === "Approved") {
+                      borderColor = "border-green-600";
+                      dotColor = "bg-green-600";
+                    } else if (status === "Rejected") {
+                      borderColor = "border-red-600";
+                      dotColor = "bg-red-600";
+                    } else if (status === "Pending") {
+                      borderColor = "border-yellow-500";
+                      dotColor = "bg-yellow-500";
+                    }
+
+                    return (
+                      <div
+                        key={request_id}
+                        className={`p-4 bg-white rounded-2xl shadow-md border-2 ${borderColor} flex items-center justify-between`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <span className={`w-3 h-3 rounded-full ${dotColor}`}></span>
+                          <p className="font-semibold">{message}</p>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <p className="text-gray-600 font-medium">{status}</p>
+
+                          {is_new && (
+                            <span className="px-2 py-0.5 text-xs font-semibold text-white bg-blue-500 rounded-full">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
-
         </main>
       </div>
 

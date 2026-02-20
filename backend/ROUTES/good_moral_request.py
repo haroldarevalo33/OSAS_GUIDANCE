@@ -37,7 +37,8 @@ def good_moral_request():
         student_number=student_number,
         filename_stored=filename_stored,
         filename_original=filename_original,
-        status="Pending"
+        status="Pending",
+        is_notified=False  # ✅ for notification
     )
     db.session.add(gm_request)
     db.session.commit()
@@ -47,6 +48,9 @@ def good_moral_request():
         "request_id": gm_request.request_id
     })
 
+# -------------------------
+# Cancel request
+# -------------------------
 @good_moral_bp.delete("/request/<int:request_id>")
 def cancel_request(request_id):
     gm_request = GoodMoralRequest.query.get(request_id)
@@ -69,7 +73,9 @@ def student_history():
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
 
-    requests = GoodMoralRequest.query.filter_by(student_number=student_number).order_by(GoodMoralRequest.requested_at.desc()).all()
+    requests = GoodMoralRequest.query.filter_by(student_number=student_number)\
+        .order_by(GoodMoralRequest.requested_at.desc()).all()
+
     result = [{
         "request_id": r.request_id,
         "status": r.status,
@@ -93,7 +99,6 @@ def download_certificate(request_id):
     if gm_request.status != "Approved":
         return jsonify({"message": "Request not approved yet"}), 403
 
-    # Check if there is a file
     if not gm_request.filename_stored:
         return jsonify({
             "message": "No file uploaded for this request",
@@ -112,6 +117,8 @@ def download_certificate(request_id):
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+
+
 # -------------------------
 # Admin approves/rejects a request
 # -------------------------
@@ -133,6 +140,7 @@ def process_request(request_id):
     gm_request.processed_by = admin_id
     gm_request.processed_at = db.func.now()
     gm_request.remarks = remarks
+    gm_request.is_notified = False  # ✅ reset notification
     db.session.commit()
 
     # Build download URL only if approved
@@ -140,7 +148,6 @@ def process_request(request_id):
     if gm_request.status == "Approved" and gm_request.filename_stored:
         download_url = f"{request.host_url}good-moral/download/{gm_request.request_id}"
 
-    # Return updated request object
     return jsonify({
         "message": f"Request {status} successfully",
         "request": {
@@ -155,6 +162,7 @@ def process_request(request_id):
             "remarks": gm_request.remarks
         }
     })
+
 
 # -------------------------
 # Get request by ID
@@ -176,6 +184,7 @@ def get_request(request_id):
         "remarks": gm_request.remarks
     })
 
+
 # -------------------------
 # Admin: list requests (with student info)
 # -------------------------
@@ -183,7 +192,6 @@ def get_request(request_id):
 def admin_list_requests():
     status_filter = request.args.get("status", "Pending")  # default: Pending requests
 
-    # Fetch all requests filtered by status
     requests = GoodMoralRequest.query.filter_by(status=status_filter)\
         .order_by(GoodMoralRequest.requested_at.desc()).all()
 
@@ -204,8 +212,46 @@ def admin_list_requests():
 
     return jsonify(result)
 
+
 @good_moral_bp.get("/admin/pending-count")
 def admin_pending_count():
     count = GoodMoralRequest.query.filter_by(status="Pending").count()
     return jsonify({"pending_count": count})
 
+
+# -------------------------
+# Student notifications endpoint
+# -------------------------
+@good_moral_bp.get("/student/notifications")
+def student_notifications():
+    student_number = request.args.get("student_number")
+    if not student_number:
+        return jsonify({"message": "student_number missing"}), 400
+
+    # Get all requests for this student that have not been notified
+    requests = GoodMoralRequest.query.filter_by(
+        student_number=student_number,
+        is_notified=False
+    ).all()
+
+    result = []
+
+    for r in requests:
+        if r.status == "Pending":
+            message = "Your Good Moral request is pending."
+        elif r.status == "Approved":
+            message = "Your Good Moral request has been approved."
+        elif r.status == "Rejected":
+            message = "Your Good Moral request has been rejected."
+
+        result.append({
+            "request_id": r.request_id,
+            "status": r.status,
+            "message": message
+        })
+
+        # Mark as notified so it won't show again
+        r.is_notified = True
+
+    db.session.commit()
+    return jsonify(result)
