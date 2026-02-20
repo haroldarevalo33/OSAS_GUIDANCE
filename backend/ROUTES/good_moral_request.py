@@ -208,3 +208,4 @@ def admin_list_requests():
 def admin_pending_count():
     count = GoodMoralRequest.query.filter_by(status="Pending").count()
     return jsonify({"pending_count": count})
+
