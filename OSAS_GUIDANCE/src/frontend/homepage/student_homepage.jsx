@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  Squares2X2Icon,
-  UserCircleIcon,
-  ArrowRightOnRectangleIcon,
-  NewspaperIcon,
-  DocumentCheckIcon,
-  BellIcon,
-  BookOpenIcon,
-  Bars3Icon,
-  XMarkIcon,
-} from "@heroicons/react/24/solid";
+import {Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 
 export default function StudentHome() {

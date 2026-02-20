@@ -93,6 +93,16 @@ def download_certificate(request_id):
     if gm_request.status != "Approved":
         return jsonify({"message": "Request not approved yet"}), 403
 
+    # Check if there is a file
+    if not gm_request.filename_stored:
+        return jsonify({
+            "message": "No file uploaded for this request",
+            "request_id": gm_request.request_id,
+            "student_number": gm_request.student_number,
+            "filename_original": gm_request.filename_original,
+            "status": gm_request.status
+        })
+
     file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], gm_request.filename_stored)
     if not os.path.exists(file_path):
         return jsonify({"message": "File not found"}), 404
@@ -102,8 +112,6 @@ def download_certificate(request_id):
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
-
-
 # -------------------------
 # Admin approves/rejects a request
 # -------------------------
@@ -127,8 +135,26 @@ def process_request(request_id):
     gm_request.remarks = remarks
     db.session.commit()
 
-    return jsonify({"message": f"Request {status} successfully"})
+    # Build download URL only if approved
+    download_url = None
+    if gm_request.status == "Approved" and gm_request.filename_stored:
+        download_url = f"{request.host_url}good-moral/download/{gm_request.request_id}"
 
+    # Return updated request object
+    return jsonify({
+        "message": f"Request {status} successfully",
+        "request": {
+            "request_id": gm_request.request_id,
+            "student_number": gm_request.student_number,
+            "status": gm_request.status,
+            "filename_original": gm_request.filename_original,
+            "filename_url": download_url,
+            "requested_at": gm_request.requested_at,
+            "processed_at": gm_request.processed_at,
+            "processed_by": gm_request.processed_by,
+            "remarks": gm_request.remarks
+        }
+    })
 
 # -------------------------
 # Get request by ID
@@ -149,3 +175,36 @@ def get_request(request_id):
         "processed_by": gm_request.processed_by,
         "remarks": gm_request.remarks
     })
+
+# -------------------------
+# Admin: list requests (with student info)
+# -------------------------
+@good_moral_bp.get("/admin/requests")
+def admin_list_requests():
+    status_filter = request.args.get("status", "Pending")  # default: Pending requests
+
+    # Fetch all requests filtered by status
+    requests = GoodMoralRequest.query.filter_by(status=status_filter)\
+        .order_by(GoodMoralRequest.requested_at.desc()).all()
+
+    result = []
+    for r in requests:
+        student = Student.query.filter_by(student_number=r.student_number).first()
+        result.append({
+            "request_id": r.request_id,
+            "student_number": r.student_number,
+            "student_name": student.student_name if student else "",
+            "course": student.course if student else "",
+            "status": r.status,
+            "filename_original": r.filename_original,
+            "requested_at": r.requested_at,
+            "processed_at": r.processed_at,
+            "remarks": r.remarks
+        })
+
+    return jsonify(result)
+
+@good_moral_bp.get("/admin/pending-count")
+def admin_pending_count():
+    count = GoodMoralRequest.query.filter_by(status="Pending").count()
+    return jsonify({"pending_count": count})

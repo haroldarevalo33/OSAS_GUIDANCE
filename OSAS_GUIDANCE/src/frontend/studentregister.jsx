@@ -41,7 +41,7 @@ export default function StudentRegister() {
       return;
     }
 
-    // ✅ CvSU EMAIL VALIDATION (ONLY @cvsu.edu.ph)
+    // CvSU EMAIL VALIDATION (ONLY @cvsu.edu.ph)
     const cvsuEmailRegex = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
     const normalizedEmail = email.toLowerCase();
 

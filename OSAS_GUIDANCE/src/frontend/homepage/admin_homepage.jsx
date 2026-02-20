@@ -138,8 +138,6 @@ const chartColors = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6", "#14
 const [sections, setSections] = useState([]); // to track unique section names for bars/legend
 const [courseData, setCourseData] = useState([]);
 
-
-
 useEffect(() => {
   let intervalId;
 
@@ -868,18 +866,94 @@ useEffect(() => {
   setFilteredStudents(result);
 }, [query, filterCategory, students]);
 
-//request view list
-const handleApprove = (req) => {
-  alert(`Approved ${req.student_number}`);
-  setPendingRequests(prev => prev.filter(r => r.student_number !== req.student_number));
-  setShowRequestDetails(false);
+
+// ----------------- GOOD MORAL FUNCTIONS -----------------
+const [currentAdminId] = useState(null);
+// Fetch pending requests for admin
+const fetchPendingRequests = async () => {
+  try {
+    const res = await fetch("http://localhost:5000/good-moral/admin/requests?status=Pending");
+    const data = await res.json();
+
+    // Map backend response to include proper display fields
+    const formatted = data.map((req) => ({
+      ...req,
+      student_name: req.student_name || "N/A",
+      course: req.course || "N/A",
+    }));
+
+    setPendingRequests(formatted);
+  } catch (err) {
+    console.error("Failed to fetch pending requests:", err);
+  }
 };
 
-const handleReject = (req) => {
-  alert(`Rejected ${req.student_number}`);
-  setPendingRequests(prev => prev.filter(r => r.student_number !== req.student_number));
-  setShowRequestDetails(false);
+const handleApprove = async (request) => {
+  try {
+    const res = await fetch(`http://localhost:5000/good-moral/process/${request.request_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Approved", admin_id: currentAdminId }),
+    });
+    const data = await res.json();
+
+    console.log("Approve response:", data);
+
+    // Update frontend immediately
+    setSelectedRequest((prev) => ({ ...prev, status: "Approved" }));
+
+    // Refresh pending requests
+    fetchPendingRequests();
+
+    // Load file URL if approved
+    if (data?.request?.filename_url) {
+      setCurrentGoodMoral({
+        name: data.request.filename_original,
+        url: data.request.filename_url,
+      });
+    }
+
+    setShowRequestDetails(false);
+  } catch (err) {
+    console.error("Failed to approve request:", err);
+  }
 };
+
+const handleReject = async (request) => {
+  try {
+    const res = await fetch(`http://localhost:5000/good-moral/process/${request.request_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Rejected", admin_id: currentAdminId }),
+    });
+    const data = await res.json();
+
+    console.log("Reject response:", data);
+
+    setSelectedRequest((prev) => ({ ...prev, status: "Rejected" }));
+
+    fetchPendingRequests();
+    setShowRequestDetails(false);
+  } catch (err) {
+    console.error("Failed to reject request:", err);
+  }
+};
+
+// Fetch all requests for a student (history)
+const fetchStudentRequests = async (studentNumber) => {
+  try {
+    const res = await fetch(`http://localhost:5000/good-moral/history?student_number=${studentNumber}`);
+    const data = await res.json();
+    setStudentRequests(data);
+  } catch (err) {
+    console.error("Failed to fetch student requests:", err);
+  }
+};
+
+// Automatically fetch pending requests when component mounts
+useEffect(() => {
+  fetchPendingRequests();
+}, []);
 
 // ===================== STATES ===================== //
 const [courseFilter, setCourseFilter] = useState("ALL");
@@ -2067,7 +2141,7 @@ useEffect(() => {
     {/* SIDE-BY-SIDE WRAPPER */}
     <div className="w-full flex justify-center gap-6">
 
-      {/* Good Moral Certificate */}
+      {/* ================== GOOD MORAL CERTIFICATE UI ================== */}
       <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
         <h3 className="text-lg font-semibold text-center">Good Moral Certificate</h3>
 
@@ -2084,7 +2158,7 @@ useEffect(() => {
           )}
         </button>
 
-        {/* File Display */}
+        {/* File Upload / Display */}
         {currentGoodMoral ? (
           <div className="flex flex-col gap-4 w-full">
             <div className="flex flex-col gap-2 border p-2 rounded">
@@ -2130,7 +2204,7 @@ useEffect(() => {
 
                   setCurrentGoodMoral({ name: file.name, file });
 
-                  const uploaded = await uploadFile(file, "good_moral");
+                  const uploaded = await uploadFile(file, "good_moral"); // your existing upload function
                   if (uploaded?.url) {
                     setCurrentGoodMoral((prev) => ({ ...prev, url: uploaded.url }));
                   }
@@ -2163,32 +2237,141 @@ useEffect(() => {
         )}
       </div>
 
-      {/* ===== CVSU Rules & Regulations ===== */}
-      <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
-        <h3 className="text-lg font-semibold text-center">CVSU Rules and Regulations</h3>
-        {currentRules ? (
-          <div className="flex flex-col gap-4 w-full">
-            <div className="flex flex-col gap-2 border p-2 rounded">
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const ext = currentRules.name?.split(".").pop().toLowerCase();
-                  switch (ext) {
-                    case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
-                    case "doc":
-                    case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
-                    case "jpg":
-                    case "jpeg":
-                    case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
-                    default: return <span className="text-gray-600 text-5xl">📁</span>;
-                  }
-                })()}
-                <span
-                  className="truncate font-medium cursor-pointer hover:underline"
+      {/* ================== FULLSCREEN FILE PREVIEW ================== */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
+            <button
+              onClick={() => setPreviewFile(null)}
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
+            >
+              ✕
+            </button>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+              {previewFile.name.endsWith(".pdf") ? (
+                <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px] md:min-h-[600px]" />
+              ) : (
+                <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================== REQUEST LIST MODAL ================== */}
+      {showRequestList && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
+            <button
+              onClick={() => setShowRequestList(false)}
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
+            >
+              ✕
+            </button>
+
+            <h3 className="text-xl font-semibold text-center mt-4">Pending Requests</h3>
+
+            <div className="flex-1 overflow-auto p-4 space-y-2">
+              {pendingRequests.length === 0 ? (
+                <p className="text-center text-gray-500">No pending requests</p>
+              ) : (
+                pendingRequests.map((req, idx) => (
+                  <button
+                    key={idx}
+                    className="w-full text-left border p-2 rounded hover:bg-gray-100"
+                    onClick={() => {
+                      setSelectedRequest(req);
+                      setShowRequestDetails(true);
+                    }}
+                  >
+                    {req.student_name} ({req.student_number}) - {req.course || "N/A"}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+   {/* ================== REQUEST DETAILS MODAL ================== */}
+  {showRequestDetails && selectedRequest && (
+  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
+      <button
+        onClick={() => setShowRequestDetails(false)}
+        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
+      >
+        ✕
+      </button>
+
+      <h3 className="text-lg font-semibold mb-4">Request Details</h3>
+
+      <div className="space-y-2">
+        <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
+        <p><strong>Name:</strong> {selectedRequest.student_name}</p>
+        <p><strong>Course:</strong> {selectedRequest.course || ""}</p>
+        <p><strong>Status:</strong> {selectedRequest.status}</p>
+
+        {/* Approve / Reject Buttons */}
+        {selectedRequest.status === "Pending" && (
+          <div className="flex gap-2 mt-4">
+            <button
+              className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+              onClick={() => handleApprove(selectedRequest)}
+            >
+              Approve
+            </button>
+
+            <button
+              className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+              onClick={() => handleReject(selectedRequest)}
+            >
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+       {/* ===== CVSU Rules & Regulations ===== */}
+            <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
+              <h3 className="text-lg font-semibold text-center">CVSU Rules and Regulations</h3>
+              {currentRules ? (
+                <div className="flex flex-col gap-4 w-full">
+                <div className="flex flex-col gap-2 border p-2 rounded">
+                    <div className="flex items-center gap-3">
+                      {(() => {
+                        const ext = currentRules.name?.split(".").pop().toLowerCase();
+                        switch (ext) {
+                          case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
+                          case "doc":
+                          case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
+                          case "jpg":
+                          case "jpeg":
+                          case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
+                          default: return <span className="text-gray-600 text-5xl">📁</span>;
+                        }
+                      })()}
+                      
+              <span
+                  className="truncate font-medium cursor-pointer hover:underline max-w-xs block"
+                  title={currentRules.name}
                   onClick={() => setPreviewFile(currentRules)}
                 >
-                  {currentRules.name}
+                  {(() => {
+                    const parts = currentRules.name.split(".");
+                    if (parts.length > 1) {
+                      const ext = parts.pop(); // kunin ang extension
+                      let name = parts.join("."); // base name
+                      if (name.length > 30) name = name.slice(0, 35) + "..."; // mas mahaba na truncate
+                      return `${name}.${ext}`;
+                    }
+                    return currentRules.name;
+                  })()}
                 </span>
               </div>
+
               <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
                 {currentRules.name.endsWith(".pdf") ? (
                   <embed src={currentRules.url} type="application/pdf" className="w-full h-full" />
@@ -2197,158 +2380,58 @@ useEffect(() => {
                 )}
               </div>
             </div>
+                  <label
+                    className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Change File
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
 
-            <label
-              className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Change File
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
+                        setCurrentRules({ name: file.name, file });
 
-                  setCurrentRules({ name: file.name, file });
-
-                  const uploaded = await uploadFile(file, "rules");
-                  if (uploaded?.url) {
-                    setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
-                  }
-                }}
-              />
-            </label>
-          </div>
-        ) : (
-          <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 transition-colors text-center">
-            <span className="text-6xl mb-2">📁</span>
-            <span className="text-gray-500 mb-2">Click here to upload</span>
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                setCurrentRules({ name: file.name, file });
-
-                const uploaded = await uploadFile(file, "rules");
-                if (uploaded?.url) {
-                  setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
-                }
-              }}
-            />
-            <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
-          </label>
-        )}
-      </div>
-    </div>
-
-        {/* ===== Fullscreen File Preview ===== */}
-        {previewFile && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
-
-              <button
-                onClick={() => setPreviewFile(null)}
-                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
-              >
-                ✕
-              </button>
-
-              <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-                {previewFile.name.endsWith(".pdf") ? (
-                  <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px] md:min-h-[600px]" />
-                ) : (
-                  <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ===== REQUEST LIST MODAL ===== */}
-        {showRequestList && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
-
-              <button
-                onClick={() => setShowRequestList(false)}
-                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
-              >
-                ✕
-              </button>
-
-              <h3 className="text-xl font-semibold text-center mt-4">Pending Requests</h3>
-
-              <div className="flex-1 overflow-auto p-4 space-y-2">
-                {pendingRequests.length === 0 ? (
-                  <p className="text-center text-gray-500">No pending requests</p>
-                ) : (
-                  pendingRequests.map((req, idx) => (
-                    <button
-                      key={idx}
-                      className="w-full text-left border p-2 rounded hover:bg-gray-100"
-                      onClick={() => {
-                        setSelectedRequest(req);
-                        setShowRequestDetails(true);
+                        const uploaded = await uploadFile(file, "rules");
+                        if (uploaded?.url) {
+                          setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
+                        }
                       }}
-                    >
-                      Student Number: {req.student_number}
-                    </button>
-                  ))
-                )}
-              </div>
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 transition-colors text-center">
+                  <span className="text-6xl mb-2">📁</span>
+                  <span className="text-gray-500 mb-2">Click here to upload</span>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+
+                      setCurrentRules({ name: file.name, file });
+
+                      const uploaded = await uploadFile(file, "rules");
+                      if (uploaded?.url) {
+                        setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
+                </label>
+              )}
             </div>
           </div>
-        )}
-
-          {/* ===== REQUEST DETAILS MODAL ===== */}
-          {showRequestDetails && selectedRequest && (
-            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
-
-                <button
-                  onClick={() => setShowRequestDetails(false)}
-                  className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
-                >
-                  ✕
-                </button>
-
-                <h3 className="text-lg font-semibold mb-4">Request Details</h3>
-
-                <div className="space-y-2">
-                  <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
-                  <p><strong>Section:</strong> {selectedRequest.section}</p>
-                  <p><strong>Violation:</strong> {selectedRequest.violation}</p>
-                  <p><strong>Status:</strong> {selectedRequest.status}</p>
-
-                  {selectedRequest.status === "Pending" && (
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                        onClick={() => handleApprove(selectedRequest)}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                        onClick={() => handleReject(selectedRequest)}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
         )}
+
+        {/*STUDENT RECORDS*/}
             {activePage === "records" && (
           <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
 
