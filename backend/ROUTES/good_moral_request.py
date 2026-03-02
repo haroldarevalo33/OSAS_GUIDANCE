@@ -38,7 +38,7 @@ def good_moral_request():
         filename_stored=filename_stored,
         filename_original=filename_original,
         status="Pending",
-        is_notified=False  # ✅ for notification
+        is_notified=False  # for notification
     )
     db.session.add(gm_request)
     db.session.commit()
@@ -89,37 +89,6 @@ def student_history():
 
 
 # -------------------------
-# Download approved Good Moral certificate
-# -------------------------
-@good_moral_bp.get("/download/<int:request_id>")
-def download_certificate(request_id):
-    gm_request = GoodMoralRequest.query.get(request_id)
-    if not gm_request:
-        return jsonify({"message": "Request not found"}), 404
-    if gm_request.status != "Approved":
-        return jsonify({"message": "Request not approved yet"}), 403
-
-    if not gm_request.filename_stored:
-        return jsonify({
-            "message": "No file uploaded for this request",
-            "request_id": gm_request.request_id,
-            "student_number": gm_request.student_number,
-            "filename_original": gm_request.filename_original,
-            "status": gm_request.status
-        })
-
-    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], gm_request.filename_stored)
-    if not os.path.exists(file_path):
-        return jsonify({"message": "File not found"}), 404
-
-    resp = make_response(send_file(file_path))
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
-
-
-# -------------------------
 # Admin approves/rejects a request
 # -------------------------
 @good_moral_bp.patch("/process/<int:request_id>")
@@ -140,29 +109,10 @@ def process_request(request_id):
     gm_request.processed_by = admin_id
     gm_request.processed_at = db.func.now()
     gm_request.remarks = remarks
-    gm_request.is_notified = False  # ✅ reset notification
+    gm_request.is_notified = False  #  reset notification
     db.session.commit()
 
-    # Build download URL only if approved
-    download_url = None
-    if gm_request.status == "Approved" and gm_request.filename_stored:
-        download_url = f"{request.host_url}good-moral/download/{gm_request.request_id}"
-
-    return jsonify({
-        "message": f"Request {status} successfully",
-        "request": {
-            "request_id": gm_request.request_id,
-            "student_number": gm_request.student_number,
-            "status": gm_request.status,
-            "filename_original": gm_request.filename_original,
-            "filename_url": download_url,
-            "requested_at": gm_request.requested_at,
-            "processed_at": gm_request.processed_at,
-            "processed_by": gm_request.processed_by,
-            "remarks": gm_request.remarks
-        }
-    })
-
+  
 
 # -------------------------
 # Get request by ID

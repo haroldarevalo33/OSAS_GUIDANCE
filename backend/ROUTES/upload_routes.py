@@ -74,6 +74,33 @@ def list_files():
             "status": "error",
             "message": str(e)
         }), 500
+    
+    # List only Good Moral files
+@upload_bp.route("/good-moral", methods=["GET"])
+def list_good_moral_files():
+    try:
+        files = UploadedFile.query.filter_by(file_type="good_moral").order_by(UploadedFile.id.desc()).all()
+        file_list = [
+            {
+                "id": f.id,
+                "stored": f.filename_stored,
+                "original": f.filename_original,
+                "mimetype": f.mimetype,
+                "size_bytes": f.size_bytes,
+                "path": f.path
+            }
+            for f in files
+        ]
+        return jsonify({
+            "status": "success",
+            "count": len(file_list),
+            "files": file_list
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 
 # Serve files for download
@@ -81,3 +108,5 @@ def list_files():
 def download_file(filename):
     upload_dir = os.path.join(current_app.root_path, "upload")
     return send_from_directory(upload_dir, filename)
+
+
