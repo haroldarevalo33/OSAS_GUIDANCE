@@ -75,7 +75,7 @@ def list_files():
             "message": str(e)
         }), 500
     
-    # List only Good Moral files
+# List only Good Moral files
 @upload_bp.route("/good-moral", methods=["GET"])
 def list_good_moral_files():
     try:

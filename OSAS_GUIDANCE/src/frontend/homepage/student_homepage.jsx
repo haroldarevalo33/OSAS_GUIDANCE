@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
@@ -353,7 +354,7 @@ const fetchLatestGoodMoral = async () => {
 useEffect(() => {
   if (!studentNumber) return;
 
-  // 🔥 Same style as student record fetch
+  // Same style as student record fetch
   fetchLatestGoodMoral();
 
 }, [studentNumber]);
@@ -376,7 +377,7 @@ useEffect(() => {
 }, [studentNumber]);
 
 // -----------------------
-// FETCH NOTIFICATIONS
+// FETCH NOTIFICATIONS + HISTORY
 // -----------------------
 const POLL_INTERVAL = 5000; // 5 seconds
 
@@ -384,46 +385,54 @@ const fetchNotifications = async () => {
   if (!studentNumber) return;
 
   try {
-    const res = await fetch(
+    //  Fetch new notifications
+    const notifRes = await fetch(
+      `http://localhost:5000/good-moral/student/notifications?student_number=${studentNumber}`,
+      { headers: { Accept: "application/json" } }
+    );
+    if (!notifRes.ok) throw new Error(`Failed to fetch notifications: ${notifRes.status}`);
+    const notifData = await notifRes.json();
+
+    const newNotifs = Array.isArray(notifData)
+      ? notifData.map(n => ({
+          request_id: n.request_id,
+          status: n.status,
+          message: n.message,
+          is_new: true,
+          requested_at: n.requested_at,
+        }))
+      : [];
+
+    // Fetch full history (all requests)
+    const historyRes = await fetch(
       `http://localhost:5000/good-moral/history?student_number=${studentNumber}`,
       { headers: { Accept: "application/json" } }
     );
+    if (!historyRes.ok) throw new Error(`Failed to fetch history: ${historyRes.status}`);
+    const historyData = await historyRes.json();
 
-    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+    const fullHistory = Array.isArray(historyData)
+      ? historyData.map(r => ({
+          request_id: r.request_id,
+          status: r.status,
+          message:
+            r.status === "Pending"
+              ? "Your Good Moral request is pending."
+              : r.status === "Approved"
+              ? "Your Good Moral request has been approved."
+              : "Your Good Moral request has been rejected.",
+          is_new: false, // already seen
+          requested_at: r.requested_at,
+        }))
+      : [];
 
-    const data = await res.json();
+    // Merge notifications with history: notifications take precedence (is_new = true)
+    const merged = [...fullHistory.filter(h => !newNotifs.some(n => n.request_id === h.request_id)), ...newNotifs];
 
-    if (Array.isArray(data)) {
-      const formatted = data.map(n => ({
-        request_id: n.request_id,
-        message:
-          n.status === "Pending"
-            ? "Your Good Moral request is pending."
-            : n.status === "Approved"
-            ? "Your Good Moral request has been approved."
-            : "Your Good Moral request has been rejected.",
-        status: n.status,
-        is_new: !n.notified, // you can track notified field from backend
-        requested_at: n.requested_at,
-      }));
-
-      setNotifications(prev => {
-        // replace existing notifications with updated status
-        const updated = prev.map(p => {
-          const updatedItem = formatted.find(f => f.request_id === p.request_id);
-          return updatedItem ? { ...p, ...updatedItem } : p;
-        });
-
-        // add any new notifications
-        const newNotes = formatted.filter(
-          f => !prev.some(p => p.request_id === f.request_id)
-        );
-
-        return [...updated, ...newNotes];
-      });
-    }
+    // Update state
+    setNotifications(merged);
   } catch (err) {
-    console.error("Error fetching notifications:", err);
+    console.error("Error fetching notifications/history:", err);
   }
 };
 
@@ -433,11 +442,12 @@ const fetchNotifications = async () => {
 useEffect(() => {
   if (!studentNumber) return;
 
-  fetchNotifications();
+  fetchNotifications(); // initial fetch
   const intervalId = setInterval(fetchNotifications, POLL_INTERVAL);
 
   return () => clearInterval(intervalId);
 }, [studentNumber]);
+
 
   // ---------------------------
   // Render

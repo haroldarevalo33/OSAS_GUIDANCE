@@ -38,7 +38,7 @@ def good_moral_request():
         filename_stored=filename_stored,
         filename_original=filename_original,
         status="Pending",
-        is_notified=False  # for notification
+        is_notified=False  #  for notification
     )
     db.session.add(gm_request)
     db.session.commit()
@@ -112,7 +112,26 @@ def process_request(request_id):
     gm_request.is_notified = False  #  reset notification
     db.session.commit()
 
-  
+    # Build download URL only if approved
+    download_url = None
+    if gm_request.status == "Approved" and gm_request.filename_stored:
+        download_url = f"{request.host_url}good-moral/download/{gm_request.request_id}"
+
+    return jsonify({
+        "message": f"Request {status} successfully",
+        "request": {
+            "request_id": gm_request.request_id,
+            "student_number": gm_request.student_number,
+            "status": gm_request.status,
+            "filename_original": gm_request.filename_original,
+            "filename_url": download_url,
+            "requested_at": gm_request.requested_at,
+            "processed_at": gm_request.processed_at,
+            "processed_by": gm_request.processed_by,
+            "remarks": gm_request.remarks
+        }
+    })
+
 
 # -------------------------
 # Get request by ID
@@ -169,19 +188,16 @@ def admin_pending_count():
     return jsonify({"pending_count": count})
 
 
-# -------------------------
-# Student notifications endpoint
-# -------------------------
 @good_moral_bp.get("/student/notifications")
 def student_notifications():
     student_number = request.args.get("student_number")
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
 
-    # Get all requests for this student that have not been notified
+    # Get all requests that have not been notified
     requests = GoodMoralRequest.query.filter_by(
         student_number=student_number,
-        is_notified=False
+        is_notified=False  # use proper Python boolean
     ).all()
 
     result = []
@@ -193,15 +209,20 @@ def student_notifications():
             message = "Your Good Moral request has been approved."
         elif r.status == "Rejected":
             message = "Your Good Moral request has been rejected."
+        else:
+            message = "Status unknown."
 
         result.append({
             "request_id": r.request_id,
             "status": r.status,
-            "message": message
+            "message": message,
+            "requested_at": r.requested_at
         })
 
-        # Mark as notified so it won't show again
-        r.is_notified = True
+        # Mark as notified
+        r.is_notified = True  # proper Python boolean
+        db.session.add(r)
 
-    db.session.commit()
+    db.session.commit()  # commit once after loop
+
     return jsonify(result)
