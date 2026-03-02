@@ -204,8 +204,28 @@ export default function StudentHome() {
   };
 
  
-
-
+  // Fetch rules file from backend on mount
+  useEffect(() => {
+    async function fetchRules() {
+      try {
+        const res = await fetch("http://localhost:5000/file/list");
+        const data = await res.json();
+        const rulesFile = (data.files || []).find((f) => f.file_type === "rules");
+        if (rulesFile) {
+          setCurrentRules({
+            name: rulesFile.original,
+            url: `http://localhost:5000/file/download/${rulesFile.stored}`,
+          });
+        } else {
+          setCurrentRules(null);
+        }
+      } catch (err) {
+        console.error("Error fetching rules:", err);
+        setCurrentRules(null);
+      }
+          }
+    fetchRules();
+  }, []);
 // -------------------
 // Fetch Good Moral file from backend
 // -------------------
