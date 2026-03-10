@@ -108,5 +108,3 @@ def list_good_moral_files():
 def download_file(filename):
     upload_dir = os.path.join(current_app.root_path, "upload")
     return send_from_directory(upload_dir, filename)
-
-

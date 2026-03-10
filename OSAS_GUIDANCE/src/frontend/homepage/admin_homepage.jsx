@@ -338,30 +338,25 @@ useEffect(() => {
 
 //fetch user
 useEffect(() => {
-    async function fetchUser() {
-      try {
-        const res = await fetch("http://localhost:5000/admin/me?admin_id=1"); 
-        if (!res.ok) throw new Error("Failed to fetch user info");
-        const data = await res.json();
+  async function fetchUser() {
+    try {
+      const res = await fetch("http://localhost:5000/admin/me?admin_id=1"); 
+      if (!res.ok) throw new Error("Failed to fetch user info");
+      const data = await res.json();
 
-        // Adjust the profile_pic URL to include /admin if needed
-        const profilePicUrl = data.profile_pic.includes("/admin/uploads/")
-          ? data.profile_pic
-          : data.profile_pic.replace("/uploads/", "/admin/uploads/");
-
-        setUser({
-          id: data.id,
-          name: data.name || "Admin",
-          email: data.email || "",
-          profile_pic: profilePicUrl,
-        });
-      } catch (err) {
-        console.error(err);
-      }
+      setUser({
+        id: data.admin_id,           // fixed key
+        name: data.name || "Admin",
+        email: data.email || "",
+        profile_pic: data.profile_pic,  // backend already returns full URL
+      });
+    } catch (err) {
+      console.error(err);
     }
+  }
 
-    fetchUser();
-  }, []);
+  fetchUser();
+}, []);
 
   if (!user) return <p>Loading...</p>;
 
