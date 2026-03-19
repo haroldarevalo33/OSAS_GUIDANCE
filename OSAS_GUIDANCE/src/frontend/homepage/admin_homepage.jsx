@@ -1549,31 +1549,31 @@ useEffect(() => {
             </div>
 
         {/* ================= MAIN GRID (Charts) ================= */}
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  {/* LINE CHART */}
-  <div className="lg:col-span-2 bg-green-50 border border-green-200 p-6 rounded-xl shadow-sm">
-    <h3 className="text-lg font-semibold text-green-800 mb-4 font-sans">
-      Monthly Behavioral Case Trends ({selectedYear})
-    </h3>
-    <ResponsiveContainer width="100%" height={320}>
-      <LineChart data={lineData.filter((d) => d.year === selectedYear)}>
-        <CartesianGrid stroke="#d1fae5" />
-        <XAxis dataKey="month" />
-        <YAxis
-          allowDecimals={false} // whole numbers lang
-          domain={[0, (dataMax) => Math.ceil(dataMax)]} // auto-adjust to ceiling ng max value
-          tickFormatter={(value) => Math.floor(value)} // siguraduhin whole number sa ticks
-        />
-        <Tooltip />
-        <Line
-          type="monotone"
-          dataKey="cases"
-          stroke="#16a34a"
-          strokeWidth={2}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* LINE CHART */}
+            <div className="lg:col-span-2 bg-green-50 border border-green-200 p-6 rounded-xl shadow-sm">
+              <h3 className="text-lg font-semibold text-green-800 mb-4 font-sans">
+                Monthly Behavioral Case Trends ({selectedYear})
+              </h3>
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={lineData.filter((d) => d.year === selectedYear)}>
+                  <CartesianGrid stroke="#d1fae5" />
+                  <XAxis dataKey="month" />
+                  <YAxis
+                    allowDecimals={false} // whole numbers lang
+                    domain={[0, (dataMax) => Math.ceil(dataMax)]} // auto-adjust to ceiling ng max value
+                    tickFormatter={(value) => Math.floor(value)} // siguraduhin whole number sa ticks
+                  />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="cases"
+                    stroke="#16a34a"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
               {/* PIE CHART */}
               <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-xl shadow-sm">
