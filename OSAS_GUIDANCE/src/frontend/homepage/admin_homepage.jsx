@@ -264,14 +264,19 @@ useEffect(() => {
   return () => document.removeEventListener("click", handleClickOutside);
 }, []);
   
-// ================= STATES =================
+//// ================= STATES =================
 const [lineData, setLineData] = useState([]);
 const [sectionData, setSectionData] = useState([]);
 const [courseData, setCourseData] = useState([]);
 const [sections, setSections] = useState([]); // unique section names for legend
+const [showMonthDetailModal, setShowMonthDetailModal] = useState(false);
+const [selectedMonthDetail, setSelectedMonthDetail] = useState(null);
+const [showCourseSectionsModal, setShowCourseSectionsModal] = useState(false);
+const [selectedCourseDetail, setSelectedCourseDetail] = useState(null);
+
 const chartColors = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6", "#14b8a6"];
 
-// ================= FETCH AND PROCESS DATA =================
+//// ================= FETCH AND PROCESS DATA =================
 useEffect(() => {
   let intervalId;
 
@@ -280,28 +285,38 @@ useEffect(() => {
       const res = await fetch("/violations");
       const data = await res.json();
 
-      //  LINE CHART (Monthly Cases with Year)
+      //// MONTHLY DATA
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      const monthlyCounts = months.map((m, i) => ({
-        month: m,
-        cases: data.filter((v) => {
+      const monthlyCounts = months.map((m, i) => {
+        const monthViolations = data.filter(v => {
           const d = new Date(v.violation_date);
           return !isNaN(d) && d.getMonth() === i && d.getFullYear() === selectedYear;
-        }).length,
-        year: selectedYear,
-      }));
+        });
+
+        const details = monthViolations.map(v => ({
+          courseName: v.course_year_section ? v.course_year_section.split(" ")[0].toUpperCase().trim() : "Unknown",
+          section: v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown",
+        }));
+
+        return {
+          month: m,
+          cases: monthViolations.length,
+          year: selectedYear,
+          details,
+        };
+      });
       setLineData(monthlyCounts);
 
-      // SECTION CHART
+      //// SECTION DATA
       const sectionCounts = {};
-      data.forEach((v) => {
+      data.forEach(v => {
         const d = new Date(v.violation_date);
-        if (isNaN(d) || d.getFullYear() !== selectedYear) return; // filter by selected year
+        if (isNaN(d) || d.getFullYear() !== selectedYear) return;
 
         const sec = v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown";
         sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
       });
-      const sectionArray = Object.keys(sectionCounts).map((sec) => ({
+      const sectionArray = Object.keys(sectionCounts).map(sec => ({
         section: sec,
         value: sectionCounts[sec],
         year: selectedYear,
@@ -309,28 +324,38 @@ useEffect(() => {
       setSectionData(sectionArray);
       setSections(Object.keys(sectionCounts));
 
-      //  COURSE CHART
+      //// COURSE DATA
       const courseCounts = {};
-      data.forEach((v) => {
+      const courseSectionsMap = {}; // map to build section drill-down
+      data.forEach(v => {
         const d = new Date(v.violation_date);
-        if (isNaN(d) || d.getFullYear() !== selectedYear) return; // filter by selected year
+        if (isNaN(d) || d.getFullYear() !== selectedYear) return;
         if (!v.course_year_section) return;
 
         const course = v.course_year_section.split(" ")[0].toUpperCase().trim();
         courseCounts[course] = (courseCounts[course] || 0) + 1;
+
+        // For drill-down sections
+        if (!courseSectionsMap[course]) courseSectionsMap[course] = [];
+        courseSectionsMap[course].push({
+          section: v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown",
+          value: 1,
+        });
       });
-      const courseArray = Object.keys(courseCounts).map((course) => ({
+
+      const courseArray = Object.keys(courseCounts).map(course => ({
         course,
         value: courseCounts[course],
         year: selectedYear,
+        sections: courseSectionsMap[course] || [],
       }));
       setCourseData(courseArray);
 
-      // UPDATE years list dynamically
-      const uniqueYears = Array.from(new Set(data.map((v) => {
+      //// UPDATE YEARS
+      const uniqueYears = Array.from(new Set(data.map(v => {
         const d = new Date(v.violation_date);
         return !isNaN(d) ? d.getFullYear() : null;
-      }).filter(Boolean))).sort((a, b) => b - a);
+      }).filter(Boolean))).sort((a,b) => b - a);
       setYears(uniqueYears);
 
     } catch (err) {
@@ -338,17 +363,25 @@ useEffect(() => {
     }
   };
 
-  // initial fetch
   fetchViolations();
-
-  // poll every 5 seconds
   intervalId = setInterval(fetchViolations, 5000);
 
-  // cleanup
   return () => clearInterval(intervalId);
 
-}, [activePage, selectedYear]); // re-fetch when activePage or selectedYear changes
-  //email
+}, [activePage, selectedYear]);
+
+//// ================= HANDLERS =================
+const openMonthDetail = (monthItem) => {
+  if (monthItem.cases > 0) {
+    setSelectedMonthDetail(monthItem);
+    setShowMonthDetailModal(true);
+  }
+};
+
+const openCourseSections = (courseItem) => {
+  setSelectedCourseDetail(courseItem);
+  setShowCourseSectionsModal(true);
+};
 const [profilePicPreview, setProfilePicPreview] = useState(null);
 const [user, setUser] = useState({ name: "", email: "", profile_pic:"" });
 
@@ -1669,41 +1702,98 @@ useEffect(() => {
             </div>
 
             {/* ================= MODALS ================= */}
-            {/* Monthly Cases Modal */}
-            {showModalMonthly && (
+           {/* Monthly Cases Modal */}
+              {showModalMonthly && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/50"></div>
+                  <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+                    <button
+                      className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
+                      onClick={() => setShowModalMonthly(false)}
+                    >
+                      ×
+                    </button>
+                    <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
+                      Total Behavioral Cases:{" "}
+                      {lineData
+                        .filter((d) => d.year === selectedYear)
+                        .reduce((sum, item) => sum + item.cases, 0)}
+                    </h3>
+                    <div className="divide-y divide-gray-300">
+                      {lineData
+                        .filter((d) => d.year === selectedYear)
+                        .map((item) => {
+                          const hasCases = item.cases > 0;
+                          return (
+                            <div
+                              key={item.month}
+                              className={`flex justify-between py-2 font-medium cursor-${hasCases ? "pointer" : "default"} 
+                                          ${hasCases ? "hover:bg-green-100" : "text-gray-400"}`}
+                              onClick={() => hasCases && openMonthDetail(item)}
+                            >
+                              <span>{item.month}</span>
+                              <span>{item.cases}</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </div>
+              )}  
+          {/* Detailed Month Modal */}
+            {showMonthDetailModal && selectedMonthDetail && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div className="absolute inset-0 bg-black/50"></div>
-                <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+                <div className="relative bg-white rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
                   <button
                     className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
-                    onClick={() => setShowModalMonthly(false)}
+                    onClick={() => setShowMonthDetailModal(false)}
                   >
                     ×
                   </button>
-                  <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
-                    Total Behavioral Cases:{" "}
-                    {lineData
-                      .filter((d) => d.year === selectedYear)
-                      .reduce((sum, item) => sum + item.cases, 0)}
+
+                  <h3 className="text-xl font-semibold text-blue-800 mb-2 text-center">
+                    Cases for {selectedMonthDetail.month} {selectedYear}
                   </h3>
+
+                  {/* Highlight the course with the most cases */}
+                  {selectedMonthDetail.details.length > 0 && (() => {
+                    // Count occurrences per course
+                    const courseCounts = {};
+                    selectedMonthDetail.details.forEach(d => {
+                      const key = d.courseName;
+                      courseCounts[key] = (courseCounts[key] || 0) + 1;
+                    });
+                    const maxCount = Math.max(...Object.values(courseCounts));
+                    const topCourses = Object.entries(courseCounts)
+                      .filter(([_, count]) => count === maxCount)
+                      .map(([course]) => course);
+
+                    return (
+                      <p className="text-center text-green-700 font-semibold mb-4">
+                        {topCourses.length === 1
+                          ? `Most Cases: ${topCourses[0]} (${maxCount})`
+                          : `Most Cases: ${topCourses.join(", ")} (${maxCount})`}
+                      </p>
+                    );
+                  })()}
+
                   <div className="divide-y divide-gray-300">
-                    {lineData
-                      .filter((d) => d.year === selectedYear)
-                      .map((item) => (
-                        <div
-                          key={item.month}
-                          className="flex justify-between py-2 text-green-900 font-medium"
-                        >
-                          <span>{item.month}</span>
-                          <span>{item.cases}</span>
+                    {selectedMonthDetail.details.length > 0 ? (
+                      selectedMonthDetail.details.map((course, idx) => (
+                        <div key={idx} className="py-2 text-gray-900">
+                          <p className="font-semibold">{course.courseName}</p>
+                          <p>Section: {course.section}</p>
                         </div>
-                      ))}
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">No cases for this month</p>
+                    )}
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Students by Course Modal */}
+          {/* Students by Course Modal */}
             {showModalCourse && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div className="absolute inset-0 bg-black/50"></div>
@@ -1716,17 +1806,18 @@ useEffect(() => {
                   </button>
                   <h3 className="text-xl font-semibold text-yellow-800 mb-4 text-center">
                     Total Students by Course:{" "}
-                    {courseData
-                      .filter((d) => d.year === selectedYear)
+                    {courseData.filter(d => d.year === selectedYear)
                       .reduce((sum, item) => sum + item.value, 0)}
                   </h3>
+
                   <div className="divide-y divide-gray-300">
                     {courseData
-                      .filter((d) => d.year === selectedYear)
-                      .map((item) => (
+                      .filter(d => d.year === selectedYear)
+                      .map(item => (
                         <div
                           key={item.course}
-                          className="flex justify-between py-2 text-yellow-900 font-medium"
+                          className="flex justify-between py-2 text-yellow-900 font-medium cursor-pointer hover:bg-yellow-100 rounded px-2"
+                          onClick={() => openCourseSections(item)}
                         >
                           <span>{item.course}</span>
                           <span>{item.value}</span>
@@ -1736,8 +1827,58 @@ useEffect(() => {
                 </div>
               </div>
             )}
+            {/* Course Sections Modal */}
+            {showCourseSectionsModal && selectedCourseDetail && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/50"></div>
+                <div className="relative bg-white rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+                  <button
+                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
+                    onClick={() => setShowCourseSectionsModal(false)}
+                  >
+                    ×
+                  </button>
 
-            {/* Cases per Section Modal */}
+                  <h3 className="text-xl font-semibold text-blue-800 mb-2 text-center">
+                    Sections for {selectedCourseDetail.course} ({selectedYear})
+                  </h3>
+
+                  {/* Most students section */}
+                  {selectedCourseDetail.sections.length > 0 && (() => {
+                    const sectionCounts = {};
+                    selectedCourseDetail.sections.forEach(s => {
+                      sectionCounts[s.section] = (sectionCounts[s.section] || 0) + 1;
+                    });
+                    const maxCount = Math.max(...Object.values(sectionCounts));
+                    const topSections = Object.entries(sectionCounts)
+                      .filter(([_, count]) => count === maxCount)
+                      .map(([sec]) => sec);
+
+                    return (
+                      <p className="text-center text-green-700 font-semibold mb-4">
+                        {topSections.length === 1
+                          ? `Most Students: ${topSections[0]} (${maxCount})`
+                          : `Most Students: ${topSections.join(", ")} (${maxCount})`}
+                      </p>
+                    );
+                  })()}
+
+                  <div className="divide-y divide-gray-300">
+                    {selectedCourseDetail.sections.length > 0 ? (
+                      selectedCourseDetail.sections.map((s, idx) => (
+                        <div key={idx} className="py-2 text-gray-900">
+                          <p className="font-semibold">{s.section}</p>
+                          <p>Students: {s.value}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">No sections for this course</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          {/* Cases per Section Modal */}
             {showModalSection && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div className="absolute inset-0 bg-black/50"></div>
@@ -1748,16 +1889,33 @@ useEffect(() => {
                   >
                     ×
                   </button>
-                  <h3 className="text-xl font-semibold text-purple-800 mb-4 text-center">
+
+                  <h3 className="text-xl font-semibold text-purple-800 mb-2 text-center">
                     Total Cases per Section:{" "}
                     {sectionData
-                      .filter((d) => d.year === selectedYear)
+                      .filter(d => d.year === selectedYear)
                       .reduce((sum, item) => sum + item.value, 0)}
                   </h3>
+
+                  {/* Top Section */}
+                  {(() => {
+                    const filteredSections = sectionData.filter(d => d.year === selectedYear);
+                    if (filteredSections.length === 0) return null;
+
+                    const maxValue = Math.max(...filteredSections.map(s => s.value));
+                    const topSection = filteredSections.find(s => s.value === maxValue);
+
+                    return (
+                      <p className="text-center text-green-700 font-semibold mb-4">
+                        Section with Most Cases: {topSection.section} ({topSection.value})
+                      </p>
+                    );
+                  })()}
+
                   <div className="divide-y divide-gray-300">
                     {sectionData
-                      .filter((d) => d.year === selectedYear)
-                      .map((item) => (
+                      .filter(d => d.year === selectedYear)
+                      .map(item => (
                         <div
                           key={item.section}
                           className="flex justify-between py-2 text-purple-900 font-medium"
@@ -1770,7 +1928,7 @@ useEffect(() => {
                 </div>
               </div>
             )}
-          </div>
+                      </div>
         )}
           {/* News */}
           {activePage === "news" && (
