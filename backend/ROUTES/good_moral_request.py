@@ -35,7 +35,7 @@ def good_moral_request():
     # Create Good Moral request in DB
     gm_request = GoodMoralRequest(
         student_number=student_number,
-        filename_stored=filename_stored,
+        filename_stored=filename_stored, 
         filename_original=filename_original,
         status="Pending",
         is_notified=False  #  for notification

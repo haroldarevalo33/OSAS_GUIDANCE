@@ -4,6 +4,8 @@ import Swal from "sweetalert2";
 import {LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,BarChart, Bar, PieChart, Pie, Cell, Legend} from "recharts";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function AdminHome() {
   const [activePage, setActivePage] = useState("trends");
@@ -57,7 +59,138 @@ const [currentRules, setCurrentRules] = useState(null);
   { student_number: "202210225", section: "Section 3", violation: "Absent", status: "Pending" },
 ]);
 const [selectedRequest, setSelectedRequest] = useState(null);
-   
+const [showModalMonthly, setShowModalMonthly] = useState(false);
+const [showModalCourse, setShowModalCourse] = useState(false);
+const [showModalSection, setShowModalSection] = useState(false);
+const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // default current year
+const [years, setYears] = useState([]);
+
+{/*downloadFullReport*/}
+const downloadFullReport = () => {
+  const doc = new jsPDF("p", "mm", "a4"); // portrait, mm, A4
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 14; // normal margin
+  const maxLineWidth = pageWidth - margin * 2;
+
+  // ================= TITLE =================
+  doc.setFont("times", "bold");
+  doc.setFontSize(18);
+  doc.text("Guidance Analytics Report", margin, 20);
+
+  // ================= USE SELECTED YEAR =================
+  const reportYear = selectedYear; // <- fix here
+
+  // Filtered data
+  const filteredLineData = lineData.filter(d => d.year === selectedYear);
+  const filteredCourseData = courseData.filter(d => d.year === selectedYear);
+  const filteredSectionData = sectionData.filter(d => d.year === selectedYear);
+
+  // ================= DATA SUMMARIES =================
+  const totalCases = filteredLineData.reduce((sum, item) => sum + item.cases, 0);
+  const totalStudents = filteredCourseData.reduce((sum, item) => sum + item.value, 0);
+  const totalSectionCases = filteredSectionData.reduce((sum, item) => sum + item.value, 0);
+
+  // ================= GENERATE DYNAMIC PARAGRAPHS =================
+  const paragraphs = [];
+
+  paragraphs.push(
+    `This report presents a comprehensive overview of guidance-related analytics for the academic year ${reportYear}. ` +
+    `It encompasses detailed information on behavioral cases, student distribution across courses, and section-specific case counts. ` +
+    `The purpose of this report is to provide data-driven insights to assist guidance personnel and administrative staff in monitoring trends, identifying areas requiring intervention, and implementing measures that support student welfare and a positive learning environment.`
+  );
+
+  // Monthly Behavioral Cases Analysis
+  if (filteredLineData.length > 0) {
+    const peakMonth = filteredLineData.reduce((prev, curr) => (curr.cases > prev.cases ? curr : prev));
+    const lowestMonth = filteredLineData.reduce((prev, curr) => (curr.cases < prev.cases ? curr : prev));
+
+    paragraphs.push(
+      `Throughout the year, a total of ${totalCases} behavioral cases were recorded. ` +
+      `The highest incidence was observed in ${peakMonth.month} with ${peakMonth.cases} reported cases, ` +
+      `while the lowest occurred in ${lowestMonth.month}, with ${lowestMonth.cases} cases. ` +
+      `These trends help identify critical periods where focused guidance and preventive strategies are necessary.`
+    );
+  }
+
+  // Course distribution analysis
+  if (filteredCourseData.length > 0) {
+    const topCourse = filteredCourseData.reduce((prev, curr) => (curr.value > prev.value ? curr : prev));
+    paragraphs.push(
+      `In terms of student enrollment, the institution recorded a total of ${totalStudents} students across all courses. ` +
+      `Notably, the course '${topCourse.course}' had the highest enrollment, with ${topCourse.value} students. ` +
+      `Understanding course enrollment distribution aids in resource allocation, program planning, and targeted guidance initiatives.`
+    );
+  }
+
+  // Section-wise cases analysis
+  if (filteredSectionData.length > 0) {
+    const topSection = filteredSectionData.reduce((prev, curr) => (curr.value > prev.value ? curr : prev));
+    paragraphs.push(
+      `Section-wise analysis revealed that section '${topSection.section}' recorded the highest number of behavioral cases at ${topSection.value}, ` +
+      `contributing to a cumulative total of ${totalSectionCases} cases across all sections. ` +
+      `Identifying sections with elevated cases allows for targeted counseling, intervention programs, and monitoring strategies.`
+    );
+  }
+
+  // Suggestions
+  paragraphs.push(
+    `Based on the data analyzed, it is recommended to implement proactive measures including regular counseling sessions, awareness campaigns, and structured peer support programs. ` +
+    `Special attention should be given during peak months to mitigate potential risks. ` +
+    `Additionally, continuous monitoring and timely reporting of behavioral trends are encouraged to enhance student well-being and maintain a safe academic environment.`
+  );
+
+  // ================= ADD PARAGRAPHS =================
+  doc.setFont("times", "normal");
+  doc.setFontSize(12);
+
+  let cursorY = 30;
+  paragraphs.forEach((para) => {
+    const lines = doc.splitTextToSize(para, maxLineWidth);
+    lines.forEach((line) => {
+      if (cursorY > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        cursorY = 20;
+      }
+      doc.text(line, margin, cursorY);
+      cursorY += 7;
+    });
+    cursorY += 5;
+  });
+
+  // ================= TABLES =================
+  const tables = [
+    { title: "Monthly Behavioral Cases", data: filteredLineData.map(d => [d.month, d.cases]), head: ["Month", "Cases"], color: [22, 163, 74] },
+    { title: "Students by Course", data: filteredCourseData.map(d => [d.course, d.value]), head: ["Course", "Students"], color: [234, 179, 8] },
+    { title: "Cases per Section", data: filteredSectionData.map(d => [d.section, d.value]), head: ["Section", "Cases"], color: [139, 92, 246] },
+  ];
+
+  tables.forEach((table) => {
+    if (cursorY > doc.internal.pageSize.getHeight() - 30) {
+      doc.addPage();
+      cursorY = 20;
+    }
+
+    doc.setFont("times", "bold");
+    doc.text(table.title, margin, cursorY);
+    cursorY += 5;
+
+    autoTable(doc, {
+      startY: cursorY,
+      head: [table.head],
+      body: table.data,
+      theme: "grid",
+      headStyles: { fillColor: table.color },
+      styles: { font: "times" },
+    });
+
+    cursorY = doc.lastAutoTable.finalY + 10;
+  });
+
+  // ================= SAVE PDF =================
+  doc.save(`Guidance_Analytics_Report_${reportYear}.pdf`);
+};
+
 // Function to generate a DOCX for a specific violation
 const downloadViolationDoc = (violation) => {
   const doc = new Document({
@@ -131,13 +264,14 @@ useEffect(() => {
   return () => document.removeEventListener("click", handleClickOutside);
 }, []);
   
-// STATES
+// ================= STATES =================
 const [lineData, setLineData] = useState([]);
 const [sectionData, setSectionData] = useState([]);
-const chartColors = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6", "#14b8a6"];
-const [sections, setSections] = useState([]); // to track unique section names for bars/legend
 const [courseData, setCourseData] = useState([]);
+const [sections, setSections] = useState([]); // unique section names for legend
+const chartColors = ["#10b981", "#3b82f6", "#f97316", "#ef4444", "#8b5cf6", "#14b8a6"];
 
+// ================= FETCH AND PROCESS DATA =================
 useEffect(() => {
   let intervalId;
 
@@ -146,42 +280,58 @@ useEffect(() => {
       const res = await fetch("/violations");
       const data = await res.json();
 
-      // 1️⃣ LINE CHART (Monthly Cases)
+      //  LINE CHART (Monthly Cases with Year)
       const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const monthlyCounts = months.map((m, i) => ({
         month: m,
         cases: data.filter((v) => {
           const d = new Date(v.violation_date);
-          return !isNaN(d) && d.getMonth() === i;
+          return !isNaN(d) && d.getMonth() === i && d.getFullYear() === selectedYear;
         }).length,
+        year: selectedYear,
       }));
       setLineData(monthlyCounts);
 
-      // 2️⃣ SECTION CHART
+      // SECTION CHART
       const sectionCounts = {};
       data.forEach((v) => {
+        const d = new Date(v.violation_date);
+        if (isNaN(d) || d.getFullYear() !== selectedYear) return; // filter by selected year
+
         const sec = v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown";
         sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
       });
       const sectionArray = Object.keys(sectionCounts).map((sec) => ({
         section: sec,
         value: sectionCounts[sec],
+        year: selectedYear,
       }));
       setSectionData(sectionArray);
       setSections(Object.keys(sectionCounts));
 
-      // 3️⃣ COURSE CHART
+      //  COURSE CHART
       const courseCounts = {};
       data.forEach((v) => {
+        const d = new Date(v.violation_date);
+        if (isNaN(d) || d.getFullYear() !== selectedYear) return; // filter by selected year
         if (!v.course_year_section) return;
+
         const course = v.course_year_section.split(" ")[0].toUpperCase().trim();
         courseCounts[course] = (courseCounts[course] || 0) + 1;
       });
       const courseArray = Object.keys(courseCounts).map((course) => ({
         course,
         value: courseCounts[course],
+        year: selectedYear,
       }));
       setCourseData(courseArray);
+
+      // UPDATE years list dynamically
+      const uniqueYears = Array.from(new Set(data.map((v) => {
+        const d = new Date(v.violation_date);
+        return !isNaN(d) ? d.getFullYear() : null;
+      }).filter(Boolean))).sort((a, b) => b - a);
+      setYears(uniqueYears);
 
     } catch (err) {
       console.error("Failed to fetch violations:", err);
@@ -197,8 +347,7 @@ useEffect(() => {
   // cleanup
   return () => clearInterval(intervalId);
 
-}, [activePage]); // <-- refetch automatically if activePage changes
-
+}, [activePage, selectedYear]); // re-fetch when activePage or selectedYear changes
   //email
 const [profilePicPreview, setProfilePicPreview] = useState(null);
 const [user, setUser] = useState({ name: "", email: "", profile_pic:"" });
@@ -1313,110 +1462,316 @@ useEffect(() => {
         {activePage === "uploadFileFormat" && "Upload File Format"}
         {activePage === "news" && "News Management"}
       </h2>
-    {/* Trends */}
-      {activePage === "trends" && (
-        <div className="space-y-8">
+      
+      {/* Trends */}
+        {activePage === "trends" && (
+          <div className="space-y-8">
+            {/* ================= YEAR DROPDOWN ================= */}
+            <div className="flex items-center justify-end space-x-2">
+              <label className="font-sans font-medium text-gray-700">Select Year:</label>
+              <select
+                className="border rounded px-2 py-1 font-sans"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* LINE CHART */}
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h3 className="text-xl font-semibold text-gray-700 mb-4">
-              Monthly Behavioral Case Trends
-            </h3>
-
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={lineData}>
-                <CartesianGrid stroke="#e5e7eb" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="cases"
-                  stroke="#16a34a"
-                  strokeWidth={3}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          {/* BAR CHART */}
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h3 className="text-xl font-semibold text-gray-700 mb-4">
-              Case Count Per Section
-            </h3>
-
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={sectionData} barCategoryGap="30%">
-                <CartesianGrid stroke="#e5e7eb" />
-                <XAxis dataKey="section" />
-                <YAxis />
-                <Tooltip />
-
-                {/* Centered legend */}
-                <Legend
-                  verticalAlign="bottom"
-                  align="center"
-                  height={60} // adjust spacing if needed
-                  content={() => (
-                    <div className="flex flex-wrap justify-center gap-4 mt-2">
-                      {sectionData.map((entry, index) => (
-                        <div key={entry.section} className="flex items-center gap-1">
-                          <span
-                            className="w-4 h-4 block"
-                            style={{ backgroundColor: chartColors[index % chartColors.length] }}
-                          ></span>
-                          <span className="text-gray-700">{entry.section}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                />
-
-                {/* Single Bar with per-cell colors */}
-                <Bar dataKey="value">
-                  {sectionData.map((entry, index) => (
-                    <Cell
-                      key={entry.section}
-                      fill={chartColors[index % chartColors.length]}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-            {/* PIE CHART */}
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                Case Distribution by Course
-              </h3>
-
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Tooltip />
-                  <Legend />
-                  <Pie
-                    data={courseData}          // <-- course data
-                    dataKey="value"            // <-- number of cases per course
-                    nameKey="course"           // <-- label = course (BSIT, BSBA...)
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                    label
+            {/* ================= SUMMARY CARDS ================= */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Total Behavioral Cases */}
+              <div className="relative bg-green-50 border border-green-200 rounded-2xl shadow-md p-6">
+                <div className="absolute left-0 top-0 h-full w-1.5 bg-green-600 rounded-l-2xl"></div>
+                <div className="pl-4">
+                  <p className="text-sm text-gray-600 font-sans">
+                    Total Behavioral Cases ({selectedYear})
+                  </p>
+                  <p className="text-3xl font-bold text-green-900 mt-2 font-sans">
+                    {lineData
+                      .filter((d) => d.year === selectedYear)
+                      .reduce((sum, item) => sum + item.cases, 0)}
+                  </p>
+                  <button
+                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans"
+                    onClick={() => setShowModalMonthly(true)}
                   >
-                    {courseData.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={chartColors[index % chartColors.length]}
-                      />
-                    ))}
-                  </Pie>
-                </PieChart>
+                    View Monthly Cases
+                  </button>
+                </div>
+              </div>
+
+              {/* Total Students by Course */}
+              <div className="relative bg-yellow-50 border border-yellow-200 rounded-2xl shadow-md p-6">
+                <div className="absolute left-0 top-0 h-full w-1.5 bg-yellow-500 rounded-l-2xl"></div>
+                <div className="pl-4">
+                  <p className="text-sm text-gray-600 font-sans">
+                    Total Students by Course ({selectedYear})
+                  </p>
+                  <p className="text-3xl font-bold text-yellow-800 mt-2 font-sans">
+                    {courseData
+                      .filter((d) => d.year === selectedYear)
+                      .reduce((sum, item) => sum + item.value, 0)}
+                  </p>
+                  <button
+                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans"
+                    onClick={() => setShowModalCourse(true)}
+                  >
+                    View Students by Course
+                  </button>
+                </div>
+              </div>
+
+              {/* Total Cases per Section */}
+              <div className="relative bg-purple-50 border border-purple-200 rounded-2xl shadow-md p-6">
+                <div className="absolute left-0 top-0 h-full w-1.5 bg-purple-600 rounded-l-2xl"></div>
+                <div className="pl-4">
+                  <p className="text-sm text-gray-600 font-sans">
+                    Total Cases per Section ({selectedYear})
+                  </p>
+                  <p className="text-3xl font-bold text-purple-900 mt-2 font-sans">
+                    {sectionData
+                      .filter((d) => d.year === selectedYear)
+                      .reduce((sum, item) => sum + item.value, 0)}
+                  </p>
+                  <button
+                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans"
+                    onClick={() => setShowModalSection(true)}
+                  >
+                    View Cases per Section
+                  </button>
+                </div>
+              </div>
+            </div>
+
+        {/* ================= MAIN GRID (Charts) ================= */}
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {/* LINE CHART */}
+  <div className="lg:col-span-2 bg-green-50 border border-green-200 p-6 rounded-xl shadow-sm">
+    <h3 className="text-lg font-semibold text-green-800 mb-4 font-sans">
+      Monthly Behavioral Case Trends ({selectedYear})
+    </h3>
+    <ResponsiveContainer width="100%" height={320}>
+      <LineChart data={lineData.filter((d) => d.year === selectedYear)}>
+        <CartesianGrid stroke="#d1fae5" />
+        <XAxis dataKey="month" />
+        <YAxis
+          allowDecimals={false} // whole numbers lang
+          domain={[0, (dataMax) => Math.ceil(dataMax)]} // auto-adjust to ceiling ng max value
+          tickFormatter={(value) => Math.floor(value)} // siguraduhin whole number sa ticks
+        />
+        <Tooltip />
+        <Line
+          type="monotone"
+          dataKey="cases"
+          stroke="#16a34a"
+          strokeWidth={2}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
+
+              {/* PIE CHART */}
+              <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-xl shadow-sm">
+                <h3 className="text-lg font-semibold text-yellow-800 mb-4 text-center font-sans">
+                  Course Distribution ({selectedYear})
+                </h3>
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Tooltip />
+                    <Legend />
+                    <Pie
+                      data={courseData.filter((d) => d.year === selectedYear)}
+                      dataKey="value"
+                      nameKey="course"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label
+                    >
+                      {courseData
+                        .filter((d) => d.year === selectedYear)
+                        .map((entry, index) => (
+                          <Cell
+                            key={index}
+                            fill={chartColors[index % chartColors.length]}
+                          />
+                        ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* ================= BAR CHART ================= */}
+            <div className="bg-purple-50 border border-purple-200 p-6 rounded-xl shadow-sm">
+              <h3 className="text-lg font-semibold text-purple-800 mb-4 font-sans">
+                Case Count Per Section ({selectedYear})
+              </h3>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart
+                  data={sectionData.filter((d) => d.year === selectedYear)}
+                  barCategoryGap="30%"
+                >
+                  <CartesianGrid stroke="#d1fae5" />
+                  <XAxis dataKey="section" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    height={50}
+                    content={() => (
+                      <div className="flex flex-wrap justify-center gap-4 mt-2 text-sm font-sans">
+                        {sectionData
+                          .filter((d) => d.year === selectedYear)
+                          .map((entry, index) => (
+                            <div key={entry.section} className="flex items-center gap-1">
+                              <span
+                                className="w-3 h-3 block rounded"
+                                style={{
+                                  backgroundColor:
+                                    chartColors[index % chartColors.length],
+                                }}
+                              ></span>
+                              <span className="text-gray-700">{entry.section}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  />
+                  <Bar dataKey="value">
+                    {sectionData
+                      .filter((d) => d.year === selectedYear)
+                      .map((entry, index) => (
+                        <Cell
+                          key={entry.section}
+                          fill={chartColors[index % chartColors.length]}
+                        />
+                      ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </div>
 
-          </div>
+            {/* ================= DOWNLOAD BUTTON ================= */}
+            <div className="flex justify-end">
+              <button
+                className="bg-green-600 text-white px-6 py-3 rounded-xl font-medium shadow-md hover:bg-green-700 transition font-sans"
+                onClick={downloadFullReport}
+              >
+                Download Report
+              </button>
+            </div>
+
+            {/* ================= MODALS ================= */}
+            {/* Monthly Cases Modal */}
+            {showModalMonthly && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/50"></div>
+                <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+                  <button
+                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
+                    onClick={() => setShowModalMonthly(false)}
+                  >
+                    ×
+                  </button>
+                  <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
+                    Total Behavioral Cases:{" "}
+                    {lineData
+                      .filter((d) => d.year === selectedYear)
+                      .reduce((sum, item) => sum + item.cases, 0)}
+                  </h3>
+                  <div className="divide-y divide-gray-300">
+                    {lineData
+                      .filter((d) => d.year === selectedYear)
+                      .map((item) => (
+                        <div
+                          key={item.month}
+                          className="flex justify-between py-2 text-green-900 font-medium"
+                        >
+                          <span>{item.month}</span>
+                          <span>{item.cases}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
             )}
 
+            {/* Students by Course Modal */}
+            {showModalCourse && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/50"></div>
+                <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+                  <button
+                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
+                    onClick={() => setShowModalCourse(false)}
+                  >
+                    ×
+                  </button>
+                  <h3 className="text-xl font-semibold text-yellow-800 mb-4 text-center">
+                    Total Students by Course:{" "}
+                    {courseData
+                      .filter((d) => d.year === selectedYear)
+                      .reduce((sum, item) => sum + item.value, 0)}
+                  </h3>
+                  <div className="divide-y divide-gray-300">
+                    {courseData
+                      .filter((d) => d.year === selectedYear)
+                      .map((item) => (
+                        <div
+                          key={item.course}
+                          className="flex justify-between py-2 text-yellow-900 font-medium"
+                        >
+                          <span>{item.course}</span>
+                          <span>{item.value}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cases per Section Modal */}
+            {showModalSection && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/50"></div>
+                <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+                  <button
+                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
+                    onClick={() => setShowModalSection(false)}
+                  >
+                    ×
+                  </button>
+                  <h3 className="text-xl font-semibold text-purple-800 mb-4 text-center">
+                    Total Cases per Section:{" "}
+                    {sectionData
+                      .filter((d) => d.year === selectedYear)
+                      .reduce((sum, item) => sum + item.value, 0)}
+                  </h3>
+                  <div className="divide-y divide-gray-300">
+                    {sectionData
+                      .filter((d) => d.year === selectedYear)
+                      .map((item) => (
+                        <div
+                          key={item.section}
+                          className="flex justify-between py-2 text-purple-900 font-medium"
+                        >
+                          <span>{item.section}</span>
+                          <span>{item.value}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
           {/* News */}
           {activePage === "news" && (
             <div className="bg-white p-6 rounded-xl shadow-lg space-y-6">
@@ -1665,6 +2020,8 @@ useEffect(() => {
             </div>
           </div>
         )}
+
+        
 
   {showViolationDetailsModal && currentViolation && (() => {
   const v = currentViolation;
