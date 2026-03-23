@@ -232,21 +232,24 @@ export default function StudentHome() {
 // Fetch Good Moral file from backend
 // -------------------
 const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
+
 useEffect(() => {
   const fetchGoodMoralFile = async () => {
     try {
-      const res = await fetch("http://localhost:5000/file/good-moral"); // Backend endpoint
-      if (!res.ok) return;
+      const studentNumber = "123456"; // palitan ng actual student number
+      const res = await fetch(`http://localhost:5000/good-moral/history?student_number=${studentNumber}`);
+      if (!res.ok) throw new Error("Failed to fetch history");
 
       const data = await res.json();
-      if (data.status !== "success") return;
 
-      // Take the first Good Moral file (or adapt if multiple)
-      const goodMoralFile = data.files[0];
-      if (goodMoralFile) {
+      // Filter approved requests
+      const approved = data.filter(r => r.status === "Approved");
+
+      if (approved.length > 0) {
+        const latest = approved[0]; // latest approved
         setCurrentGoodMoral({
-          name: goodMoralFile.original,
-          url: `http://localhost:5000/file/download/${goodMoralFile.stored}`,
+          name: latest.filename_original,
+          url: `http://localhost:5000/good-moral/download/${latest.request_id}`,
         });
       }
     } catch (err) {
@@ -855,7 +858,6 @@ useEffect(() => {
               )}
             </>
           )}
-          
      {/* Good Moral */}
       {activePage === "GoodMoral" && (
         <div className="flex flex-col items-center">
@@ -896,110 +898,137 @@ useEffect(() => {
                 )}
               </div>
 
+              {/* ============================= */}
               {/* Approved Good Moral File Box */}
-              {studentRecord?.lastGoodMoralRequest.status === "Approved" && currentGoodMoral && (
-                <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50">
+              {/* ============================= */}
+              {studentRecord?.lastGoodMoralRequest.status === "Approved" && (
+                <>
+                  {/* If we have currentGoodMoral state (from fetch) */}
+                  {currentGoodMoral ? (
+                    <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50">
 
-                  {/* File Name with extension in bold */}
-                  <p className="text-gray-800 font-semibold truncate">
-                    {(() => {
-                      const parts = currentGoodMoral.name.split(".");
-                      const ext = parts.length > 1 ? parts.pop() : "";
-                      const nameOnly = parts.join(".");
-                      return (
-                        <>
-                          {nameOnly}
-                          {ext && <span className="font-bold">.{ext}</span>}
-                        </>
-                      );
-                    })()}
-                  </p>
+                      {/* File Name with extension in bold */}
+                      <p className="text-gray-800 font-semibold truncate">
+                        {(() => {
+                          const parts = currentGoodMoral.name.split(".");
+                          const ext = parts.length > 1 ? parts.pop() : "";
+                          const nameOnly = parts.join(".");
+                          return (
+                            <>
+                              {nameOnly}
+                              {ext && <span className="font-bold">.{ext}</span>}
+                            </>
+                          );
+                        })()}
+                      </p>
 
-                  {/* Scrollable PDF/Doc Preview */}
-                  <div className="w-full border rounded overflow-hidden h-64 mb-2">
-                    <iframe
-                      src={currentGoodMoral.url}
-                      className="w-full h-full"
-                      title="Good Moral Certificate Preview"
-                    />
-                  </div>
+                      {/* Scrollable PDF/Doc Preview */}
+                      <div className="w-full border rounded overflow-hidden h-64 mb-2">
+                        <iframe
+                          src={currentGoodMoral.url}
+                          className="w-full h-full"
+                          title="Good Moral Certificate Preview"
+                        />
+                      </div>
 
-                  {/* View File button at bottom-right */}
-                  <div className="flex justify-end mt-auto">
-                    <button
-                      onClick={() => window.open(currentGoodMoral.url, "_blank")}
-                      className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
-                    >
-                      View File
-                    </button>
-                  </div>
-                </div>
+                      {/* View File button at bottom-right */}
+                      <div className="flex justify-end mt-auto">
+                        <button
+                          onClick={() => window.open(currentGoodMoral.url, "_blank")}
+                          className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+                        >
+                          View File
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* If autofill PDF is available without fetching state */
+                    <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4">
+                      <iframe
+                        src={`http://localhost:5000/good-moral/download/${studentRecord.lastGoodMoralRequest.request_id}`}
+                        className="w-full h-64"
+                        title="Good Moral Certificate"
+                      ></iframe>
+                      <div className="flex justify-end mt-2">
+                        <a
+                          href={`http://localhost:5000/good-moral/download/${studentRecord.lastGoodMoralRequest.request_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+                            View File
+                          </button>
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Cancel request button (only Pending) */}
-              {studentRecord?.lastGoodMoralRequest.status === "Pending" && (
-                <button
-                  onClick={() => {
-                    Swal.fire({
-                      title: "Are you sure?",
-                      text: "Do you want to cancel your Good Moral request?",
-                      icon: "warning",
-                      showCancelButton: true,
-                      confirmButtonColor: "#3085d6",
-                      cancelButtonColor: "#d33",
-                      confirmButtonText: "Yes, cancel it!",
-                    }).then((result) => {
-                      if (result.isConfirmed) {
-                        const BACKEND_URL = "http://localhost:5000";
-                        fetch(`${BACKEND_URL}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`, {
-                          method: "DELETE",
-                        })
-                          .then((res) => {
-                            if (res.ok) {
-                              Swal.fire({
-                                toast: true,
-                                position: "top-end",
-                                icon: "success",
-                                title: "Request cancelled!",
-                                showConfirmButton: false,
-                                timer: 500,
-                              });
-                              setTimeout(() => {
-                                window.location.reload();
-                              }, 500);
-                            } else {
-                              Swal.fire({
-                                toast: true,
-                                position: "top-end",
-                                icon: "error",
-                                title: "Failed to cancel request",
-                                showConfirmButton: false,
-                                timer: 1500,
-                              });
+                {/* Cancel request button (only Pending) */}
+                    {studentRecord?.lastGoodMoralRequest.status === "Pending" && (
+                      <button
+                        onClick={() => {
+                          Swal.fire({
+                            title: "Are you sure?",
+                            text: "Do you want to cancel your Good Moral request?",
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonColor: "#3085d6",
+                            cancelButtonColor: "#d33",
+                            confirmButtonText: "Yes, cancel it!",
+                          }).then((result) => {
+                            if (result.isConfirmed) {
+                              const BACKEND_URL = "http://localhost:5000";
+                              fetch(`${BACKEND_URL}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`, {
+                                method: "DELETE",
+                              })
+                                .then((res) => {
+                                  if (res.ok) {
+                                    Swal.fire({
+                                      toast: true,
+                                      position: "top-end",
+                                      icon: "success",
+                                      title: "Request cancelled!",
+                                      showConfirmButton: false,
+                                      timer: 500,
+                                    });
+                                    setTimeout(() => {
+                                      window.location.reload();
+                                    }, 500);
+                                  } else {
+                                    Swal.fire({
+                                      toast: true,
+                                      position: "top-end",
+                                      icon: "error",
+                                      title: "Failed to cancel request",
+                                      showConfirmButton: false,
+                                      timer: 1500,
+                                    });
+                                  }
+                                })
+                                .catch(() => {
+                                  Swal.fire({
+                                    toast: true,
+                                    position: "top-end",
+                                    icon: "error",
+                                    title: "Failed to cancel request",
+                                    showConfirmButton: false,
+                                    timer: 1500,
+                                  });
+                                });
                             }
-                          })
-                          .catch(() => {
-                            Swal.fire({
-                              toast: true,
-                              position: "top-end",
-                              icon: "error",
-                              title: "Failed to cancel request",
-                              showConfirmButton: false,
-                              timer: 1500,
-                            });
                           });
-                      }
-                    });
-                  }}
-                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
-                >
-                  Cancel Request
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                        }}
+                        className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           {/* RULES */}
           {activePage === "Rules" && (
             <div className="flex flex-col items-center">

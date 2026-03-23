@@ -1,13 +1,49 @@
 import os
 import uuid
-from flask import Blueprint, request, jsonify, send_file, current_app, make_response
-from models import Admin, Student, GoodMoralRequest, db
+import io
+from flask import Blueprint, request, jsonify, send_file, current_app, send_from_directory
+from models import Student, GoodMoralRequest, UploadedFile, db
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from pypdf import PdfReader, PdfWriter
 
 good_moral_bp = Blueprint("good_moral_bp", __name__, url_prefix="/good-moral")
 
-# -------------------------
+# =========================
+# PDF Generation Function (auto-fill only)
+# =========================
+def generate_good_moral_pdf(template_path, student_name, student_number):
+    """
+    Uses the uploaded Good Moral template and fills in the student's
+    name and number on the PDF. Does NOT create a new blank template.
+    """
+    overlay_buffer = io.BytesIO()
+    c = canvas.Canvas(overlay_buffer, pagesize=A4)
+    width, height = A4  # 595 x 842
+
+    # Adjust positions as needed
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(228, height - 222, str(student_name))
+    c.drawString(146, height - 245, str(student_number))
+    c.save()
+    overlay_buffer.seek(0)
+
+    template_reader = PdfReader(template_path)
+    overlay_reader = PdfReader(overlay_buffer)
+
+    writer = PdfWriter()
+    page = template_reader.pages[0]
+    page.merge_page(overlay_reader.pages[0])
+    writer.add_page(page)
+
+    output_buffer = io.BytesIO()
+    writer.write(output_buffer)
+    output_buffer.seek(0)
+    return output_buffer
+
+# =========================
 # Student submits a Good Moral request
-# -------------------------
+# =========================
 @good_moral_bp.post("/request")
 def good_moral_request():
     data = request.form or {}
@@ -38,7 +74,7 @@ def good_moral_request():
         filename_stored=filename_stored, 
         filename_original=filename_original,
         status="Pending",
-        is_notified=False  #  for notification
+        is_notified=False
     )
     db.session.add(gm_request)
     db.session.commit()
@@ -48,9 +84,9 @@ def good_moral_request():
         "request_id": gm_request.request_id
     })
 
-# -------------------------
+# =========================
 # Cancel request
-# -------------------------
+# =========================
 @good_moral_bp.delete("/request/<int:request_id>")
 def cancel_request(request_id):
     gm_request = GoodMoralRequest.query.get(request_id)
@@ -63,10 +99,9 @@ def cancel_request(request_id):
     db.session.commit()
     return jsonify({"message": "Request cancelled successfully"})
 
-
-# -------------------------
+# =========================
 # Student views all their requests
-# -------------------------
+# =========================
 @good_moral_bp.get("/history")
 def student_history():
     student_number = request.args.get("student_number")
@@ -87,14 +122,13 @@ def student_history():
 
     return jsonify(result)
 
-
-# -------------------------
+# =========================
 # Admin approves/rejects a request
-# -------------------------
+# =========================
 @good_moral_bp.patch("/process/<int:request_id>")
 def process_request(request_id):
     data = request.json or {}
-    status = data.get("status")  # "Approved" or "Rejected"
+    status = data.get("status")
     admin_id = data.get("admin_id")
     remarks = data.get("remarks", "")
 
@@ -109,10 +143,9 @@ def process_request(request_id):
     gm_request.processed_by = admin_id
     gm_request.processed_at = db.func.now()
     gm_request.remarks = remarks
-    gm_request.is_notified = False  #  reset notification
+    gm_request.is_notified = False
     db.session.commit()
 
-    # Build download URL only if approved
     download_url = None
     if gm_request.status == "Approved" and gm_request.filename_stored:
         download_url = f"{request.host_url}good-moral/download/{gm_request.request_id}"
@@ -132,10 +165,9 @@ def process_request(request_id):
         }
     })
 
-
-# -------------------------
+# =========================
 # Get request by ID
-# -------------------------
+# =========================
 @good_moral_bp.get("/<int:request_id>")
 def get_request(request_id):
     gm_request = GoodMoralRequest.query.get(request_id)
@@ -153,14 +185,12 @@ def get_request(request_id):
         "remarks": gm_request.remarks
     })
 
-
-# -------------------------
-# Admin: list requests (with student info)
-# -------------------------
+# =========================
+# Admin: list requests
+# =========================
 @good_moral_bp.get("/admin/requests")
 def admin_list_requests():
-    status_filter = request.args.get("status", "Pending")  # default: Pending requests
-
+    status_filter = request.args.get("status", "Pending")
     requests = GoodMoralRequest.query.filter_by(status=status_filter)\
         .order_by(GoodMoralRequest.requested_at.desc()).all()
 
@@ -181,27 +211,29 @@ def admin_list_requests():
 
     return jsonify(result)
 
-
+# =========================
+# Admin pending count
+# =========================
 @good_moral_bp.get("/admin/pending-count")
 def admin_pending_count():
     count = GoodMoralRequest.query.filter_by(status="Pending").count()
     return jsonify({"pending_count": count})
 
-
+# =========================
+# Student notifications
+# =========================
 @good_moral_bp.get("/student/notifications")
 def student_notifications():
     student_number = request.args.get("student_number")
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
 
-    # Get all requests that have not been notified
     requests = GoodMoralRequest.query.filter_by(
         student_number=student_number,
-        is_notified=False  # use proper Python boolean
+        is_notified=False
     ).all()
 
     result = []
-
     for r in requests:
         if r.status == "Pending":
             message = "Your Good Moral request is pending."
@@ -218,11 +250,47 @@ def student_notifications():
             "message": message,
             "requested_at": r.requested_at
         })
-
-        # Mark as notified
-        r.is_notified = True  # proper Python boolean
+        r.is_notified = True
         db.session.add(r)
 
-    db.session.commit()  # commit once after loop
-
+    db.session.commit()
     return jsonify(result)
+
+# =========================
+# Download Good Moral PDF
+# =========================
+@good_moral_bp.get("/download/<int:request_id>")
+def download_certificate(request_id):
+  
+    gm_request = GoodMoralRequest.query.get(request_id)
+    if not gm_request:
+        return jsonify({"message": "Request not found"}), 404
+
+    if gm_request.status != "Approved":
+        return jsonify({"message": "Request not approved"}), 403
+
+    student = Student.query.filter_by(student_number=gm_request.student_number).first()
+    if not student:
+        return jsonify({"message": "Student not found"}), 404
+
+  
+    gm_template = UploadedFile.query.filter_by(
+        file_type="good_moral"
+    ).order_by(UploadedFile.uploaded_at.desc()).first()
+
+    if not gm_template or not os.path.exists(gm_template.path):
+        return jsonify({"message": "No Good Moral template uploaded"}), 404
+
+
+    pdf = generate_good_moral_pdf(
+        template_path=gm_template.path,
+        student_name=student.student_name,
+        student_number=student.student_number
+    )
+
+    return send_file(
+        pdf,
+        as_attachment=False,
+        download_name="good_moral_certificate.pdf",
+        mimetype="application/pdf"
+    )

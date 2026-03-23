@@ -75,6 +75,7 @@ def create_app():
     from routes.news import news_bp
     from routes.upload_routes import upload_bp
     from routes.good_moral_request import good_moral_bp 
+    
 
     # ------------------------------------------------
     # Register Blueprints
@@ -85,7 +86,8 @@ def create_app():
     app.register_blueprint(stats_bp)
     app.register_blueprint(news_bp)
     app.register_blueprint(upload_bp)
-    app.register_blueprint(good_moral_bp, url_prefix="/good-moral")  # ✅ Register Good Moral
+    app.register_blueprint(good_moral_bp, url_prefix="/good-moral")
+   
 
     # ------------------------------------------------
     # ML Prediction Route
