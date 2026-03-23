@@ -15,8 +15,20 @@ export default function StudentRegister() {
   const [studentName, setStudentName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [course, setCourse] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
   const [password, setPassword] = useState("");
+
+  // ================= Course List =================
+  const courses = [
+    "Bachelor of Elementary Education",
+    "Bachelor of Secondary Education",
+    "BS Business Management",
+    "BS Computer Science",
+    "BS Fisheries",
+    "BS Hospitality Management (formerly BS Hotel and Restaurant Management)",
+    "BS Information Technology",
+    "Basic Seaman Training Course"
+  ];
 
   // Word fade effect
   useEffect(() => {
@@ -32,7 +44,7 @@ export default function StudentRegister() {
 
   // Handle registration
   const handleRegister = async () => {
-    if (!studentNumber || !studentName || !email || !phone || !course || !password) {
+    if (!studentNumber || !studentName || !email || !phone || !selectedCourse || !password) {
       Swal.fire({
         icon: "warning",
         title: "Incomplete Form",
@@ -61,9 +73,9 @@ export default function StudentRegister() {
         body: JSON.stringify({
           student_number: studentNumber,
           student_name: studentName,
-          email: normalizedEmail, // ✅ lowercase email
+          email: normalizedEmail,
           phone,
-          course,
+          course: selectedCourse, // ✅ fixed
           password,
         }),
       });
@@ -170,14 +182,24 @@ export default function StudentRegister() {
             className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
-          <label className="text-gray-700 font-medium">Course</label>
-          <input
-            type="text"
-            placeholder="Enter your course"
-            value={course}
-            onChange={(e) => setCourse(e.target.value)}
-            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
-          />
+          {/* Course Selection Dropdown */}
+          <label htmlFor="course" className="font-semibold mb-2 block">
+            Select Course
+          </label>
+          <select
+            id="course"
+            name="course"
+            className="border border-gray-300 rounded-lg p-2 w-full"
+            value={selectedCourse}
+            onChange={(e) => setSelectedCourse(e.target.value)}
+          >
+            <option value="">-- Select a Course --</option>
+            {courses.map((course, index) => (
+              <option key={index} value={course}>
+                {course}
+              </option>
+            ))}
+          </select>
 
           <label className="text-gray-700 font-medium">Password</label>
           <div className="relative">

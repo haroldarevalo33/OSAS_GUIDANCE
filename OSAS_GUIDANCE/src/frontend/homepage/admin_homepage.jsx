@@ -622,13 +622,14 @@ const handlePreviewFile = (file) => {
   const closePreview = () => setPreviewFile(null);
   const [previewFile, setPreviewFile] = useState(null);
 
-  const menuItems = [
-    { id: "trends", label: "View Trends", icon: ChartBarIcon },
-    { id: "records", label: "Accounts Record", icon: UserGroupIcon},
-    { id: "search", label: "Students Violation", icon: MagnifyingGlassIcon },
-    { id: "violation", label: "Encode Violation", icon: PencilSquareIcon },
-    { id: "uploadFileFormat", label: "Upload File Format", icon: DocumentPlusIcon }, // updated icon
-    { id: "news", label: "News Management", icon: NewspaperIcon },
+const menuItems = [
+  { id: "trends", label: "View Trends", icon: ChartBarIcon },
+  { id: "records", label: "Accounts Record", icon: UserGroupIcon },
+  { id: "search", label: "Students Violation", icon: MagnifyingGlassIcon },
+  { id: "violation", label: "Encode Violation", icon: PencilSquareIcon },
+  {id: "uploadFileFormat", label: "Upload File Format", icon: DocumentPlusIcon,badge: pendingRequests.length,},
+  { id: "news", label: "News Management", icon: NewspaperIcon },
+
     
   ];
   // ------------------ Fetch News ------------------
@@ -1311,9 +1312,9 @@ useEffect(() => {
 }, [query, courseFilter, dateFrom, dateTo, sortOrder]);
 
 
-  // ------------------ Render ------------------
-  return (
-    <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
+// ------------------ Render ------------------
+return (
+  <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
 
   {/* ================= BURGER BUTTON (MOBILE) ================= */}
   <button
@@ -1345,7 +1346,6 @@ useEffect(() => {
     `}
   >
 
-
     {/* LOGO */}
     <div className="flex items-center gap-3 px-4 mb-8">
       <img
@@ -1371,12 +1371,19 @@ useEffect(() => {
                 setActivePage(item.id);
                 setSidebarOpen(false); // auto close mobile
               }}
-              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg transition-all ${
+              className={`relative flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg transition-all ${
                 activePage === item.id ? "bg-green-600 shadow-inner" : "hover:bg-gray-700/60"
               }`}
             >
               <Icon className="w-5 h-5 text-white" />
               <span className="font-medium">{item.label}</span>
+
+              {/* ===== BADGE FOR UPLOAD FILE ===== */}
+              {item.id === "uploadFileFormat" && pendingRequests.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                  {pendingRequests.length}
+                </span>
+              )}
             </button>
           );
         })}
@@ -1401,6 +1408,7 @@ useEffect(() => {
     {/* HEADER */}
     <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-6 relative">
       <div></div>
+
       {/* USER ICON (TOP RIGHT) */}
       <div className="relative">
         {user.profile_pic && user.profile_pic !== "default.png" ? (
@@ -1431,7 +1439,6 @@ useEffect(() => {
             className="absolute right-0 mt-2 w-64 bg-[#1f2937] text-white rounded-xl shadow-lg overflow-hidden z-50"
           >
             <div className="p-4 flex flex-col items-center space-y-2">
-
               <div className="relative">
                 {profilePicPreview ||
                 (user.profile_pic && user.profile_pic !== "default.png") ? (
@@ -1497,7 +1504,6 @@ useEffect(() => {
         )}
       </div>
     </header>
-
     {/* PAGE CONTENT */}
     <section className="p-8 overflow-auto h-[calc(100vh-4rem)]">
       <h2 className="text-3xl font-bold text-gray-700 mb-6">
@@ -2954,138 +2960,137 @@ useEffect(() => {
         </div>
         )}
 
-        {/*STUDENT RECORDS*/}
-            {activePage === "records" && (
-          <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
+            {/*STUDENT RECORDS*/}
+                {activePage === "records" && (
+              <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
 
-            {/* ================= FILTER BAR ================= */}
-            <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-lg 
-            border border-green-300 shadow-sm">
+                {/* ================= FILTER BAR ================= */}
+                <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-lg 
+                border border-green-300 shadow-sm">
 
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search student..."
-                className="flex-1 min-w-[200px] px-3 py-2 border border-green-300 rounded-lg 
-                focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search student..."
+                    className="flex-1 min-w-[200px] px-3 py-2 border border-green-300 rounded-lg 
+                    focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
 
-              <select
-                value={courseFilter}
-                onChange={(e) => setCourseFilter(e.target.value)}
-                className="px-3 py-2 border border-green-300 rounded-lg bg-white 
-                focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">All Courses</option>
-                <option value="BEED">BEED</option>
-                <option value="BSED">BSED</option>
-                <option value="BSBM">BSBM</option>
-                <option value="BSCS">BSCS</option>
-                <option value="BSHM">BSHM</option>
-                <option value="BSIT">BSIT</option>
-                <option value="BSFAS">BSFAS</option>
-              </select>
+                  <select
+                    value={courseFilter}
+                    onChange={(e) => setCourseFilter(e.target.value)}
+                    className="px-3 py-2 border border-green-300 rounded-lg bg-white 
+                    focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="all">All Courses</option>
+                      <option value="Bachelor of Elementary Education">Bachelor of Elementary Education</option>
+                        <option value="Bachelor of Secondary Education">Bachelor of Secondary Education</option>
+                        <option value="BS Business Management">BS Business Management</option>
+                        <option value="BS Computer Science">BS Computer Science</option>
+                        <option value="BS Fisheries">BS Fisheries</option>
+                        <option value="BS Hospitality Management">BS Hospitality Management (formerly BS Hotel and Restaurant Management)</option>
+                        <option value="BS Information Technology">BS Information Technology</option>
+                      </select>
+                    <div className="flex items-center gap-2">
+                    <span className="text-green-700 font-medium">From:</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="px-2 py-2 border border-green-300 rounded-lg 
+                      focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-green-700 font-medium">From:</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="px-2 py-2 border border-green-300 rounded-lg 
-                  focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-700 font-medium">To:</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="px-2 py-2 border border-green-300 rounded-lg 
+                      focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-green-700 font-medium">To:</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="px-2 py-2 border border-green-300 rounded-lg 
-                  focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    className="px-3 py-2 border border-green-300 rounded-lg bg-white 
+                    focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="asc">Sort A → Z</option>
+                    <option value="desc">Sort Z → A</option>
+                  </select>
 
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className="px-3 py-2 border border-green-300 rounded-lg bg-white 
-                focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="asc">Sort A → Z</option>
-                <option value="desc">Sort Z → A</option>
-              </select>
+                </div>
 
-            </div>
-
-            {/* ================= TABLE ================= */}
-            <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
-              <table className="min-w-full text-left">
-                <thead className="bg-green-600 text-white">
-                  <tr>
-                    <th className="px-4 py-3">ID</th>
-                    <th className="px-4 py-3">Student Name</th>
-                    <th className="px-4 py-3">Student Number</th>
-                    <th className="px-4 py-3">Email</th>
-                    <th className="px-4 py-3">Phone</th>
-                    <th className="px-4 py-3">Course</th>
-                    <th className="px-4 py-3">Date Registered</th>
-                    <th className="px-4 py-3 text-center">Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredStudents.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-6 text-green-700">
-                        No students found.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredStudents.map((s) => (
-                      <tr
-                        key={s.id}
-                        className="border-b border-green-200 hover:bg-green-100 transition-colors"
-                      >
-                        <td className="py-3 px-4">{s.id}</td>
-                        <td className="py-3 px-4">{s.student_name}</td>
-                        <td className="py-3 px-4">{s.student_number}</td>
-                        <td className="py-3 px-4">{s.email}</td>
-                        <td className="py-3 px-4">{s.phone}</td>
-                        <td className="py-3 px-4">{s.course}</td>
-                        <td className="py-3 px-4">
-                          {s.created_at ? s.created_at.slice(0, 10) : "—"}
-                        </td>
-
-                        <td className="py-3 px-4 flex gap-2 justify-center">
-                          <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            onClick={() => setViewStudent(s)}
-                          >
-                            View
-                          </button>
-
-                          <button
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            onClick={() => setDeleteStudent(s)}
-                          >
-                            Delete
-                          </button>
-                        </td>
+                {/* ================= TABLE ================= */}
+                <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
+                  <table className="min-w-full text-left">
+                    <thead className="bg-green-600 text-white">
+                      <tr>
+                        <th className="px-4 py-3">ID</th>
+                        <th className="px-4 py-3">Student Name</th>
+                        <th className="px-4 py-3">Student Number</th>
+                        <th className="px-4 py-3">Email</th>
+                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">Course</th>
+                        <th className="px-4 py-3">Date Registered</th>
+                        <th className="px-4 py-3 text-center">Actions</th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                    </thead>
 
-            </section>
-              </main>
-            </div>
-          );
-         }
+                    <tbody>
+                      {filteredStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="text-center py-6 text-green-700">
+                            No students found.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredStudents.map((s) => (
+                          <tr
+                            key={s.id}
+                            className="border-b border-green-200 hover:bg-green-100 transition-colors"
+                          >
+                            <td className="py-3 px-4">{s.id}</td>
+                            <td className="py-3 px-4">{s.student_name}</td>
+                            <td className="py-3 px-4">{s.student_number}</td>
+                            <td className="py-3 px-4">{s.email}</td>
+                            <td className="py-3 px-4">{s.phone}</td>
+                            <td className="py-3 px-4">{s.course}</td>
+                            <td className="py-3 px-4">
+                              {s.created_at ? s.created_at.slice(0, 10) : "—"}
+                            </td>
+
+                            <td className="py-3 px-4 flex gap-2 justify-center">
+                              <button
+                                className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                onClick={() => setViewStudent(s)}
+                              >
+                                View
+                              </button>
+
+                              <button
+                                className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                onClick={() => setDeleteStudent(s)}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+         </section>
+        </main>
+      </div>
+    );
+  }
