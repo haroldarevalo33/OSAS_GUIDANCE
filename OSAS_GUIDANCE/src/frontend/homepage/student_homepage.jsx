@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from "react";
 import {Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
@@ -8,7 +6,7 @@ export default function StudentHome() {
   // Page + data states
   const [activePage, setActivePage] = useState("Info");
   const [studentRecord, setStudentRecord] = useState(null);
-  const [loading, setLoading] = useState(true);
+  
 
   // Small states
   const [violation, setViolation] = useState("—");
@@ -27,6 +25,7 @@ export default function StudentHome() {
   const [goodMoralApproved, setGoodMoralApproved] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotification, setSelectedNotification] = useState(null); // for modal
+  const [loading, setLoading] = useState(true);
 
   // Rules preview
   const [currentRules, setCurrentRules] = useState(null);
@@ -228,38 +227,62 @@ export default function StudentHome() {
           }
     fetchRules();
   }, []);
+
 // -------------------
-// Fetch Good Moral file from backend
+// Auto-fetch latest Good Moral file for student
 // -------------------
 const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
 
 useEffect(() => {
+  if (!studentNumber) return;
+
   const fetchGoodMoralFile = async () => {
     try {
-      const studentNumber = "123456"; // palitan ng actual student number
-      const res = await fetch(`http://localhost:5000/good-moral/history?student_number=${studentNumber}`);
+      const res = await fetch(
+        `http://localhost:5000/good-moral/history?student_number=${studentNumber}`
+      );
       if (!res.ok) throw new Error("Failed to fetch history");
 
       const data = await res.json();
+      const latest = data[0] || null;
 
-      // Filter approved requests
-      const approved = data.filter(r => r.status === "Approved");
+      // Update studentRecord safely
+      setStudentRecord((prev) => {
+        const safePrev = prev || {};
+        if (
+          safePrev.lastGoodMoralRequest?.request_id === latest?.request_id &&
+          safePrev.lastGoodMoralRequest?.status === latest?.status
+        ) {
+          return safePrev; // No change
+        }
+        return { ...safePrev, lastGoodMoralRequest: latest };
+      });
 
-      if (approved.length > 0) {
-        const latest = approved[0]; // latest approved
+      // Update currentGoodMoral safely
+      if (latest?.status === "Approved") {
         setCurrentGoodMoral({
-          name: latest.filename_original,
+          name: latest.filename_original || latest.filename || "Good Moral Certificate",
           url: `http://localhost:5000/good-moral/download/${latest.request_id}`,
         });
+      } else {
+        setCurrentGoodMoral(null);
       }
+
     } catch (err) {
       console.error("Error fetching Good Moral file:", err);
     }
   };
 
+  // Initial fetch
   fetchGoodMoralFile();
-}, []);
-// -------------------------
+
+  // Poll every 5 seconds
+  const interval = setInterval(() => {
+    if (document.visibilityState === "visible") fetchGoodMoralFile();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [studentNumber]);
 // Good Moral Functions
 // -------------------------
 
@@ -784,6 +807,7 @@ useEffect(() => {
           </div>
         </header>
 
+        {/*Dashboard*/}
         {/* CONTENT */}
         <main className="flex-1 overflow-auto p-4 md:p-10">
           {/* INFO */}
@@ -836,7 +860,20 @@ useEffect(() => {
               </div>
             </>
           )}
-
+          {/* ====================== */}
+            {/* Global Loading Spinner */}
+            {/* ====================== */}
+            {loading && (
+              <div className="fixed bottom-10 right-10 flex flex-col items-center justify-center z-50">
+                <div className="relative">
+                  {/* Large professional green spinner */}
+                  <div className="animate-spin rounded-full h-28 w-28 border-t-4 border-b-4 border-green-600 shadow-lg"></div>
+                </div>
+                <p className="text-green-700 mt-4 text-lg font-semibold text-center">
+                  Loading...
+                </p>
+              </div>
+            )}
           {/* NEWS */}
           {activePage === "News" && (
             <>
@@ -858,16 +895,26 @@ useEffect(() => {
               )}
             </>
           )}
+
      {/* Good Moral */}
       {activePage === "GoodMoral" && (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center w-full relative min-h-[400px]">
+
           <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
             Good Moral Certificate
           </h2>
 
-          {/* If student has not requested yet */}
-          {!studentRecord?.lastGoodMoralRequest ? (
+          {/* ====================== */}
+          {/* Render based on studentRecord safely */}
+          {/* ====================== */}
+          {!studentRecord?.lastGoodMoralRequest ||
+            studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
             <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
+              {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
+                <p className="text-red-700 font-medium mb-4">
+                  Remarks: {studentRecord?.lastGoodMoralRequest?.remarks || "Your previous request was rejected."}
+                </p>
+              )}
               <p className="text-gray-700 mb-4">
                 Request your Good Moral Certificate here.
               </p>
@@ -875,7 +922,9 @@ useEffect(() => {
                 onClick={submitGoodMoralRequest}
                 className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700"
               >
-                Request Good Moral
+                {studentRecord?.lastGoodMoralRequest?.status === "Rejected"
+                  ? "Submit Again"
+                  : "Request Good Moral"} 
               </button>
             </div>
           ) : (
@@ -884,152 +933,123 @@ useEffect(() => {
               {/* Status & Remarks */}
               <div className="mb-4">
                 <p className="text-gray-700 font-semibold">
-                  Status: {studentRecord?.lastGoodMoralRequest.status || "Pending"}
+                  Status: {studentRecord?.lastGoodMoralRequest?.status || "Pending"}
                 </p>
-                {studentRecord?.lastGoodMoralRequest.status === "Rejected" && (
-                  <p className="text-red-700 font-medium">
-                    Remarks: {studentRecord?.lastGoodMoralRequest.remarks || "No remarks"}
-                  </p>
-                )}
-                {studentRecord?.lastGoodMoralRequest.status === "Pending" && (
+
+                {studentRecord?.lastGoodMoralRequest?.status === "Pending" && (
                   <p className="text-yellow-700 font-medium">
                     Waiting for admin approval...
                   </p>
                 )}
               </div>
 
-              {/* ============================= */}
               {/* Approved Good Moral File Box */}
-              {/* ============================= */}
-              {studentRecord?.lastGoodMoralRequest.status === "Approved" && (
-                <>
-                  {/* If we have currentGoodMoral state (from fetch) */}
-                  {currentGoodMoral ? (
-                    <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50">
+              {currentGoodMoral && (
+                <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4">
 
-                      {/* File Name with extension in bold */}
-                      <p className="text-gray-800 font-semibold truncate">
-                        {(() => {
-                          const parts = currentGoodMoral.name.split(".");
-                          const ext = parts.length > 1 ? parts.pop() : "";
-                          const nameOnly = parts.join(".");
-                          return (
-                            <>
-                              {nameOnly}
-                              {ext && <span className="font-bold">.{ext}</span>}
-                            </>
-                          );
-                        })()}
-                      </p>
+                  {/* File Name */}
+                  <p className="text-gray-800 font-semibold truncate">
+                    {(() => {
+                      if (!currentGoodMoral?.name) return null;
+                      const parts = currentGoodMoral.name.split(".");
+                      const ext = parts.length > 1 ? parts.pop() : "";
+                      const nameOnly = parts.join(".");
+                      return (
+                        <>
+                          {nameOnly}
+                          {ext && <span className="font-bold">.{ext}</span>}
+                        </>
+                      );
+                    })()}
+                  </p>
 
-                      {/* Scrollable PDF/Doc Preview */}
-                      <div className="w-full border rounded overflow-hidden h-64 mb-2">
-                        <iframe
-                          src={currentGoodMoral.url}
-                          className="w-full h-full"
-                          title="Good Moral Certificate Preview"
-                        />
-                      </div>
+                  {/* Scrollable PDF/Doc Preview */}
+                  <div className="w-full border rounded overflow-hidden h-64 mb-2">
+                    <iframe
+                      src={currentGoodMoral?.url}
+                      className="w-full h-full"
+                      title={currentGoodMoral?.name || "Good Moral Certificate Preview"}
+                    />
+                  </div>
 
-                      {/* View File button at bottom-right */}
-                      <div className="flex justify-end mt-auto">
-                        <button
-                          onClick={() => window.open(currentGoodMoral.url, "_blank")}
-                          className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
-                        >
-                          View File
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* If autofill PDF is available without fetching state */
-                    <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4">
-                      <iframe
-                        src={`http://localhost:5000/good-moral/download/${studentRecord.lastGoodMoralRequest.request_id}`}
-                        className="w-full h-64"
-                        title="Good Moral Certificate"
-                      ></iframe>
-                      <div className="flex justify-end mt-2">
-                        <a
-                          href={`http://localhost:5000/good-moral/download/${studentRecord.lastGoodMoralRequest.request_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
-                            View File
-                          </button>
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </>
+                  {/* View File button */}
+                  <div className="flex justify-end mt-auto">
+                    <button
+                      onClick={() => window.open(currentGoodMoral?.url, "_blank")}
+                      className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+                    >
+                      View File
+                    </button>
+                  </div>
+
+                </div>
               )}
 
-                {/* Cancel request button (only Pending) */}
-                    {studentRecord?.lastGoodMoralRequest.status === "Pending" && (
-                      <button
-                        onClick={() => {
-                          Swal.fire({
-                            title: "Are you sure?",
-                            text: "Do you want to cancel your Good Moral request?",
-                            icon: "warning",
-                            showCancelButton: true,
-                            confirmButtonColor: "#3085d6",
-                            cancelButtonColor: "#d33",
-                            confirmButtonText: "Yes, cancel it!",
-                          }).then((result) => {
-                            if (result.isConfirmed) {
-                              const BACKEND_URL = "http://localhost:5000";
-                              fetch(`${BACKEND_URL}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`, {
-                                method: "DELETE",
-                              })
-                                .then((res) => {
-                                  if (res.ok) {
-                                    Swal.fire({
-                                      toast: true,
-                                      position: "top-end",
-                                      icon: "success",
-                                      title: "Request cancelled!",
-                                      showConfirmButton: false,
-                                      timer: 500,
-                                    });
-                                    setTimeout(() => {
-                                      window.location.reload();
-                                    }, 500);
-                                  } else {
-                                    Swal.fire({
-                                      toast: true,
-                                      position: "top-end",
-                                      icon: "error",
-                                      title: "Failed to cancel request",
-                                      showConfirmButton: false,
-                                      timer: 1500,
-                                    });
-                                  }
-                                })
-                                .catch(() => {
-                                  Swal.fire({
-                                    toast: true,
-                                    position: "top-end",
-                                    icon: "error",
-                                    title: "Failed to cancel request",
-                                    showConfirmButton: false,
-                                    timer: 1500,
-                                  });
-                                });
+              {/* Cancel request button (only Pending) */}
+              {studentRecord?.lastGoodMoralRequest?.status === "Pending" && (
+                <button
+                  onClick={() => {
+                    Swal.fire({
+                      title: "Are you sure?",
+                      text: "Do you want to cancel your Good Moral request?",
+                      icon: "warning",
+                      showCancelButton: true,
+                      confirmButtonColor: "#3085d6",
+                      cancelButtonColor: "#d33",
+                      confirmButtonText: "Yes, cancel it!",
+                    }).then((result) => {
+                      if (result.isConfirmed) {
+                        const BACKEND_URL = "http://localhost:5000";
+                        fetch(
+                          `${BACKEND_URL}/good-moral/request/${studentRecord?.lastGoodMoralRequest?.request_id}`,
+                          { method: "DELETE" }
+                        )
+                          .then((res) => {
+                            if (res.ok) {
+                              Swal.fire({
+                                toast: true,
+                                position: "top-end",
+                                icon: "success",
+                                title: "Request cancelled!",
+                                showConfirmButton: false,
+                                timer: 500,
+                              });
+                              setTimeout(() => window.location.reload(), 500);
+                            } else {
+                              Swal.fire({
+                                toast: true,
+                                position: "top-end",
+                                icon: "error",
+                                title: "Failed to cancel request",
+                                showConfirmButton: false,
+                                timer: 1500,
+                              });
                             }
+                          })
+                          .catch(() => {
+                            Swal.fire({
+                              toast: true,
+                              position: "top-end",
+                              icon: "error",
+                              title: "Failed to cancel request",
+                              showConfirmButton: false,
+                              timer: 1500,
+                            });
                           });
-                        }}
-                        className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
-                      >
-                        Cancel Request
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          {/* RULES */}
+                      }
+                    });
+                  }}
+                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                >
+                  Cancel Request
+                </button>
+              )}
+
+            </div>
+          )}
+        </div>
+      )}
+         {/* RULES */}
           {activePage === "Rules" && (
             <div className="flex flex-col items-center">
               <h2 className="text-2xl md:text-3xl font-bold text-green-800 mb-4 text-center">CvSU Rules and Regulations</h2>

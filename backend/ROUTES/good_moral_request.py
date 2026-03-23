@@ -23,7 +23,7 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
 
     # Adjust positions as needed
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(228, height - 222, str(student_name))
+    c.drawString(240, height - 222, str(student_name))
     c.drawString(146, height - 245, str(student_number))
     c.save()
     overlay_buffer.seek(0)

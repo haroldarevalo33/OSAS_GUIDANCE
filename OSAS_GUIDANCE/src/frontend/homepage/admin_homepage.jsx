@@ -1046,7 +1046,7 @@ useEffect(() => {
 
 // ----------------- GOOD MORAL FUNCTIONS -----------------
 const [currentAdminId] = useState(null);
-// Fetch pending requests for admin
+// ----------------- FETCH PENDING REQUESTS (AUTO-POLLING) -----------------
 const fetchPendingRequests = async () => {
   try {
     const res = await fetch("http://localhost:5000/good-moral/admin/requests?status=Pending");
@@ -1065,6 +1065,19 @@ const fetchPendingRequests = async () => {
   }
 };
 
+// ----------------- AUTO-POLLING EVERY 5 SECONDS -----------------
+useEffect(() => {
+  // Initial fetch
+  fetchPendingRequests();
+
+  // Set interval to fetch automatically
+  const interval = setInterval(() => {
+    fetchPendingRequests();
+  }, 5000); // every 5 seconds
+
+  // Cleanup interval on unmount
+  return () => clearInterval(interval);
+}, []);
 const handleApprove = async (request) => {
   try {
     const res = await fetch(`http://localhost:5000/good-moral/process/${request.request_id}`, {
