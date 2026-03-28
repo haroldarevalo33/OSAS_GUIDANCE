@@ -14,7 +14,7 @@ export default function AdminHome() {
   const [loadingRss, setLoadingRss] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // sa taas ng AdminHome component
+
 const [predictedViolation, setPredictedViolation] = useState("");
 const [predictedSection, setPredictedSection] = useState("");
   // Upload File State

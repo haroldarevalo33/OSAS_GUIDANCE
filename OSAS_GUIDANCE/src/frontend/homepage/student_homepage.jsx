@@ -21,12 +21,14 @@ export default function StudentHome() {
   const [profilePreview, setProfilePreview] = useState(null);
 
   // Good moral / notifications
-  const [goodMoralRequested, setGoodMoralRequested] = useState(false);
-  const [goodMoralApproved, setGoodMoralApproved] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [selectedNotification, setSelectedNotification] = useState(null); // for modal
   const [loading, setLoading] = useState(true);
-
+  const [isRevoked, setIsRevoked] = useState(false);
+  const [hasShownRevokeAlert, setHasShownRevokeAlert] = useState(false);
+  const [violationsCount, setViolationsCount] = useState(0);
+  const [canSubmit,setCanSubmit] = useState(false);
+  const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
+  
   // Rules preview
   const [currentRules, setCurrentRules] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
@@ -228,89 +230,95 @@ export default function StudentHome() {
     fetchRules();
   }, []);
 
-// -------------------
-// Auto-fetch latest Good Moral file for student
-// -------------------
-const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
 
+// -------------------------
+// Good Moral Functions
+// -------------------------
+const API_BASE = "http://localhost:5000"; // Flask backend URL
+
+// =========================
+// AUTO-FETCH LATEST GOOD MORAL
+// =========================
 useEffect(() => {
   if (!studentNumber) return;
 
-  const fetchGoodMoralFile = async () => {
-    try {
-      const res = await fetch(
-        `http://localhost:5000/good-moral/history?student_number=${studentNumber}`
-      );
-      if (!res.ok) throw new Error("Failed to fetch history");
+  let interval;
 
-      const data = await res.json();
-      const latest = data[0] || null;
+// =========================
+// AUTO-FETCH LATEST GOOD MORAL
+// =========================
+const fetchGoodMoralFile = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
+    const data = await res.json();
 
-      // Update studentRecord safely
-      setStudentRecord((prev) => {
-        const safePrev = prev || {};
-        if (
-          safePrev.lastGoodMoralRequest?.request_id === latest?.request_id &&
-          safePrev.lastGoodMoralRequest?.status === latest?.status
-        ) {
-          return safePrev; // No change
-        }
-        return { ...safePrev, lastGoodMoralRequest: latest };
+    const totalViolations = Number(data.violation_count) || 0;
+    setViolationsCount(totalViolations);
+
+    const latest = data.requests?.[0] || null;
+
+    //  revoked ONLY if auto-revoked (3+ violations)
+    const isRevoked =
+      latest?.status === "Rejected" &&
+      (latest?.remarks || "").toLowerCase().includes("auto-revoked");
+
+    setIsRevoked(isRevoked);
+
+    //  allow submit if NOT revoked
+    setCanSubmit(!isRevoked);
+
+    setStudentRecord(prev => ({
+      ...prev,
+      lastGoodMoralRequest: latest,
+    }));
+
+    //  show Swal ONLY if revoked (3 violations)
+    if (isRevoked && activePage === "GoodMoral" && !hasShownRevokeAlert) {
+      Swal.fire({
+        icon: "warning",
+        title: "Access Revoked",
+        text: "Your Good Moral has been revoked due to multiple violations.",
       });
-
-      // Update currentGoodMoral safely
-      if (latest?.status === "Approved") {
-        setCurrentGoodMoral({
-          name: latest.filename_original || latest.filename || "Good Moral Certificate",
-          url: `http://localhost:5000/good-moral/download/${latest.request_id}`,
-        });
-      } else {
-        setCurrentGoodMoral(null);
-      }
-
-    } catch (err) {
-      console.error("Error fetching Good Moral file:", err);
+      setHasShownRevokeAlert(true);
     }
-  };
 
-  // Initial fetch
+    // show file if approved
+    if (latest?.status === "Approved" && !isRevoked) {
+      setCurrentGoodMoral({
+        name: latest.filename_original || "Good Moral Certificate",
+        url: `${API_BASE}/good-moral/download/${latest.request_id}`,
+      });
+    } else {
+      setCurrentGoodMoral(null);
+    }
+
+  } catch (err) {
+    console.error(err);
+  }
+};
   fetchGoodMoralFile();
 
-  // Poll every 5 seconds
-  const interval = setInterval(() => {
+  interval = setInterval(() => {
     if (document.visibilityState === "visible") fetchGoodMoralFile();
   }, 5000);
 
   return () => clearInterval(interval);
-}, [studentNumber]);
-// Good Moral Functions
-// -------------------------
-
-const API_BASE = "http://localhost:5000"; // <-- Flask backend URL
+}, [studentNumber, activePage, hasShownRevokeAlert]);
 
 // =========================
-// SUBMIT REQUEST
+// SUBMIT GOOD MORAL REQUEST
 // =========================
 const submitGoodMoralRequest = async (file) => {
+  if (!studentNumber) {
+    Swal.fire({ icon: "error", title: "Error", text: "Student number is missing" });
+    return;
+  }
+  if (!file) {
+    Swal.fire({ icon: "error", title: "Error", text: "Please select a file to upload" });
+    return;
+  }
+
   try {
-    if (!studentNumber) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Student number is missing",
-      });
-      return;
-    }
-
-    if (!file) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Please select a file to upload",
-      });
-      return;
-    }
-
     const formData = new FormData();
     formData.append("student_number", studentNumber);
     formData.append("certificate_file", file);
@@ -320,9 +328,19 @@ const submitGoodMoralRequest = async (file) => {
       body: formData,
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json();
 
     if (!res.ok) {
+      if (res.status === 403) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Access Denied",
+          text: data.message || "You have reached 3 violations.",
+          confirmButtonText: "OK",
+        });
+        setActivePage("Info");
+        return;
+      }
       throw new Error(data.message || "Failed to submit request");
     }
 
@@ -335,7 +353,6 @@ const submitGoodMoralRequest = async (file) => {
       timer: 2000,
     });
 
-    // Immediately fetch latest request after submit
     fetchLatestGoodMoral();
 
   } catch (err) {
@@ -356,16 +373,12 @@ const fetchLatestGoodMoral = async () => {
 
   try {
     const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
-    const requests = await res.json();
+    const data = await res.json();
 
-    setStudentRecord((prev) => {
-      const latest = requests.length > 0 ? requests[0] : null;
+    const latest = data.requests?.[0] || null;
 
-      // Avoid unnecessary re-render if same request
-      if (prev.lastGoodMoralRequest?.request_id === latest?.request_id) {
-        return prev;
-      }
-
+    setStudentRecord(prev => {
+      if (prev.lastGoodMoralRequest?.request_id === latest?.request_id) return prev;
       return { ...prev, lastGoodMoralRequest: latest };
     });
 
@@ -374,16 +387,12 @@ const fetchLatestGoodMoral = async () => {
   }
 };
 
-
 // =========================
 // AUTO FETCH ON PAGE LOAD
 // =========================
 useEffect(() => {
   if (!studentNumber) return;
-
-  // Same style as student record fetch
   fetchLatestGoodMoral();
-
 }, [studentNumber]);
 
 // =========================
@@ -393,29 +402,23 @@ useEffect(() => {
   if (!studentNumber) return;
 
   const interval = setInterval(() => {
-    // Only fetch if tab is active (low-spec friendly)
-    if (document.visibilityState === "visible") {
-      fetchLatestGoodMoral();
-    }
-  }, 1000); // every 10s, adjust if needed
+    if (document.visibilityState === "visible") fetchLatestGoodMoral();
+  }, 1000);
 
   return () => clearInterval(interval);
-
 }, [studentNumber]);
 
-// -----------------------
+// =========================
 // FETCH NOTIFICATIONS + HISTORY
-// -----------------------
-const POLL_INTERVAL = 5000; // 5 seconds
+// =========================
+const POLL_INTERVAL = 5000;
 
 const fetchNotifications = async () => {
   if (!studentNumber) return;
 
   try {
-    //  Fetch new notifications
     const notifRes = await fetch(
-      `http://localhost:5000/good-moral/student/notifications?student_number=${studentNumber}`,
-      { headers: { Accept: "application/json" } }
+      `${API_BASE}/good-moral/student/notifications?student_number=${studentNumber}`
     );
     if (!notifRes.ok) throw new Error(`Failed to fetch notifications: ${notifRes.status}`);
     const notifData = await notifRes.json();
@@ -430,16 +433,12 @@ const fetchNotifications = async () => {
         }))
       : [];
 
-    // Fetch full history (all requests)
-    const historyRes = await fetch(
-      `http://localhost:5000/good-moral/history?student_number=${studentNumber}`,
-      { headers: { Accept: "application/json" } }
-    );
+    const historyRes = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
     if (!historyRes.ok) throw new Error(`Failed to fetch history: ${historyRes.status}`);
     const historyData = await historyRes.json();
 
-    const fullHistory = Array.isArray(historyData)
-      ? historyData.map(r => ({
+    const fullHistory = Array.isArray(historyData.requests)
+      ? historyData.requests.map(r => ({
           request_id: r.request_id,
           status: r.status,
           message:
@@ -448,24 +447,26 @@ const fetchNotifications = async () => {
               : r.status === "Approved"
               ? "Your Good Moral request has been approved."
               : "Your Good Moral request has been rejected.",
-          is_new: false, // already seen
+          is_new: false,
           requested_at: r.requested_at,
         }))
       : [];
 
-    // Merge notifications with history: notifications take precedence (is_new = true)
-    const merged = [...fullHistory.filter(h => !newNotifs.some(n => n.request_id === h.request_id)), ...newNotifs];
+    const merged = [
+      ...fullHistory.filter(h => !newNotifs.some(n => n.request_id === h.request_id)),
+      ...newNotifs,
+    ];
 
-    // Update state
     setNotifications(merged);
+
   } catch (err) {
     console.error("Error fetching notifications/history:", err);
   }
 };
 
-// -----------------------
-// Polling on mount
-// -----------------------
+// =========================
+// Polling notifications on mount
+// =========================
 useEffect(() => {
   if (!studentNumber) return;
 
@@ -474,8 +475,6 @@ useEffect(() => {
 
   return () => clearInterval(intervalId);
 }, [studentNumber]);
-
-
   // ---------------------------
   // Render
   return (
@@ -895,160 +894,162 @@ useEffect(() => {
               )}
             </>
           )}
+        {/* =========================
+            GOOD MORAL COMPONENT
+        ========================= */}
+        {activePage === "GoodMoral" && (
+          <div className="flex flex-col items-center w-full relative min-h-[400px]">
 
-     {/* Good Moral */}
-      {activePage === "GoodMoral" && (
-        <div className="flex flex-col items-center w-full relative min-h-[400px]">
-
-          <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
+            {/* Title */}
+            <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
             Good Moral Certificate
-          </h2>
+            </h2>
 
-          {/* ====================== */}
-          {/* Render based on studentRecord safely */}
-          {/* ====================== */}
-          {!studentRecord?.lastGoodMoralRequest ||
+            {/* Revoke Banner */}
+            {isRevoked && (
+              <div className="w-full max-w-lg bg-red-100 border border-red-600 text-red-800 p-4 rounded-xl mb-6 text-center font-semibold">
+                Your Good Moral Certificate has been revoked due to multiple violations.
+              </div>
+            )}
+
+            {/* Request Form / Status */}
+            {!studentRecord?.lastGoodMoralRequest ||
             studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
-              {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
-                <p className="text-red-700 font-medium mb-4">
-                  Remarks: {studentRecord?.lastGoodMoralRequest?.remarks || "Your previous request was rejected."}
-                </p>
-              )}
-              <p className="text-gray-700 mb-4">
-                Request your Good Moral Certificate here.
-              </p>
-              <button
-                onClick={submitGoodMoralRequest}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700"
-              >
-                {studentRecord?.lastGoodMoralRequest?.status === "Rejected"
-                  ? "Submit Again"
-                  : "Request Good Moral"} 
-              </button>
-            </div>
-          ) : (
-            <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600">
+              <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
 
-              {/* Status & Remarks */}
-              <div className="mb-4">
-                <p className="text-gray-700 font-semibold">
-                  Status: {studentRecord?.lastGoodMoralRequest?.status || "Pending"}
-                </p>
-
-                {studentRecord?.lastGoodMoralRequest?.status === "Pending" && (
-                  <p className="text-yellow-700 font-medium">
-                    Waiting for admin approval...
+                {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
+                  <p className="text-red-700 font-medium mb-4">
+                    Remarks: {studentRecord?.lastGoodMoralRequest?.remarks || "Your previous request was rejected."}
                   </p>
                 )}
+
+                <p className="text-gray-700 mb-4">
+                  Request your Good Moral Certificate here.
+                </p>
+
+                {/* Submit Button */}
+                <div className="text-center mt-4">
+                <button
+                  onClick={submitGoodMoralRequest}
+                  disabled={isRevoked && violationsCount >= 3} // only block if revoked **and** >=3 violations
+                  className={`bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-all duration-200 ${
+                    isRevoked && violationsCount >= 3 ? "opacity-50 cursor-not-allowed hover:bg-green-600" : ""
+                  }`}
+                  title={
+                    isRevoked && violationsCount >= 3
+                      ? "Your Good Moral request has been revoked due to multiple violations."
+                      : ""
+                  }
+                >
+                  {studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? "Submit Again" : "Request Good Moral"}
+                </button>
+                </div>
               </div>
+            ) : (
+              <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600">
 
-              {/* Approved Good Moral File Box */}
-              {currentGoodMoral && (
-                <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4">
-
-                  {/* File Name */}
-                  <p className="text-gray-800 font-semibold truncate">
-                    {(() => {
-                      if (!currentGoodMoral?.name) return null;
-                      const parts = currentGoodMoral.name.split(".");
-                      const ext = parts.length > 1 ? parts.pop() : "";
-                      const nameOnly = parts.join(".");
-                      return (
-                        <>
-                          {nameOnly}
-                          {ext && <span className="font-bold">.{ext}</span>}
-                        </>
-                      );
-                    })()}
+                {/* Status & Remarks */}
+                <div className="mb-4">
+                  <p className="text-green-600 font-semibold">
+                    Status: {isRevoked ? "Rejected" : studentRecord?.lastGoodMoralRequest?.status || "Pending"}
                   </p>
 
-                  {/* Scrollable PDF/Doc Preview */}
-                  <div className="w-full border rounded overflow-hidden h-64 mb-2">
-                    <iframe
-                      src={currentGoodMoral?.url}
-                      className="w-full h-full"
-                      title={currentGoodMoral?.name || "Good Moral Certificate Preview"}
-                    />
-                  </div>
+                  {studentRecord?.lastGoodMoralRequest?.status === "Pending" && !isRevoked && (
+                    <p className="text-yellow-700 font-medium">
+                      Waiting for admin approval...
+                    </p>
+                  )}
 
-                  {/* View File button */}
-                  <div className="flex justify-end mt-auto">
-                    <button
-                      onClick={() => window.open(currentGoodMoral?.url, "_blank")}
-                      className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
-                    >
-                      View File
-                    </button>
-                  </div>
-
+                  {(studentRecord?.lastGoodMoralRequest?.status === "Rejected" || isRevoked) && (
+                    <p className="text-red-700 font-medium">
+                      Remarks: {studentRecord?.lastGoodMoralRequest?.remarks || (isRevoked ? "Auto-revoked due to multiple violations." : "Your request was rejected.")}
+                    </p>
+                  )}
                 </div>
-              )}
 
-              {/* Cancel request button (only Pending) */}
-              {studentRecord?.lastGoodMoralRequest?.status === "Pending" && (
-                <button
-                  onClick={() => {
-                    Swal.fire({
-                      title: "Are you sure?",
-                      text: "Do you want to cancel your Good Moral request?",
-                      icon: "warning",
-                      showCancelButton: true,
-                      confirmButtonColor: "#3085d6",
-                      cancelButtonColor: "#d33",
-                      confirmButtonText: "Yes, cancel it!",
-                    }).then((result) => {
-                      if (result.isConfirmed) {
-                        const BACKEND_URL = "http://localhost:5000";
-                        fetch(
-                          `${BACKEND_URL}/good-moral/request/${studentRecord?.lastGoodMoralRequest?.request_id}`,
-                          { method: "DELETE" }
-                        )
-                          .then((res) => {
-                            if (res.ok) {
-                              Swal.fire({
-                                toast: true,
-                                position: "top-end",
-                                icon: "success",
-                                title: "Request cancelled!",
-                                showConfirmButton: false,
-                                timer: 500,
-                              });
-                              setTimeout(() => window.location.reload(), 500);
-                            } else {
-                              Swal.fire({
-                                toast: true,
-                                position: "top-end",
-                                icon: "error",
-                                title: "Failed to cancel request",
-                                showConfirmButton: false,
-                                timer: 1500,
-                              });
-                            }
-                          })
-                          .catch(() => {
-                            Swal.fire({
-                              toast: true,
-                              position: "top-end",
-                              icon: "error",
-                              title: "Failed to cancel request",
-                              showConfirmButton: false,
-                              timer: 1500,
+              {/* Approved Good Moral File Preview */}
+                {currentGoodMoral && !isRevoked && (
+                  <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4">
+                    <p className="text-gray-800 font-semibold truncate">
+                      {(() => {
+                        const name = currentGoodMoral.name || "Good Moral Certificate";
+                        const parts = name.split(".");
+                        if (parts.length === 1) return name; // no extension
+                        const extension = parts.pop(); // remove last item
+                        const baseName = parts.join("."); // join rest safely
+                        return (
+                          <>
+                            {baseName}
+                            {extension && <span className="font-bold">.{extension}</span>}
+                          </>
+                        );
+                      })()}
+                    </p>
+                    <div className="w-full border rounded overflow-hidden h-64 mb-2">
+                      <iframe
+                        src={currentGoodMoral?.url}
+                        className="w-full h-full"
+                        title={currentGoodMoral?.name || "Good Moral Certificate Preview"}
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => window.open(currentGoodMoral?.url, "_blank")}
+                        className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+                      >
+                        View File
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancel Pending Request */}
+                {studentRecord?.lastGoodMoralRequest?.status === "Pending" && !isRevoked && (
+                  <button
+                    onClick={() => {
+                      Swal.fire({
+                        title: "Are you sure?",
+                        text: "Do you want to cancel your Good Moral request?",
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#3085d6",
+                        cancelButtonColor: "#d33",
+                        confirmButtonText: "Yes, cancel it!",
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+                          fetch(`${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`, { method: "DELETE" })
+                            .then(res => {
+                              if (res.ok) {
+                                Swal.fire({
+                                  toast: true,
+                                  position: "top-end",
+                                  icon: "success",
+                                  title: "Request cancelled!",
+                                  showConfirmButton: false,
+                                  timer: 500,
+                                });
+                                setTimeout(() => window.location.reload(), 500);
+                              } else {
+                                Swal.fire({ toast: true, position: "top-end", icon: "error", title: "Failed to cancel request", showConfirmButton: false, timer: 1500 });
+                              }
+                            })
+                            .catch(() => {
+                              Swal.fire({ toast: true, position: "top-end", icon: "error", title: "Failed to cancel request", showConfirmButton: false, timer: 1500 });
                             });
-                          });
-                      }
-                    });
-                  }}
-                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
-                >
-                  Cancel Request
-                </button>
-              )}
+                        }
+                      });
+                    }}
+                    className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                  >
+                    Cancel Request
+                  </button>
+                )}
 
-            </div>
-          )}
-        </div>
-      )}
+              </div>
+            )}
+          </div>
+        )}
          {/* RULES */}
           {activePage === "Rules" && (
             <div className="flex flex-col items-center">

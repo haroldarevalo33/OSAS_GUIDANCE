@@ -1,8 +1,8 @@
 import os
 import uuid
 import io
-from flask import Blueprint, request, jsonify, send_file, current_app, send_from_directory
-from models import Student, GoodMoralRequest, UploadedFile, db
+from flask import Blueprint, request, jsonify, send_file, current_app
+from models import Student, GoodMoralRequest, UploadedFile, Violation, db
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from pypdf import PdfReader, PdfWriter
@@ -13,15 +13,10 @@ good_moral_bp = Blueprint("good_moral_bp", __name__, url_prefix="/good-moral")
 # PDF Generation Function (auto-fill only)
 # =========================
 def generate_good_moral_pdf(template_path, student_name, student_number):
-    """
-    Uses the uploaded Good Moral template and fills in the student's
-    name and number on the PDF. Does NOT create a new blank template.
-    """
     overlay_buffer = io.BytesIO()
     c = canvas.Canvas(overlay_buffer, pagesize=A4)
-    width, height = A4  # 595 x 842
+    width, height = A4
 
-    # Adjust positions as needed
     c.setFont("Helvetica-Bold", 12)
     c.drawString(240, height - 222, str(student_name))
     c.drawString(146, height - 245, str(student_number))
@@ -42,13 +37,30 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
     return output_buffer
 
 # =========================
+# Helper: Auto-revoke based on violations
+# =========================
+def auto_revoke_if_violations(student_number):
+    violation_count = Violation.query.filter_by(student_id=student_number).count()
+    if violation_count >= 3:
+        # Auto-revoke all pending/approved requests
+        requests = GoodMoralRequest.query.filter_by(student_number=student_number)\
+            .filter(GoodMoralRequest.status.in_(["Pending", "Approved"])).all()
+        for r in requests:
+            r.status = "Rejected"
+            r.remarks = "Auto-revoked due to 3 or more violations"
+            db.session.add(r)
+        db.session.commit()
+        return True
+    return False
+
+# =========================
 # Student submits a Good Moral request
 # =========================
 @good_moral_bp.post("/request")
 def good_moral_request():
     data = request.form or {}
     student_number = data.get("student_number")
-    file = request.files.get("certificate_file")  # Optional
+    file = request.files.get("certificate_file")
 
     if not student_number:
         return jsonify({"message": "Missing student_number"}), 400
@@ -57,10 +69,23 @@ def good_moral_request():
     if not student:
         return jsonify({"message": "Student not found"}), 404
 
+    # Check violation count first
+    violation_count = Violation.query.filter_by(student_id=student_number).count()
+    if violation_count >= 3:
+        return jsonify({"message": "Cannot submit: 3 or more violations"}), 403
+
+    # Check for existing pending requests
+    pending_request = GoodMoralRequest.query.filter_by(
+        student_number=student_number,
+        status="Pending"
+    ).first()
+    if pending_request:
+        return jsonify({"message": "You already have a pending request"}), 400
+
+    # Save uploaded file
     filename_stored = None
     filename_original = None
 
-    # Only save file if uploaded
     if file:
         ext = os.path.splitext(file.filename)[1].lower()
         filename_stored = f"{uuid.uuid4().hex}{ext}"
@@ -68,10 +93,10 @@ def good_moral_request():
         file.save(upload_path)
         filename_original = file.filename
 
-    # Create Good Moral request in DB
+    # Create new Good Moral request
     gm_request = GoodMoralRequest(
         student_number=student_number,
-        filename_stored=filename_stored, 
+        filename_stored=filename_stored,
         filename_original=filename_original,
         status="Pending",
         is_notified=False
@@ -100,13 +125,19 @@ def cancel_request(request_id):
     return jsonify({"message": "Request cancelled successfully"})
 
 # =========================
-# Student views all their requests
+# Student views all their requests + violation count
 # =========================
 @good_moral_bp.get("/history")
 def student_history():
     student_number = request.args.get("student_number")
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
+
+    # Count current violations
+    violation_count = Violation.query.filter_by(student_id=student_number).count()
+
+    # Auto-revoke if violations >= 3
+    auto_revoke_if_violations(student_number)
 
     requests = GoodMoralRequest.query.filter_by(student_number=student_number)\
         .order_by(GoodMoralRequest.requested_at.desc()).all()
@@ -120,7 +151,11 @@ def student_history():
         "remarks": r.remarks
     } for r in requests]
 
-    return jsonify(result)
+    # Return requests + current violation count
+    return jsonify({
+        "violation_count": violation_count,
+        "requests": result
+    })
 
 # =========================
 # Admin approves/rejects a request
@@ -173,6 +208,8 @@ def get_request(request_id):
     gm_request = GoodMoralRequest.query.get(request_id)
     if not gm_request:
         return jsonify({"message": "Request not found"}), 404
+
+    auto_revoke_if_violations(gm_request.student_number)
 
     return jsonify({
         "request_id": gm_request.request_id,
@@ -228,6 +265,8 @@ def student_notifications():
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
 
+    auto_revoke_if_violations(student_number)
+
     requests = GoodMoralRequest.query.filter_by(
         student_number=student_number,
         is_notified=False
@@ -240,7 +279,10 @@ def student_notifications():
         elif r.status == "Approved":
             message = "Your Good Moral request has been approved."
         elif r.status == "Rejected":
-            message = "Your Good Moral request has been rejected."
+            if r.remarks and "Auto-revoked" in r.remarks:
+                message = "Your Good Moral has been revoked due to multiple violations."
+            else:
+                message = "Your Good Moral request has been rejected."
         else:
             message = "Status unknown."
 
@@ -261,10 +303,15 @@ def student_notifications():
 # =========================
 @good_moral_bp.get("/download/<int:request_id>")
 def download_certificate(request_id):
-  
     gm_request = GoodMoralRequest.query.get(request_id)
     if not gm_request:
         return jsonify({"message": "Request not found"}), 404
+
+    # Auto-revoke if necessary
+    if auto_revoke_if_violations(gm_request.student_number):
+        return jsonify({
+            "message": "Your Good Moral certificate has been revoked due to violations."
+        }), 403
 
     if gm_request.status != "Approved":
         return jsonify({"message": "Request not approved"}), 403
@@ -273,14 +320,12 @@ def download_certificate(request_id):
     if not student:
         return jsonify({"message": "Student not found"}), 404
 
-  
     gm_template = UploadedFile.query.filter_by(
         file_type="good_moral"
     ).order_by(UploadedFile.uploaded_at.desc()).first()
 
     if not gm_template or not os.path.exists(gm_template.path):
         return jsonify({"message": "No Good Moral template uploaded"}), 404
-
 
     pdf = generate_good_moral_pdf(
         template_path=gm_template.path,

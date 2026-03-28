@@ -75,7 +75,7 @@ export default function StudentRegister() {
           student_name: studentName,
           email: normalizedEmail,
           phone,
-          course: selectedCourse, // ✅ fixed
+          course: selectedCourse, 
           password,
         }),
       });
