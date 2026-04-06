@@ -168,9 +168,11 @@ class GoodMoralRequest(db.Model):
     remarks = db.Column(db.Text, nullable=True)
 
     # -----------------------------
-    # New column for notification tracking
+    # Notification / read / delete tracking
     # -----------------------------
-    is_notified = db.Column(db.Boolean, nullable=False, default=False)
+    is_notified = db.Column(db.Boolean, nullable=False, default=False)  # retain for old code
+    is_read = db.Column(db.Boolean, nullable=False, default=False)      # new: mark as opened
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)   # new: soft delete
 
     # Relationships
     student = db.relationship("Student", back_populates="good_moral_requests")

@@ -20,15 +20,19 @@ export default function StudentHome() {
   const [accountModal, setAccountModal] = useState(false);
   const [profilePreview, setProfilePreview] = useState(null);
 
-  // Good moral / notifications
+  // Good moral
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRevoked, setIsRevoked] = useState(false);
   const [hasShownRevokeAlert, setHasShownRevokeAlert] = useState(false);
   const [violationsCount, setViolationsCount] = useState(0);
   const [canSubmit,setCanSubmit] = useState(false);
+
+  // notifications
   const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
-  
+  const [selectedNotification, setSelectedNotification] = useState(null);
+  const [badgeCount, setBadgeCount] = useState(0);
+
   // Rules preview
   const [currentRules, setCurrentRules] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
@@ -230,7 +234,6 @@ export default function StudentHome() {
     fetchRules();
   }, []);
 
-
 // -------------------------
 // Good Moral Functions
 // -------------------------
@@ -244,10 +247,74 @@ useEffect(() => {
 
   let interval;
 
+  const fetchGoodMoralFile = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
+      const data = await res.json();
+
+      const totalViolations = Number(data.violation_count) || 0;
+      setViolationsCount(totalViolations);
+
+      const latest = data.history?.[0] || null;
+
+      const revoked =
+        latest?.status === "Rejected" &&
+        (latest?.remarks || "").toLowerCase().includes("auto-revoked");
+
+      setIsRevoked(revoked);
+      setCanSubmit(!revoked);
+
+      setStudentRecord(prev => ({
+        ...prev,
+        lastGoodMoralRequest: latest,
+      }));
+
+      // Unified revoke / violations alert (only once)
+      if (
+        (revoked || totalViolations >= 3) &&
+        activePage === "GoodMoral" &&
+        !hasShownRevokeAlert
+      ) {
+        Swal.fire({
+          icon: "warning",
+          title: revoked ? "Access Revoked" : "You've Reached 3 Violations",
+          text: revoked
+            ? "Your Good Moral has been revoked due to multiple violations."
+            : "You cannot submit a Good Moral request until your violations are cleared.",
+        }).then(() => {
+          // Redirect to Info page after user clicks OK
+          setActivePage("Info");
+        });
+
+        setHasShownRevokeAlert(true);
+        setCanSubmit(false);
+      }
+
+      if (latest?.status === "Approved" && !revoked) {
+        setCurrentGoodMoral({
+          name: latest.filename_original || "Good Moral Certificate",
+          url: `${API_BASE}/good-moral/download/${latest.request_id}`,
+        });
+      } else {
+        setCurrentGoodMoral(null);
+      }
+
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  fetchGoodMoralFile();
+
+  return () => clearInterval(interval);
+}, [studentNumber, activePage, hasShownRevokeAlert]);
+
 // =========================
-// AUTO-FETCH LATEST GOOD MORAL
+// FETCH LATEST GOOD MORAL
 // =========================
-const fetchGoodMoralFile = async () => {
+const fetchLatestGoodMoral = async () => {
+  if (!studentNumber) return;
+
   try {
     const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
     const data = await res.json();
@@ -255,35 +322,47 @@ const fetchGoodMoralFile = async () => {
     const totalViolations = Number(data.violation_count) || 0;
     setViolationsCount(totalViolations);
 
-    const latest = data.requests?.[0] || null;
+    const latest = data.history?.[0] || null;
 
-    //  revoked ONLY if auto-revoked (3+ violations)
-    const isRevoked =
+    const revoked =
       latest?.status === "Rejected" &&
       (latest?.remarks || "").toLowerCase().includes("auto-revoked");
 
-    setIsRevoked(isRevoked);
-
-    //  allow submit if NOT revoked
-    setCanSubmit(!isRevoked);
+    setIsRevoked(revoked);
+    setCanSubmit(!revoked && totalViolations < 3);
 
     setStudentRecord(prev => ({
       ...prev,
       lastGoodMoralRequest: latest,
     }));
 
-    //  show Swal ONLY if revoked (3 violations)
-    if (isRevoked && activePage === "GoodMoral" && !hasShownRevokeAlert) {
+    // =============================
+    // SINGLE ALERT LOGIC (REVOKE OR 3 VIOLATIONS)
+    // =============================
+    if (
+      (revoked || totalViolations >= 3) &&
+      activePage === "GoodMoral" &&
+      !hasShownRevokeAlert
+    ) {
       Swal.fire({
         icon: "warning",
-        title: "Access Revoked",
-        text: "Your Good Moral has been revoked due to multiple violations.",
+        title: revoked ? "Access Revoked" : "You've Reached 3 Violations",
+        text: revoked
+          ? "Your Good Moral has been revoked due to multiple violations."
+          : "You cannot submit a Good Moral request until your violations are cleared.",
+      }).then(() => {
+        // Redirect to Info page after user clicks OK
+        setActivePage("Info");
       });
+
       setHasShownRevokeAlert(true);
+      setCanSubmit(false);
     }
 
-    // show file if approved
-    if (latest?.status === "Approved" && !isRevoked) {
+    // =============================
+    // CURRENT GOOD MORAL FILE
+    // =============================
+    if (latest?.status === "Approved" && !revoked) {
       setCurrentGoodMoral({
         name: latest.filename_original || "Good Moral Certificate",
         url: `${API_BASE}/good-moral/download/${latest.request_id}`,
@@ -293,18 +372,9 @@ const fetchGoodMoralFile = async () => {
     }
 
   } catch (err) {
-    console.error(err);
+    console.error("Fetch error:", err);
   }
 };
-  fetchGoodMoralFile();
-
-  interval = setInterval(() => {
-    if (document.visibilityState === "visible") fetchGoodMoralFile();
-  }, 5000);
-
-  return () => clearInterval(interval);
-}, [studentNumber, activePage, hasShownRevokeAlert]);
-
 // =========================
 // SUBMIT GOOD MORAL REQUEST
 // =========================
@@ -353,7 +423,7 @@ const submitGoodMoralRequest = async (file) => {
       timer: 2000,
     });
 
-    fetchLatestGoodMoral();
+    await fetchLatestGoodMoral();
 
   } catch (err) {
     console.error(err);
@@ -366,29 +436,7 @@ const submitGoodMoralRequest = async (file) => {
 };
 
 // =========================
-// FETCH LATEST REQUEST
-// =========================
-const fetchLatestGoodMoral = async () => {
-  if (!studentNumber) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
-    const data = await res.json();
-
-    const latest = data.requests?.[0] || null;
-
-    setStudentRecord(prev => {
-      if (prev.lastGoodMoralRequest?.request_id === latest?.request_id) return prev;
-      return { ...prev, lastGoodMoralRequest: latest };
-    });
-
-  } catch (err) {
-    console.error("Fetch error:", err);
-  }
-};
-
-// =========================
-// AUTO FETCH ON PAGE LOAD
+// AUTO-FETCH ON PAGE LOAD
 // =========================
 useEffect(() => {
   if (!studentNumber) return;
@@ -396,82 +444,239 @@ useEffect(() => {
 }, [studentNumber]);
 
 // =========================
-// OPTIONAL LIGHT POLLING
+// LIGHT POLLING FOR REAL-TIME UPDATES
 // =========================
 useEffect(() => {
   if (!studentNumber) return;
 
   const interval = setInterval(() => {
-    if (document.visibilityState === "visible") fetchLatestGoodMoral();
+    if (document.visibilityState === "visible") {
+      fetchLatestGoodMoral();
+    }
   }, 1000);
 
   return () => clearInterval(interval);
 }, [studentNumber]);
-
 // =========================
-// FETCH NOTIFICATIONS + HISTORY
+// Constants
 // =========================
 const POLL_INTERVAL = 5000;
 
+// =========================
+// Fetch unread notification count (backend-based)
+// =========================
+const fetchUnreadCount = async (overrideLocal = false) => {
+  if (!studentNumber) return;
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/good-moral/student/notifications/unread-count?student_number=${studentNumber}`
+    );
+    const data = await res.json();
+
+    if (overrideLocal || data.unread_count > badgeCount) {
+      setBadgeCount(data.unread_count);
+    }
+  } catch (err) {
+    console.error("Error fetching unread count:", err);
+  }
+};
+
+// =========================
+// Fetch notifications + Good Moral history
+// =========================
 const fetchNotifications = async () => {
   if (!studentNumber) return;
 
   try {
-    const notifRes = await fetch(
-      `${API_BASE}/good-moral/student/notifications?student_number=${studentNumber}`
-    );
-    if (!notifRes.ok) throw new Error(`Failed to fetch notifications: ${notifRes.status}`);
-    const notifData = await notifRes.json();
+    const [notifRes, historyRes] = await Promise.all([
+      fetch(`${API_BASE}/good-moral/student/notifications?student_number=${studentNumber}`),
+      fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`)
+    ]);
 
-    const newNotifs = Array.isArray(notifData)
-      ? notifData.map(n => ({
-          request_id: n.request_id,
-          status: n.status,
-          message: n.message,
-          is_new: true,
-          requested_at: n.requested_at,
-        }))
+    const notifData = notifRes.ok ? await notifRes.json() : { notifications: [] };
+    const historyData = historyRes.ok ? await historyRes.json() : { history: [] };
+
+    // =========================
+    // Normalize function
+    // =========================
+    const normalize = (n, isHistory = false) => {
+      // Skip Pending / unknown notifications by returning null
+      if (n.status !== "Approved" && n.status !== "Rejected") return null;
+
+      return {
+        request_id: n.request_id,
+        status: n.status,
+        message: isHistory
+          ? n.status === "Approved"
+            ? "Your Good Moral request has been approved."
+            : n.remarks?.toLowerCase().includes("auto-revoked")
+            ? "Your Good Moral has been revoked due to multiple violations."
+            : "Your Good Moral request has been rejected."
+          : n.message,
+        is_read: n.is_read || false,
+        requested_at: n.requested_at,
+        is_deleted: n.is_deleted || false
+      };
+    };
+
+    const newNotifs = Array.isArray(notifData.notifications)
+      ? notifData.notifications.map(n => normalize(n)).filter(Boolean)
+      : [];
+    const fullHistory = Array.isArray(historyData.history)
+      ? historyData.history.map(r => normalize(r, true)).filter(Boolean)
       : [];
 
-    const historyRes = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
-    if (!historyRes.ok) throw new Error(`Failed to fetch history: ${historyRes.status}`);
-    const historyData = await historyRes.json();
-
-    const fullHistory = Array.isArray(historyData.requests)
-      ? historyData.requests.map(r => ({
-          request_id: r.request_id,
-          status: r.status,
-          message:
-            r.status === "Pending"
-              ? "Your Good Moral request is pending."
-              : r.status === "Approved"
-              ? "Your Good Moral request has been approved."
-              : "Your Good Moral request has been rejected.",
-          is_new: false,
-          requested_at: r.requested_at,
-        }))
-      : [];
-
+    // =========================
+    // Merge & deduplicate
+    // =========================
     const merged = [
-      ...fullHistory.filter(h => !newNotifs.some(n => n.request_id === h.request_id)),
-      ...newNotifs,
+      ...notifications,
+      ...fullHistory,
+      ...newNotifs
     ];
 
-    setNotifications(merged);
+    const updated = merged
+      // Keep local is_read/is_deleted
+      .map(n => {
+        const local = notifications.find(
+          l => l.request_id === n.request_id && l.requested_at === n.requested_at
+        );
+        return {
+          ...n,
+          is_read: local?.is_read ?? n.is_read,
+          is_deleted: local?.is_deleted ?? n.is_deleted
+        };
+      })
+      // Remove exact duplicates
+      .filter((n, index, arr) =>
+        index === arr.findIndex(m =>
+          m.request_id === n.request_id &&
+          m.status === n.status &&
+          m.message === n.message &&
+          m.requested_at === n.requested_at
+        )
+      )
+      // Remove deleted
+      .filter(n => !n.is_deleted)
+      // Sort newest first
+      .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
 
+    setNotifications(updated);
+    setBadgeCount(updated.filter(n => !n.is_read).length);
+
+    // Sync badge with backend
+    fetchUnreadCount();
   } catch (err) {
     console.error("Error fetching notifications/history:", err);
   }
 };
 
 // =========================
-// Polling notifications on mount
+// Mark notification as read (backend + local)
+const markAsRead = async (note) => {
+  setNotifications(prev => {
+    const updated = prev.map(n =>
+      n.request_id === note.request_id && n.requested_at === note.requested_at
+        ? { ...n, is_read: true }
+        : n
+    );
+    setBadgeCount(updated.filter(n => !n.is_read).length);
+    return updated;
+  });
+
+  try {
+    await fetch(`${API_BASE}/good-moral/student/notifications/close/${note.request_id}`, {
+      method: "PATCH"
+    });
+    fetchUnreadCount();
+  } catch (err) {
+    console.error("Failed to mark notification as read:", err);
+  }
+};
+
+// =========================
+// Open a notification (click card)
+const openNotification = async (note) => {
+  setSelectedNotification(note);
+  if (!note.is_read) await markAsRead(note);
+};
+
+// =========================
+// Close notification modal (X button)
+const closeNotification = (note) => {
+  if (!note) return;
+  setSelectedNotification(null);
+  if (!note.is_read) markAsRead(note);
+};
+
+// =========================
+// Soft-delete a notification
+const deleteNotification = async (request_id, requested_at) => {
+  try {
+    await fetch(`${API_BASE}/good-moral/student/notifications/${request_id}`, {
+      method: "DELETE",
+    });
+
+    // Update notifications locally
+    setNotifications(prev => {
+      const updated = prev.filter(
+        n => !(n.request_id === request_id && n.requested_at === requested_at)
+      );
+      setBadgeCount(updated.filter(n => !n.is_read).length);
+      return updated;
+    });
+
+    fetchUnreadCount();
+
+    // Clear selected notification if it's the deleted one
+    if (
+      selectedNotification?.request_id === request_id &&
+      selectedNotification?.requested_at === requested_at
+    ) {
+      setSelectedNotification(null);
+    }
+
+    Swal.fire({
+      title: "Deleted!",
+      text: "Notification has been deleted.",
+      icon: "success",
+      timer: 2300,
+      showConfirmButton: false,
+      position: "top-end",
+      toast: true,
+      timerProgressBar: true, 
+    });
+
+  } catch (err) {
+    console.error("Failed to delete notification:", err);
+
+    Swal.fire({
+      title: "Error!",
+      text: "Failed to delete notification.",
+      icon: "error",
+      timer: 1000,
+      showConfirmButton: false,
+      position: "top-end",
+      toast: true,
+      timerProgressBar: true,
+    });
+  }
+};
+
+// =========================
+// Poll notifications every POLL_INTERVAL ms
 // =========================
 useEffect(() => {
   if (!studentNumber) return;
 
-  fetchNotifications(); // initial fetch
-  const intervalId = setInterval(fetchNotifications, POLL_INTERVAL);
+  fetchNotifications();
+  fetchUnreadCount(false);
+
+  const intervalId = setInterval(() => {
+    fetchNotifications();
+    fetchUnreadCount(false);
+  }, POLL_INTERVAL);
 
   return () => clearInterval(intervalId);
 }, [studentNumber]);
@@ -535,22 +740,24 @@ useEffect(() => {
             <span className="font-medium">Rules & Regulations</span>
           </button>
 
-          <button
-            onClick={() => setActivePage("Notifications")}
-            className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
-              activePage === "Notifications" ? "bg-green-600" : "hover:bg-gray-700/60"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <BellIcon className="w-5 h-5" />
-              <span className="font-medium">Notifications</span>
-            </div>
-            {notifications.length > 0 && (
-              <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                {notifications.length}
-              </span>
-            )}
-          </button>
+      <button
+        onClick={() => setActivePage("Notifications")}
+        className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+          activePage === "Notifications" ? "bg-green-600" : "hover:bg-gray-700/60"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <BellIcon className="w-5 h-5" />
+          <span className="font-medium">Notifications</span>
+        </div>
+
+        {/* Badge: show only on desktop if there are unread notifications */}
+        {notifications.filter(n => !n.is_read).length > 0 && (
+          <span className="hidden md:inline-flex bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {notifications.filter(n => !n.is_read).length}
+          </span>
+        )}
+      </button>
         </nav><br></br>
 
     {/* DESKTOP LOGOUT BUTTON */}
@@ -569,7 +776,7 @@ useEffect(() => {
       }).then((result) => {
         if (result.isConfirmed) {
 
-          // SUCCESS TOAST BAGO MAG-REDIRECT
+          
           Swal.fire({
             toast: true,
             position: "top-end",
@@ -642,12 +849,26 @@ useEffect(() => {
               <BookOpenIcon className="w-5 h-5" />
               <span className="font-medium">Rules & Regulations</span>
             </button>
-            <button onClick={() => { setActivePage("Notifications"); setSidebarOpen(false); }} className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg ${activePage === "Notifications" ? "bg-green-600" : "hover:bg-white/10"}`}>
+            <button
+              onClick={() => {
+                setActivePage("Notifications");
+                setSidebarOpen(false);
+              }}
+              className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg ${
+                activePage === "Notifications" ? "bg-green-600" : "hover:bg-white/10"
+              }`}
+            >
               <div className="flex items-center gap-3">
                 <BellIcon className="w-5 h-5" />
                 <span className="font-medium">Notifications</span>
               </div>
-              {notifications.length > 0 && <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{notifications.length}</span>}
+
+              {/* Badge: show only unread notifications */}
+              {notifications.filter(n => !n.is_read).length > 0 && (
+                <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {notifications.filter(n => !n.is_read).length}
+                </span>
+              )}
             </button>
           </nav><br></br>
 
@@ -774,31 +995,6 @@ useEffect(() => {
 
                   <button className="w-full bg-green-600 text-white cursor-pointer py-2 rounded-lg hover:bg-green-700 mt-3">
                     Manage Account
-                  </button>
-
-                  {/* Account logout (confirmation) */}
-                  <button
-                    onClick={() => {
-                      Swal.fire({
-                        title: "Logout",
-                        text: "Are you sure you want to log out?",
-                        icon: "warning",
-                        showCancelButton: true,
-                        confirmButtonText: "Logout",
-                        cancelButtonText: "Cancel",
-                        confirmButtonColor: "#d33",
-                        cancelButtonColor: "#3085d6",
-                      }).then((result) => {
-                        if (result.isConfirmed) {
-                          localStorage.removeItem("student");
-                          setAccountModal(false);
-                          window.location.href = "/";
-                        }
-                      });
-                    }}
-                    className="w-full mt-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                  >
-                    Logout
                   </button>
                 </div>
               </div>
@@ -1109,103 +1305,184 @@ useEffect(() => {
                 )}
               </div>
             </div>
-          )}
-          
-         {/*Notifications*/}
-          {activePage === "Notifications" && (
-            <div>
-              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">
-                Notifications
-              </h2>
+            )}
+  {/* ======================== NOTIFICATIONS PAGE ========================= */}
+    {activePage === "Notifications" && (
+      <div className="w-full">
+        <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">
+          Notifications
+        </h2>
 
-              {notifications.length === 0 ? (
-                <p className="text-gray-700">No notifications at the moment.</p>
-              ) : (
-                <div className="space-y-4">
-                  {notifications.map(note => {
-                    const { request_id, message, status, is_new } = note;
+        {notifications.length === 0 ? (
+          <p className="text-gray-700 text-center">
+            No notifications at the moment.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {notifications.map((note) => {
+              const { request_id, message, status, is_read } = note;
+              const isOpened = is_read;
 
-                    let borderColor = "border-gray-400";
-                    let dotColor = "bg-gray-400";
+              // Border & dot colors based on status & read state
+              let borderColor = "border-gray-300";
+              let dotColor = "bg-gray-400";
 
-                    if (status === "Approved") {
-                      borderColor = "border-green-600";
-                      dotColor = "bg-green-600";
-                    } else if (status === "Rejected") {
-                      borderColor = "border-red-600";
-                      dotColor = "bg-red-600";
-                    } else if (status === "Pending") {
-                      borderColor = "border-yellow-500";
-                      dotColor = "bg-yellow-500";
-                    }
+              if (!isOpened) {
+                if (status === "Approved") {
+                  borderColor = "border-green-600";
+                  dotColor = "bg-green-600";
+                } else if (status === "Rejected") {
+                  borderColor = "border-red-600";
+                  dotColor = "bg-red-600";
+                }
+              }
 
-                    return (
-                      <div
-                        key={request_id}
-                        className={`p-4 bg-white rounded-2xl shadow-md border-2 ${borderColor} flex items-center justify-between`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <span className={`w-3 h-3 rounded-full ${dotColor}`}></span>
-                          <p className="font-semibold">{message}</p>
-                        </div>
+              const handleOpen = async () => {
+                setSelectedNotification(note); // open modal
 
-                        <div className="flex items-center space-x-2">
-                          <p className="text-gray-600 font-medium">{status}</p>
+                if (!note.is_read) {
+                  await openNotification(note); // mark as read & update badge/backend
+                }
+              };
 
-                          {is_new && (
-                            <span className="px-2 py-0.5 text-xs font-semibold text-white bg-blue-500 rounded-full">
-                              NEW
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* HISTORY MODAL */}
-      {historyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
-            <h2 className="text-2xl font-bold text-gray-700 mb-4">Visit History</h2>
-            <div className="max-h-80 overflow-auto border rounded-lg p-3 bg-gray-50">
-              {violationHistory.length === 0 ? (
-                <p className="text-gray-500 text-center py-6">No visit history found.</p>
-              ) : (
-                violationHistory.map((item, index) => (
-                  <div key={index} className="p-3 bg-white rounded-lg shadow mb-3 border">
-                    <p className="font-semibold">{item.predicted_violation}</p>
-                    <p className="text-sm text-gray-600">Section: {item.predicted_section}</p>
-                    <p className="text-sm text-gray-600">Date: {item.violation_date || "—"}</p>
+              return (
+                <div
+                  key={request_id}
+                  onClick={handleOpen}
+                  className={`cursor-pointer p-4 bg-white rounded-2xl shadow-md border-2 ${borderColor} flex items-center justify-between hover:scale-[1.02] transition-transform duration-200`}
+                >
+                  {/* Left: Dot + Message */}
+                  <div className="flex items-center space-x-3">
+                    <span className={`w-3 h-3 rounded-full ${dotColor}`}></span>
+                    <p className="font-semibold text-gray-800">{message}</p>
                   </div>
-                ))
-              )}
-            </div>
-            <button onClick={() => setHistoryModalOpen(false)} className="mt-5 w-full bg-green-600 text-white py-2 rounded-lg">Close</button>
-          </div>
-        </div>
-      )}
 
-      {/* FULLSCREEN PREVIEW */}
-      {previewFile && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
-            <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg">✕</button>
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-              {previewFile.name.endsWith(".pdf") ? (
-                <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px]" />
-              ) : (
-                <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" alt="preview" />
-              )}
-            </div>
+                  {/* Right: Status + NEW Badge */}
+                  <div className="flex items-center space-x-2">
+                    <p className="text-gray-600 font-medium">{status}</p>
+                    {!isOpened && (
+                      <span className="px-2 py-0.5 text-xs font-semibold text-white bg-blue-500 rounded-full">
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* ======================== MODAL FOR SELECTED NOTIFICATION ========================= */}
+    {selectedNotification && (
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-white rounded-3xl p-8 w-[95%] max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl relative animate-fadeIn">
+          {/* X BUTTON */}
+          <button
+            onClick={async () => {
+              if (!selectedNotification) return;
+              await closeNotification(selectedNotification); // mark as read + update badge/backend
+            }}
+            className="absolute top-4 right-5 text-gray-500 hover:text-red-500 text-2xl font-bold"
+          >
+            ✕
+          </button>
+
+          {/* HEADER & STATUS */}
+          {(() => {
+            let iconBg = "bg-gray-100";
+            let contentBg = "bg-gray-50";
+            let textColor = "text-gray-700";
+
+            if (selectedNotification.status === "Approved") {
+              iconBg = "bg-green-100";
+              contentBg = "bg-green-50";
+              textColor = "text-green-700";
+            } else if (selectedNotification.status === "Rejected") {
+              iconBg = "bg-red-100";
+              contentBg = "bg-red-50";
+              textColor = "text-red-700";
+          
+            }
+
+            return (
+              <>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className={`w-14 h-14 flex items-center justify-center rounded-full text-2xl ${iconBg}`}>
+                    🔔
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-800">Notification Details</h3>
+                </div>
+
+                <div className={`${contentBg} p-6 rounded-2xl mb-6`}>
+                  <p className="text-gray-800 text-lg font-semibold mb-3">
+                    {selectedNotification.message}
+                  </p>
+                  <p className={`text-base font-semibold ${textColor}`}>
+                    Status: {selectedNotification.status}
+                  </p>
+                </div>
+              </>
+            );
+          })()}
+
+          {/* ACTIONS */}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={async () => {
+                await deleteNotification(selectedNotification.request_id);
+                setSelectedNotification(null);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition"
+            >
+              Delete
+            </button>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
+    )}
+                </main>
+              </div>
+
+            {/* HISTORY MODAL */}
+            {historyModalOpen && (
+              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
+                  <h2 className="text-2xl font-bold text-gray-700 mb-4">Visit History</h2>
+                  <div className="max-h-80 overflow-auto border rounded-lg p-3 bg-gray-50">
+                    {violationHistory.length === 0 ? (
+                      <p className="text-gray-500 text-center py-6">No visit history found.</p>
+                    ) : (
+                      violationHistory.map((item, index) => (
+                        <div key={index} className="p-3 bg-white rounded-lg shadow mb-3 border">
+                          <p className="font-semibold">{item.predicted_violation}</p>
+                          <p className="text-sm text-gray-600">Section: {item.predicted_section}</p>
+                          <p className="text-sm text-gray-600">Date: {item.violation_date || "—"}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <button onClick={() => setHistoryModalOpen(false)} className="mt-5 w-full bg-green-600 text-white py-2 rounded-lg">Close</button>
+                </div>
+              </div>
+            )}
+
+            {/* FULLSCREEN PREVIEW */}
+            {previewFile && (
+              <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="relative w-full max-w-4xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
+                  <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg">✕</button>
+                  <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                    {previewFile.name.endsWith(".pdf") ? (
+                      <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px]" />
+                    ) : (
+                      <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" alt="preview" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }

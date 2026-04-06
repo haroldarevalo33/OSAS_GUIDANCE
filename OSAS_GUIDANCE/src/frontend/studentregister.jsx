@@ -42,8 +42,11 @@ export default function StudentRegister() {
     return () => clearInterval(interval);
   }, []);
 
+  // =========================
   // Handle registration
+  // =========================
   const handleRegister = async () => {
+    // Check empty fields
     if (!studentNumber || !studentName || !email || !phone || !selectedCourse || !password) {
       Swal.fire({
         icon: "warning",
@@ -53,15 +56,26 @@ export default function StudentRegister() {
       return;
     }
 
-    // CvSU EMAIL VALIDATION (ONLY @cvsu.edu.ph)
-    const cvsuEmailRegex = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
+// Student Number Validation: must be exactly 9 digits, numeric only
+if (!/^\d{9}$/.test(studentNumber)) {
+  Swal.fire({
+    icon: "error",
+    title: "Invalid Student Number",
+    text: "Student number must be exactly 9 digits.",
+  });
+  return;
+}
+
+    // CvSU Email Validation: multiple names allowed separated by dots
+    // Format: nc.firstname.lastname[.othernames]@cvsu.edu.ph
+    const cvsuEmailRegex = /^nc(\.[a-zA-Z]+){1,3}@cvsu\.edu\.ph$/;
     const normalizedEmail = email.toLowerCase();
 
     if (!cvsuEmailRegex.test(normalizedEmail)) {
       Swal.fire({
         icon: "error",
         title: "Invalid Email",
-        text: "Only CvSU Email Account are Allowed.",
+        text: "Only CvSU Email Account (e.g., nc.example@cvsu.edu.ph) are allowed.",
       });
       return;
     }
@@ -75,7 +89,7 @@ export default function StudentRegister() {
           student_name: studentName,
           email: normalizedEmail,
           phone,
-          course: selectedCourse, 
+          course: selectedCourse,
           password,
         }),
       });
@@ -167,7 +181,7 @@ export default function StudentRegister() {
           <label className="text-gray-700 font-medium">CvSU Email</label>
           <input
             type="email"
-            placeholder="example@cvsu.edu.ph"
+            placeholder="nc.example@cvsu.edu.ph"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"

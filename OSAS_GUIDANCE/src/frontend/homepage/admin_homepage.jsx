@@ -1047,13 +1047,13 @@ useEffect(() => {
 
 // ----------------- GOOD MORAL FUNCTIONS -----------------
 const [currentAdminId] = useState(null);
+
 // ----------------- FETCH PENDING REQUESTS (AUTO-POLLING) -----------------
 const fetchPendingRequests = async () => {
   try {
     const res = await fetch("http://localhost:5000/good-moral/admin/requests?status=Pending");
     const data = await res.json();
 
-    // Map backend response to include proper display fields
     const formatted = data.map((req) => ({
       ...req,
       student_name: req.student_name || "N/A",
@@ -1068,17 +1068,15 @@ const fetchPendingRequests = async () => {
 
 // ----------------- AUTO-POLLING EVERY 5 SECONDS -----------------
 useEffect(() => {
-  // Initial fetch
   fetchPendingRequests();
 
-  // Set interval to fetch automatically
   const interval = setInterval(() => {
     fetchPendingRequests();
-  }, 5000); // every 5 seconds
+  }, 5000);
 
-  // Cleanup interval on unmount
   return () => clearInterval(interval);
 }, []);
+
 const handleApprove = async (request) => {
   try {
     const res = await fetch(`http://localhost:5000/good-moral/process/${request.request_id}`, {
@@ -1090,13 +1088,10 @@ const handleApprove = async (request) => {
 
     console.log("Approve response:", data);
 
-    // Update frontend immediately
     setSelectedRequest((prev) => ({ ...prev, status: "Approved" }));
 
-    // Refresh pending requests
     fetchPendingRequests();
 
-    // Load file URL if approved
     if (data?.request?.filename_url) {
       setCurrentGoodMoral({
         name: data.request.filename_original,
@@ -1105,6 +1100,16 @@ const handleApprove = async (request) => {
     }
 
     setShowRequestDetails(false);
+
+    Swal.fire({
+      title: "Approved",
+      icon: "success",
+      toast: true,
+      position: "top-end",
+      timer: 1000,
+      showConfirmButton: false,
+    });
+
   } catch (err) {
     console.error("Failed to approve request:", err);
   }
@@ -1125,12 +1130,22 @@ const handleReject = async (request) => {
 
     fetchPendingRequests();
     setShowRequestDetails(false);
+
+    Swal.fire({
+      title: "Rejected",
+      icon: "error",
+      toast: true,
+      position: "top-end",
+      timer: 1000,
+      showConfirmButton: false,
+    });
+
   } catch (err) {
     console.error("Failed to reject request:", err);
   }
 };
 
-// Fetch all requests for a student (history)
+// Fetch all requests for a student
 const fetchStudentRequests = async (studentNumber) => {
   try {
     const res = await fetch(`http://localhost:5000/good-moral/history?student_number=${studentNumber}`);
@@ -1141,7 +1156,7 @@ const fetchStudentRequests = async (studentNumber) => {
   }
 };
 
-// Automatically fetch pending requests when component mounts
+// Automatically fetch pending requests
 useEffect(() => {
   fetchPendingRequests();
 }, []);
