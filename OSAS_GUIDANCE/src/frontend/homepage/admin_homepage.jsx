@@ -654,47 +654,55 @@ const menuItems = [
   }
 
   // ------------------ Fetch Violations ------------------
-  useEffect(() => {
-    fetchViolations();
-  }, []);
+useEffect(() => {
+  fetchViolations();
+}, []);
 
-  async function fetchViolations() {
-    try {
-      const res = await fetch("http://localhost:5000/violations");
-      const data = await res.json();
-      setViolations(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching violations:", err);
-      setViolations([]);
+async function fetchViolations() {
+  try {
+    const res = await fetch("http://localhost:5000/violations");
+    const data = await res.json();
+    setViolations(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error("Error fetching violations:", err);
+    setViolations([]);
+  }
+}
+
+// ------------------ Logout ------------------
+function handleLogout() {
+  Swal.fire({
+    title: "Logout",
+    text: "Are you sure you want to log out?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, log out",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#16a34a",
+    cancelButtonColor: "#d33",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      Swal.fire({
+        title: "Logged out",
+        text: "You have been successfully logged out.",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      }).then(() => (window.location.href = "/"));
     }
-  }
+  });
+}
 
-  // ------------------ Logout ------------------
-  function handleLogout() {
-    Swal.fire({
-      title: "Logout",
-      text: "Are you sure you want to log out?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, log out",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#16a34a",
-      cancelButtonColor: "#d33",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        Swal.fire({
-          title: "Logged out",
-          text: "You have been successfully logged out.",
-          icon: "success",
-          timer: 1200,
-          showConfirmButton: false,
-        }).then(() => (window.location.href = "/"));
-      }
-    });
-  }
+// ------------------ Submit Violation ------------------
 async function handleSubmitViolation() {
-  // Check if all fields are filled out
-  if (!studentName || !studentId || !courseYearSection || !gender || !violationText || !violationDate) {
+  if (
+    !studentName ||
+    !studentId ||
+    !courseYearSection ||
+    !gender ||
+    !violationText ||
+    !violationDate
+  ) {
     Swal.fire({
       icon: "warning",
       title: "Missing Fields",
@@ -703,21 +711,14 @@ async function handleSubmitViolation() {
     return;
   }
 
-  // Convert YYYY-MM-DD → MM/DD/YY for formatting
-  const parts = violationDate.split("-");
-  const formattedDate = `${parts[1]}/${parts[2]}/${parts[0].slice(-2)}`; // "MM/DD/YY"
-
   try {
-    // ---------------- Prediction Call ----------------
     const predictRes = await fetch("http://127.0.0.1:5000/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: violationText }),
     });
-    const predictData = await predictRes.json();
 
-    // Log the prediction data for debugging
-    console.log('Prediction Response:', predictData);
+    const predictData = await predictRes.json();
 
     if (!predictRes.ok) {
       Swal.fire({
@@ -728,33 +729,30 @@ async function handleSubmitViolation() {
       return;
     }
 
-    // ---------------- Build Payload ----------------
     const newViolation = {
       student_name: studentName,
-      student_id: parseInt(studentId, 10),
+      student_id: Number(studentId),
       course_year_section: courseYearSection,
-      gender,
+      gender: gender,
       violation_text: violationText,
-      violation_date: formattedDate,
-      predicted_violation: (predictData.predicted_violation !== null && predictData.predicted_violation !== undefined)
-        ? predictData.predicted_violation : "No predicted violation", // Check if not null or undefined
-      predicted_section: (predictData.predicted_section !== null && predictData.predicted_section !== undefined)
-        ? predictData.predicted_section : "No predicted section", // Check if not null or undefined
-      predictive_text: (predictData.predictive_text !== null && predictData.predictive_text !== undefined)
-        ? predictData.predictive_text : "No predictive text available", // Check for null/undefined
-      standard_text: (predictData.standard_text !== null && predictData.standard_text !== undefined)
-        ? predictData.standard_text : "No standard violation text available", // Check for null/undefined
+      violation_date: violationDate,
+
+      predicted_violation: predictData?.predicted_violation ?? "",
+      predicted_section: predictData?.predicted_section ?? "",
+      predictive_text: Array.isArray(predictData?.predictive_text)
+        ? predictData.predictive_text.join(" | ")
+        : predictData?.predictive_text ?? "",
+      standard_text: predictData?.standard_text ?? "",
     };
 
-    // ---------------- Submit to Backend ----------------
     const res = await fetch("http://localhost:5000/violations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newViolation),
     });
+
     const data = await res.json();
 
-    // Handle successful submission
     if (res.ok) {
       Swal.fire({
         toast: true,
@@ -763,11 +761,10 @@ async function handleSubmitViolation() {
         title: "Violation submitted successfully",
         showConfirmButton: false,
         timer: 1500,
-        timerProgressBar: true,
       });
 
-      setShowViolationModal(false);  // Close the modal
-      // Reset fields
+      setShowViolationModal(false);
+
       setStudentName("");
       setStudentId("");
       setCourseYearSection("");
@@ -776,9 +773,8 @@ async function handleSubmitViolation() {
       setViolationDate("");
       setStudentInfo(null);
 
-      await fetchViolations(); // Refresh the list of violations
+      await fetchViolations();
     } else {
-      // Handle error when submission fails
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -786,48 +782,55 @@ async function handleSubmitViolation() {
       });
     }
   } catch (err) {
-    // Handle any unexpected errors
     console.error(err);
-    Swal.fire({ icon: "error", title: "Error", text: "Invalid or Wrong Student Number." });
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Invalid or Wrong Student Number.",
+    });
   }
 }
 
-  // ------------------ View Student Info (opens modal) ------------------
-  function viewStudentInfo(student) {
+// ------------------ View Student Info ------------------
+function viewStudentInfo(student) {
+  setSelectedStudent(student);
+  setShowStudentModal(true);
+}
 
-    setSelectedStudent(student);
-    setShowStudentModal(true);
-  }
-
-
- useEffect(() => {
+// ------------------ Auto Fetch Student ------------------
+useEffect(() => {
   const q = (studentId || studentName || "").toString().trim();
+
   if (!q || q.length < 2) {
     setStudentInfo(null);
     return;
   }
 
   let isCancelled = false;
+
   const timer = setTimeout(async () => {
     setAutoFetchLoading(true);
+
     try {
-      const queryParam = encodeURIComponent(q);
-      const res = await fetch(`http://localhost:5000/students/student?query=${queryParam}`);
-      const data = await res.json(); // always JSON
+      const res = await fetch(
+        `http://localhost:5000/students/student?query=${encodeURIComponent(q)}`
+      );
+
+      const data = await res.json();
 
       if (!isCancelled) {
-        // Only fill if student found
-        if (data.student) {
+        if (data?.student) {
           setStudentInfo(data.student);
-          setStudentName(prev => prev || data.student.student_name || "");
-          setStudentId(prev => prev || String(data.student.student_id || ""));
+
+          if (!studentName) setStudentName(data.student.student_name || "");
+          if (!studentId) setStudentId(String(data.student.student_id || ""));
         } else {
-          setStudentInfo(null); // silent if not found
+          setStudentInfo(null);
         }
       }
     } catch (err) {
       console.error("Auto-fetch student error:", err);
-      if (!isCancelled) setStudentInfo(null); // silent on error
+      if (!isCancelled) setStudentInfo(null);
     } finally {
       if (!isCancelled) setAutoFetchLoading(false);
     }
@@ -839,17 +842,18 @@ async function handleSubmitViolation() {
   };
 }, [studentId, studentName]);
 
+// ------------------ Group Violations ------------------
+const violationsByStudent = React.useMemo(() => {
+  const map = {};
 
-  // ------------------ Derived: group violations by student id for quick lookups ------------------
-  const violationsByStudent = React.useMemo(() => {
-    const map = {};
-    for (const v of violations) {
-      const id = v.student_id ?? "unknown";
-      if (!map[id]) map[id] = [];
-      map[id].push(v);
-    }
-    return map;
-  }, [violations]);
+  for (const v of violations) {
+    const id = v.student_id || "unknown";
+    if (!map[id]) map[id] = [];
+    map[id].push(v);
+  }
+
+  return map;
+}, [violations]);
 
 // ===================== STATE =====================
 const [students, setStudents] = useState([]);

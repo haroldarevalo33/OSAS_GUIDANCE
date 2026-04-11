@@ -1,13 +1,12 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from models import Violation
+from models import Violation, Student
 from helpers import parse_date_flexible
 from datetime import date
 import joblib
 import os
 import string
 import numpy as np
-from models import Student
 
 violation_bp = Blueprint("violations", __name__, url_prefix="/violations")
 
@@ -18,85 +17,110 @@ model = joblib.load(os.path.join(BASE_DIR, "model.pkl"))
 vectorizer = joblib.load(os.path.join(BASE_DIR, "vectorizer.pkl"))
 violation_to_section = joblib.load(os.path.join(BASE_DIR, "violation_to_section.pkl"))
 
-# Load Standard Text
 try:
-    violation_to_standard_text = joblib.load(os.path.join(BASE_DIR, "violation_to_standard_text.pkl"))
+    violation_to_standard_text = joblib.load(
+        os.path.join(BASE_DIR, "violation_to_standard_text.pkl")
+    )
 except:
     violation_to_standard_text = {}
 
-# ---------------- Preprocessing ----------------
+violation_to_standard_text = {
+    str(k).strip().lower(): v
+    for k, v in violation_to_standard_text.items()
+}
+
+# ---------------- PREPROCESS ----------------
 def preprocess(text):
-    return text.lower().translate(str.maketrans('', '', string.punctuation))
+    if not text:
+        return ""
+    return text.lower().translate(str.maketrans("", "", string.punctuation))
+
+
+def normalize(text):
+    if not text:
+        return ""
+    return str(text).strip().lower()
+
+
+def get_standard_text(label):
+    return violation_to_standard_text.get(
+        normalize(label),
+        "No standard text available"
+    )
 
 # ---------------- GET ALL ----------------
 @violation_bp.get("")
 def get_all_violations():
     records = Violation.query.order_by(Violation.id.desc()).all()
-    data = []
 
-    for r in records:
-        dt = r.violation_date or date.today()
-
-        # Standard Text (optional)
-        standard_text = violation_to_standard_text.get(r.predicted_violation, "No standard text available")
-
-        data.append({
+    return jsonify([
+        {
             "id": r.id,
             "student_name": r.student_name,
             "student_id": r.student_id,
             "course_year_section": r.course_year_section,
             "gender": r.gender,
             "violation_text": r.violation_text,
-            "violation_date": dt.strftime("%Y-%m-%d"),
+            "violation_date": (r.violation_date or date.today()).strftime("%Y-%m-%d"),
             "predicted_violation": r.predicted_violation or "—",
             "predicted_section": r.predicted_section or "—",
-            "standard_text": standard_text
-        })
-
-    return jsonify(data)
+            "predictive_text": r.predictive_text or "—",
+            "standard_text": get_standard_text(r.predicted_violation)
+        }
+        for r in records
+    ])
 
 # ---------------- POST ----------------
 @violation_bp.post("")
 def add_violation():
     data = request.json or {}
-    required = ["student_name", "student_id", "course_year_section", "gender", "violation_text", "violation_date"]
+
+    required = [
+        "student_name",
+        "student_id",
+        "course_year_section",
+        "gender",
+        "violation_text",
+        "violation_date"
+    ]
 
     for key in required:
-        if key not in data or not data[key]:
+        if not data.get(key):
             return jsonify({"message": f"Missing field: {key}"}), 400
 
-    # ML Prediction
+    # ---------------- ML ----------------
     text_proc = preprocess(data["violation_text"])
     vectorized = vectorizer.transform([text_proc])
 
     predicted_violation = model.predict(vectorized)[0]
     predicted_section = violation_to_section.get(predicted_violation, "Unknown")
 
-    # TOP 3 PREDICTIVE LIST
+    # ---------------- TOP 3 ----------------
     try:
         probs = model.predict_proba(vectorized)[0]
         classes = model.classes_
-        top_idx = np.argsort(probs)[::-1][:3]
+
+        top = sorted(zip(classes, probs), key=lambda x: x[1], reverse=True)[:3]
 
         predictive_text = [
-            f"{classes[i]} ({probs[i]*100:.1f}%)"
-            for i in top_idx
+            f"{label} ({prob * 100:.1f}%)"
+            for label, prob in top
         ]
     except:
-        predictive_text = [predicted_violation]
+        predictive_text = [str(predicted_violation)]
 
-    # Standard Text
-    standard_text = violation_to_standard_text.get(predicted_violation, "No standard text available")
-
+    # ---------------- SAVE ----------------
     new_record = Violation(
         student_name=data["student_name"],
-        student_id=int(data["student_id"]),
+        student_id=str(data["student_id"]),
         course_year_section=data["course_year_section"],
         gender=data["gender"],
         violation_text=data["violation_text"],
         violation_date=parse_date_flexible(data["violation_date"]),
         predicted_violation=predicted_violation,
-        predicted_section=predicted_section
+        predicted_section=predicted_section,
+        predictive_text=" | ".join(predictive_text),
+        standard_text=get_standard_text(predicted_violation)
     )
 
     db.session.add(new_record)
@@ -107,7 +131,7 @@ def add_violation():
         "predicted_violation": predicted_violation,
         "predicted_section": predicted_section,
         "predictive_text": predictive_text,
-        "standard_text": standard_text
+        "standard_text": get_standard_text(predicted_violation)
     }), 201
 
 # ---------------- PUT ----------------
@@ -119,23 +143,40 @@ def update_violation(id):
 
     data = request.json or {}
 
-    # Update basic fields
     record.student_name = data.get("student_name", record.student_name)
-    record.student_id = int(data.get("student_id", record.student_id))
+    record.student_id = str(data.get("student_id", record.student_id))
     record.course_year_section = data.get("course_year_section", record.course_year_section)
     record.gender = data.get("gender", record.gender)
-    record.violation_text = data.get("violation_text", record.violation_text)
 
-    if "violation_date" in data:
-        record.violation_date = parse_date_flexible(data["violation_date"])
-
-    # Re-Predict ML model if violation text changed
     if "violation_text" in data:
+        record.violation_text = data["violation_text"]
+
         text_proc = preprocess(record.violation_text)
         vectorized = vectorizer.transform([text_proc])
 
         record.predicted_violation = model.predict(vectorized)[0]
-        record.predicted_section = violation_to_section.get(record.predicted_violation, "Unknown")
+        record.predicted_section = violation_to_section.get(
+            record.predicted_violation,
+            "Unknown"
+        )
+
+        try:
+            probs = model.predict_proba(vectorized)[0]
+            classes = model.classes_
+
+            top = sorted(zip(classes, probs), key=lambda x: x[1], reverse=True)[:3]
+
+            record.predictive_text = " | ".join([
+                f"{label} ({prob * 100:.1f}%)"
+                for label, prob in top
+            ])
+        except:
+            record.predictive_text = record.predicted_violation
+
+        record.standard_text = get_standard_text(record.predicted_violation)
+
+    if "violation_date" in data:
+        record.violation_date = parse_date_flexible(data["violation_date"])
 
     db.session.commit()
     return jsonify({"message": "Violation updated successfully"})
@@ -151,13 +192,10 @@ def delete_violation(id):
     db.session.commit()
     return jsonify({"message": "Violation deleted successfully"})
 
-
+# ---------------- SUMMARY ----------------
 @violation_bp.get("/summary/<string:student_number>")
 def get_student_summary(student_number):
 
-    print("Fetching summary for student_number:", student_number)
-
-    # Get student using student_number
     student = Student.query.filter_by(student_number=student_number).first()
 
     if not student:
@@ -168,12 +206,9 @@ def get_student_summary(student_number):
             "violation_date": "—"
         }), 200
 
-    # IMPORTANT FIX: Match violation.student_id (which stores student_number)
-    records = Violation.query.filter_by(student_id=student.student_number) \
-    .order_by(Violation.violation_date.desc()).all()
-
-
-    print("Violations found:", records)
+    records = Violation.query.filter_by(
+        student_id=str(student.student_number)
+    ).order_by(Violation.violation_date.desc()).all()
 
     if not records:
         return jsonify({
@@ -192,36 +227,31 @@ def get_student_summary(student_number):
         "violation_date": latest.violation_date.strftime("%Y-%m-%d") if latest.violation_date else "—"
     }), 200
 
-# ---------------- FULL HISTORY FOR STUDENT ----------------
+# ---------------- HISTORY ----------------
 @violation_bp.get("/history/<student_number>")
 def get_student_history(student_number):
 
     student = Student.query.filter_by(student_number=student_number).first()
-
     if not student:
         return jsonify([]), 200
 
-    # Same logic as summary — use student_number as string
-    records = (
-        Violation.query
-        .filter_by(student_id=student.student_number)
-        .order_by(Violation.violation_date.desc())
-        .all()
-    )
+    records = Violation.query.filter_by(
+        student_id=str(student.student_number)
+    ).order_by(Violation.violation_date.desc()).all()
 
-    output = []
-    for r in records:
-        output.append({
+    return jsonify([
+        {
             "predicted_violation": r.predicted_violation or "—",
             "predicted_section": r.predicted_section or "—",
             "violation_date": r.violation_date.strftime("%Y-%m-%d") if r.violation_date else "—"
-        })
+        }
+        for r in records
+    ]), 200
 
-    return jsonify(output), 200
-
-# ---------------- ADVANCED SEARCH (WITH FILTERS) ----------------
+# ---------------- SEARCH ----------------
 @violation_bp.get("/search")
 def search_violations():
+
     q = request.args.get("q", "").strip().upper()
     course = request.args.get("course", "ALL").strip().upper()
     start_date = request.args.get("startDate", "")
@@ -230,10 +260,8 @@ def search_violations():
 
     sort = "ASC" if sort not in ["ASC", "DESC"] else sort
 
-    # Base query
     query = Violation.query
 
-    # MAIN TEXT QUERY
     if q:
         like_q = f"%{q}%"
         query = query.filter(
@@ -246,11 +274,9 @@ def search_violations():
             )
         )
 
-    # COURSE FILTER
     if course != "ALL":
         query = query.filter(db.func.upper(Violation.course_year_section).like(f"%{course}%"))
 
-    # DATE RANGE
     if start_date and end_date:
         try:
             start = parse_date_flexible(start_date)
@@ -259,30 +285,27 @@ def search_violations():
         except:
             pass
 
-    # SORT
-    if sort == "ASC":
-        query = query.order_by(Violation.student_name.asc())
-    else:
-        query = query.order_by(Violation.student_name.desc())
+    query = query.order_by(
+        Violation.student_name.asc()
+        if sort == "ASC"
+        else Violation.student_name.desc()
+    )
 
     results = query.all()
-    output = []
 
-    for r in results:
-        dt = r.violation_date or date.today()
-        standard_text = violation_to_standard_text.get(r.predicted_violation, "No standard text available")
-
-        output.append({
+    return jsonify([
+        {
             "id": r.id,
             "student_name": r.student_name,
             "student_id": r.student_id,
             "course_year_section": r.course_year_section,
             "gender": r.gender,
             "violation_text": r.violation_text,
-            "violation_date": dt.strftime("%Y-%m-%d"),
+            "violation_date": (r.violation_date or date.today()).strftime("%Y-%m-%d"),
             "predicted_violation": r.predicted_violation,
             "predicted_section": r.predicted_section,
-            "standard_text": standard_text
-        })
-
-    return jsonify(output), 200
+            "predictive_text": r.predictive_text,
+            "standard_text": get_standard_text(r.predicted_violation)
+        }
+        for r in results
+    ]), 200
