@@ -13,6 +13,7 @@ export default function AdminHome() {
   const [rssItems, setRssItems] = useState([]);
   const [loadingRss, setLoadingRss] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLoading, IsItLoading] = useState(true);
 
 
 const [predictedViolation, setPredictedViolation] = useState("");
@@ -29,6 +30,17 @@ const [currentRules, setCurrentRules] = useState(null);
   const [violationText, setViolationText] = useState("");
   const [violationDate, setViolationDate] = useState("");
   const [showViolationModal, setShowViolationModal] = useState(false);
+  const [isGenerated, setIsGenerated] = useState(false);
+  const [isLoadingPredict, setIsLoadingPredict] = useState(false);
+  const [showModalViolation, setShowModalViolation] = useState(false);
+  const [violationData, setViolationData] = useState([]);
+  const [predictedViolationData, setPredictedViolationData] = useState([]);
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [selectedViolation, setSelectedViolation] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [monthlyViolationData, setMonthlyViolationData] = useState({});
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(null);
   
 
   // auto-filled student info fetched from /student?query=
@@ -90,63 +102,111 @@ const downloadFullReport = () => {
   const totalCases = filteredLineData.reduce((sum, item) => sum + item.cases, 0);
   const totalStudents = filteredCourseData.reduce((sum, item) => sum + item.value, 0);
   const totalSectionCases = filteredSectionData.reduce((sum, item) => sum + item.value, 0);
-
-  // ================= GENERATE DYNAMIC PARAGRAPHS =================
   const paragraphs = [];
 
-  paragraphs.push(
-    `This report presents a comprehensive overview of guidance-related analytics for the academic year ${reportYear}. ` +
-    `It encompasses detailed information on behavioral cases, student distribution across courses, and section-specific case counts. ` +
-    `The purpose of this report is to provide data-driven insights to assist guidance personnel and administrative staff in monitoring trends, identifying areas requiring intervention, and implementing measures that support student welfare and a positive learning environment.`
+paragraphs.push(
+  `This report summarizes guidance-related data for the academic year ${reportYear}. ` +
+  `It includes behavioral cases, student distribution by course, section case counts, and recorded as well as system-predicted violations. ` +
+  `The purpose is to help guidance staff understand student behavior trends, identify issues, and improve support programs for students.`
+);
+
+// ================= MONTHLY BEHAVIORAL CASES =================
+if (filteredLineData.length > 0) {
+  const peakMonth = filteredLineData.reduce((prev, curr) =>
+    curr.cases > prev.cases ? curr : prev
   );
 
-  // Monthly Behavioral Cases Analysis
-  if (filteredLineData.length > 0) {
-    const peakMonth = filteredLineData.reduce((prev, curr) => (curr.cases > prev.cases ? curr : prev));
-    const lowestMonth = filteredLineData.reduce((prev, curr) => (curr.cases < prev.cases ? curr : prev));
-
-    paragraphs.push(
-      `Throughout the year, a total of ${totalCases} behavioral cases were recorded. ` +
-      `The highest incidence was observed in ${peakMonth.month} with ${peakMonth.cases} reported cases, ` +
-      `while the lowest occurred in ${lowestMonth.month}, with ${lowestMonth.cases} cases. ` +
-      `These trends help identify critical periods where focused guidance and preventive strategies are necessary.`
-    );
-  }
-
-  // Course distribution analysis
-  if (filteredCourseData.length > 0) {
-    const topCourse = filteredCourseData.reduce((prev, curr) => (curr.value > prev.value ? curr : prev));
-    paragraphs.push(
-      `In terms of student enrollment, the institution recorded a total of ${totalStudents} students across all courses. ` +
-      `Notably, the course '${topCourse.course}' had the highest enrollment, with ${topCourse.value} students. ` +
-      `Understanding course enrollment distribution aids in resource allocation, program planning, and targeted guidance initiatives.`
-    );
-  }
-
-  // Section-wise cases analysis
-  if (filteredSectionData.length > 0) {
-    const topSection = filteredSectionData.reduce((prev, curr) => (curr.value > prev.value ? curr : prev));
-    paragraphs.push(
-      `Section-wise analysis revealed that section '${topSection.section}' recorded the highest number of behavioral cases at ${topSection.value}, ` +
-      `contributing to a cumulative total of ${totalSectionCases} cases across all sections. ` +
-      `Identifying sections with elevated cases allows for targeted counseling, intervention programs, and monitoring strategies.`
-    );
-  }
-
-  // Suggestions
-  paragraphs.push(
-    `Based on the data analyzed, it is recommended to implement proactive measures including regular counseling sessions, awareness campaigns, and structured peer support programs. ` +
-    `Special attention should be given during peak months to mitigate potential risks. ` +
-    `Additionally, continuous monitoring and timely reporting of behavioral trends are encouraged to enhance student well-being and maintain a safe academic environment.`
+  const lowestMonth = filteredLineData.reduce((prev, curr) =>
+    curr.cases < prev.cases ? curr : prev
   );
 
+  paragraphs.push(
+    `A total of ${totalCases} behavioral cases were recorded this year. ` +
+    `The highest was in ${peakMonth.month} with ${peakMonth.cases} cases, while the lowest was in ${lowestMonth.month} with ${lowestMonth.cases} cases. ` +
+    `This shows that some months need more attention and guidance support than others.`
+  );
+}
+
+// ================= COURSE DISTRIBUTION =================
+if (filteredCourseData.length > 0) {
+  const topCourse = filteredCourseData.reduce((prev, curr) =>
+    curr.value > prev.value ? curr : prev
+  );
+
+  paragraphs.push(
+    `There are ${totalStudents} students in total across all courses. ` +
+    `The course '${topCourse.course}' has the most students with ${topCourse.value}. ` +
+    `This helps in planning school resources and support programs.`
+  );
+}
+
+// ================= SECTION CASES (NOW LINKED TO VIOLATION) =================
+if (filteredSectionData.length > 0 && violationData && violationData.length > 0) {
+  const topSection = filteredSectionData.reduce((prev, curr) =>
+    curr.value > prev.value ? curr : prev
+  );
+
+  const topViolation = violationData.reduce((prev, curr) =>
+    curr.value > prev.value ? curr : prev
+  );
+
+  paragraphs.push(
+    `Section '${topSection.section}' recorded the highest number of cases with ${topSection.value}. ` +
+    `In this section, the most common violation observed was '${topViolation.violation}'. ` +
+    `This suggests that students in section '${topSection.section}' are mostly involved in '${topViolation.violation}' cases, ` +
+    `which may require focused monitoring and targeted intervention. ` +
+    `Overall, there are ${totalSectionCases} cases from all sections combined.`
+  );
+}
+
+// ================= VIOLATION ANALYSIS (NOW LINKED TO SECTION) =================
+if (violationData && violationData.length > 0) {
+
+  const topViolation = violationData.reduce((prev, curr) =>
+    curr.value > prev.value ? curr : prev
+  );
+
+  const lowestViolation = violationData.reduce((prev, curr) =>
+    curr.value < prev.value ? curr : prev
+  );
+
+  const totalViolations = violationData.reduce(
+    (sum, v) => sum + (v.value || 0),
+    0
+  );
+
+  const avgViolations = (totalViolations / violationData.length).toFixed(2);
+
+  const topSection = filteredSectionData?.reduce?.((prev, curr) =>
+    curr.value > prev.value ? curr : prev
+  );
+
+  paragraphs.push(
+    `There are ${totalViolations} total violation cases recorded this year. ` +
+    `The most common violation is '${topViolation.violation}' with ${topViolation.value} cases. ` +
+    `This violation is most frequently observed in section '${topSection?.section || "Unknown"}', ` +
+    `indicating that this section needs closer monitoring and stronger intervention strategies. ` +
+    `The least common violation is '${lowestViolation.violation}' with ${lowestViolation.value} cases. ` +
+    `On average, each violation type has about ${avgViolations} cases. ` +
+    `This highlights that '${topViolation.violation}' is the primary behavioral concern across the institution.`
+  );
+}
+
+// ================= RECOMMENDATIONS =================
+paragraphs.push(
+  `It is recommended to continue counseling programs, awareness campaigns, and student support activities. ` +
+  `Extra attention should be given during months with high case counts. ` +
+  `Regular monitoring of student behavior is important to maintain discipline and a safe school environment.`
+);
   // ================= ADD PARAGRAPHS =================
   doc.setFont("times", "normal");
   doc.setFontSize(12);
 
   let cursorY = 30;
+
   paragraphs.forEach((para) => {
     const lines = doc.splitTextToSize(para, maxLineWidth);
+
     lines.forEach((line) => {
       if (cursorY > doc.internal.pageSize.getHeight() - 20) {
         doc.addPage();
@@ -155,43 +215,66 @@ const downloadFullReport = () => {
       doc.text(line, margin, cursorY);
       cursorY += 7;
     });
+
     cursorY += 5;
   });
 
-  // ================= TABLES =================
-  const tables = [
-    { title: "Monthly Behavioral Cases", data: filteredLineData.map(d => [d.month, d.cases]), head: ["Month", "Cases"], color: [22, 163, 74] },
-    { title: "Students by Course", data: filteredCourseData.map(d => [d.course, d.value]), head: ["Course", "Students"], color: [234, 179, 8] },
-    { title: "Cases per Section", data: filteredSectionData.map(d => [d.section, d.value]), head: ["Section", "Cases"], color: [139, 92, 246] },
-  ];
+// ================= TABLES =================
+const tables = [
+  {
+    title: "Monthly Behavioral Cases",
+    data: filteredLineData.map(d => [d.month, d.cases]),
+    head: ["Month", "Cases"],
+    color: [22, 163, 74]
+  },
+  {
+    title: "Students by Course",
+    data: filteredCourseData.map(d => [d.course, d.value]),
+    head: ["Course", "Students"],
+    color: [234, 179, 8]
+  },
+  {
+    title: "Cases per Section",
+    data: filteredSectionData.map(d => [d.section, d.value]),
+    head: ["Section", "Cases"],
+    color: [139, 92, 246]
+  },
+  // ================= VIOLATION TABLE (FIXED USING YOUR useEffect violationData) =================
+  {
+    title: "Violation Analysis (Recorded + Predicted)",
+    data: (violationData || []).map(v => [v.violation, v.value]),
+    head: ["Violation Type", "Count"],
+    color: [239, 68, 68]
+  }
+];
 
-  tables.forEach((table) => {
-    if (cursorY > doc.internal.pageSize.getHeight() - 30) {
-      doc.addPage();
-      cursorY = 20;
-    }
+tables.forEach((table) => {
+  if (cursorY > doc.internal.pageSize.getHeight() - 30) {
+    doc.addPage();
+    cursorY = 20;
+  }
 
-    doc.setFont("times", "bold");
-    doc.text(table.title, margin, cursorY);
-    cursorY += 5;
+  doc.setFont("times", "bold");
+  doc.text(table.title, margin, cursorY);
+  cursorY += 5;
 
-    autoTable(doc, {
-      startY: cursorY,
-      head: [table.head],
-      body: table.data,
-      theme: "grid",
-      headStyles: { fillColor: table.color },
-      styles: { font: "times" },
-    });
-
-    cursorY = doc.lastAutoTable.finalY + 10;
+  autoTable(doc, {
+    startY: cursorY,
+    head: [table.head],
+    body: table.data,
+    theme: "grid",
+    headStyles: { fillColor: table.color },
+    styles: { font: "times" },
   });
 
-  // ================= SAVE PDF =================
-  doc.save(`Guidance_Analytics_Report_${reportYear}.pdf`);
+  cursorY = doc.lastAutoTable.finalY + 10;
+});
+
+// ================= SAVE PDF =================
+doc.save(`Guidance_Analytics_Report_${reportYear}.pdf`);
 };
 
-// Function to generate a DOCX for a specific violation
+// ================= DOCX (UNCHANGED - SAFE) =================
 const downloadViolationDoc = (violation) => {
   const doc = new Document({
     sections: [
@@ -254,16 +337,20 @@ const downloadViolationDoc = (violation) => {
   });
 };
 
+
+// ================= CLICK OUTSIDE =================
 useEffect(() => {
   const handleClickOutside = (e) => {
     if (!e.target.closest("header")) {
       setShowAccountDropdown(false);
     }
   };
+
   document.addEventListener("click", handleClickOutside);
-  return () => document.removeEventListener("click", handleClickOutside);
+
+  return () =>
+    document.removeEventListener("click", handleClickOutside);
 }, []);
-  
 //// ================= STATES =================
 const [lineData, setLineData] = useState([]);
 const [sectionData, setSectionData] = useState([]);
@@ -285,77 +372,215 @@ useEffect(() => {
       const res = await fetch("/violations");
       const data = await res.json();
 
-      //// MONTHLY DATA
-      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      const monthlyCounts = months.map((m, i) => {
-        const monthViolations = data.filter(v => {
-          const d = new Date(v.violation_date);
-          return !isNaN(d) && d.getMonth() === i && d.getFullYear() === selectedYear;
-        });
+      // ================= REMOVE DUPLICATES =================
+      const uniqueData = Array.from(
+        new Map(
+          data.map(v => [
+            v.id || v.violation_id || JSON.stringify(v),
+            v
+          ])
+        ).values()
+      );
 
-        const details = monthViolations.map(v => ({
-          courseName: v.course_year_section ? v.course_year_section.split(" ")[0].toUpperCase().trim() : "Unknown",
-          section: v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown",
-        }));
+      const months = [
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec"
+      ];
+
+      const currentYear = selectedYear;
+
+      // ================= MONTHLY DATA =================
+      const monthlyCounts = months.map((m, i) => {
+        const monthViolations = uniqueData.filter(v => {
+          const d = new Date(v.violation_date);
+
+          return (
+            !isNaN(d) &&
+            d.getMonth() === i &&
+            d.getFullYear() === currentYear
+          );
+        });
 
         return {
           month: m,
           cases: monthViolations.length,
-          year: selectedYear,
-          details,
+          year: currentYear,
+          details: monthViolations.map(v => ({
+            courseName: v.course_year_section
+              ? v.course_year_section.split(" ")[0].toUpperCase().trim()
+              : "Unknown",
+
+            section:
+              v.predicted_section && v.predicted_section !== "—"
+                ? v.predicted_section
+                : "Unknown",
+
+            violationText:
+              v.predicted_violation && v.predicted_violation !== "—"
+                ? v.predicted_violation
+                : "Unknown",
+          })),
         };
       });
+
       setLineData(monthlyCounts);
 
-      //// SECTION DATA
+      // ================= SECTION DATA =================
       const sectionCounts = {};
-      data.forEach(v => {
-        const d = new Date(v.violation_date);
-        if (isNaN(d) || d.getFullYear() !== selectedYear) return;
 
-        const sec = v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown";
+      uniqueData.forEach(v => {
+        const d = new Date(v.violation_date);
+        if (isNaN(d) || d.getFullYear() !== currentYear) return;
+
+        const sec =
+          v.predicted_section && v.predicted_section !== "—"
+            ? v.predicted_section
+            : "Unknown";
+
         sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
       });
-      const sectionArray = Object.keys(sectionCounts).map(sec => ({
-        section: sec,
-        value: sectionCounts[sec],
-        year: selectedYear,
-      }));
-      setSectionData(sectionArray);
+
+      setSectionData(
+        Object.keys(sectionCounts).map(sec => ({
+          section: sec,
+          value: sectionCounts[sec],
+          year: currentYear,
+        }))
+      );
+
       setSections(Object.keys(sectionCounts));
 
-      //// COURSE DATA
+      // ================= COURSE DATA =================
       const courseCounts = {};
-      const courseSectionsMap = {}; // map to build section drill-down
-      data.forEach(v => {
+      const courseSectionsMap = {};
+
+      uniqueData.forEach(v => {
         const d = new Date(v.violation_date);
-        if (isNaN(d) || d.getFullYear() !== selectedYear) return;
+
+        if (isNaN(d) || d.getFullYear() !== currentYear) return;
         if (!v.course_year_section) return;
 
-        const course = v.course_year_section.split(" ")[0].toUpperCase().trim();
+        const course =
+          v.course_year_section.split(" ")[0].toUpperCase().trim();
+
         courseCounts[course] = (courseCounts[course] || 0) + 1;
 
-        // For drill-down sections
-        if (!courseSectionsMap[course]) courseSectionsMap[course] = [];
+        if (!courseSectionsMap[course]) {
+          courseSectionsMap[course] = [];
+        }
+
         courseSectionsMap[course].push({
-          section: v.predicted_section && v.predicted_section !== "—" ? v.predicted_section : "Unknown",
+          section:
+            v.predicted_section && v.predicted_section !== "—"
+              ? v.predicted_section
+              : "Unknown",
+
+          violationText:
+            v.predicted_violation && v.predicted_violation !== "—"
+              ? v.predicted_violation
+              : "Unknown",
+
           value: 1,
         });
       });
 
-      const courseArray = Object.keys(courseCounts).map(course => ({
-        course,
-        value: courseCounts[course],
-        year: selectedYear,
-        sections: courseSectionsMap[course] || [],
-      }));
-      setCourseData(courseArray);
+      setCourseData(
+        Object.keys(courseCounts).map(course => ({
+          course,
+          value: courseCounts[course],
+          year: currentYear,
+          sections: courseSectionsMap[course] || [],
+        }))
+      );
 
-      //// UPDATE YEARS
-      const uniqueYears = Array.from(new Set(data.map(v => {
+      // ================= VIOLATION DATA =================
+      const violationCounts = {};
+
+      uniqueData.forEach(v => {
         const d = new Date(v.violation_date);
-        return !isNaN(d) ? d.getFullYear() : null;
-      }).filter(Boolean))).sort((a,b) => b - a);
+
+        if (isNaN(d) || d.getFullYear() !== currentYear) return;
+
+        const violation =
+          v.predicted_violation && v.predicted_violation !== "—"
+            ? v.predicted_violation
+            : "Unknown";
+
+        violationCounts[violation] =
+          (violationCounts[violation] || 0) + 1;
+      });
+
+      setViolationData(
+        Object.keys(violationCounts).map(vio => ({
+          violation: vio,
+          value: violationCounts[vio],
+          year: currentYear,
+        }))
+      );
+
+      // ================= MONTHLY VIOLATION DATA =================
+      const violationMonthlyMap = {};
+
+      uniqueData.forEach(v => {
+        const d = new Date(v.violation_date);
+
+        if (isNaN(d) || d.getFullYear() !== currentYear) return;
+
+        const violation =
+          v.predicted_violation && v.predicted_violation !== "—"
+            ? v.predicted_violation
+            : "Unknown";
+
+        const monthIndex = d.getMonth();
+
+        if (!violationMonthlyMap[violation]) {
+          violationMonthlyMap[violation] = Array.from(
+            { length: 12 },
+            (_, i) => ({
+              month: months[i],
+              value: 0,
+            })
+          );
+        }
+
+        violationMonthlyMap[violation][monthIndex].value += 1;
+      });
+
+      setMonthlyViolationData(violationMonthlyMap);
+
+      // ================= PREDICTED VIOLATION DATA =================
+      setPredictedViolationData(
+        months.map((m, i) => {
+          const count = uniqueData.filter(v => {
+            const d = new Date(v.violation_date);
+
+            return (
+              !isNaN(d) &&
+              d.getMonth() === i &&
+              d.getFullYear() === currentYear
+            );
+          }).length;
+
+          return {
+            month: m,
+            predicted: count,
+            year: currentYear,
+          };
+        })
+      );
+
+      // ================= YEARS =================
+      const uniqueYears = Array.from(
+        new Set(
+          uniqueData
+            .map(v => {
+              const d = new Date(v.violation_date);
+              return !isNaN(d) ? d.getFullYear() : null;
+            })
+            .filter(Boolean)
+        )
+      ).sort((a, b) => b - a);
+
       setYears(uniqueYears);
 
     } catch (err) {
@@ -364,6 +589,7 @@ useEffect(() => {
   };
 
   fetchViolations();
+
   intervalId = setInterval(fetchViolations, 5000);
 
   return () => clearInterval(intervalId);
@@ -597,27 +823,19 @@ async function handleDeleteViolation(v) {
 }
 
 
-//handle file
+/// Handle File (PDF ONLY)
 const handlePreviewFile = (file) => {
-    const ext = file.name.split(".").pop().toLowerCase();
-    if (ext === "pdf" || ["jpg","jpeg","png"].includes(ext)) {
-      setPreviewFile(file); // opens modal below
-    } else if (ext === "doc" || ext === "docx") {
-      Swal.fire({
-        icon: "info",
-        title: "Preview not available",
-        text: "DOC/DOCX files cannot be previewed. You can download them instead.",
-        confirmButtonText: "Download",
-      }).then(() => {
-        const url = URL.createObjectURL(file);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = file.name;
-        link.click();
-        URL.revokeObjectURL(url);
-      });
-    }
-  };
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  // ===== PDF ONLY =====
+  if (ext === "pdf") {
+    setPreviewFile(file); // open preview modal
+    return;
+  }
+
+  // ===== NOT ALLOWED =====
+  alert("Only PDF files are allowed.");
+};
 
   const closePreview = () => setPreviewFile(null);
   const [previewFile, setPreviewFile] = useState(null);
@@ -712,6 +930,9 @@ async function handleSubmitViolation() {
   }
 
   try {
+    // ==========================
+    // STEP 1: PREDICT
+    // ==========================
     const predictRes = await fetch("http://127.0.0.1:5000/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -720,6 +941,7 @@ async function handleSubmitViolation() {
 
     const predictData = await predictRes.json();
 
+    //  SERVER ERROR
     if (!predictRes.ok) {
       Swal.fire({
         icon: "error",
@@ -729,6 +951,24 @@ async function handleSubmitViolation() {
       return;
     }
 
+    // ==========================
+    // INVALID INPUT (IMPORTANT FIX)
+    // ==========================
+    if (predictData.status === "error") {
+      await Swal.fire({
+        icon: "error",
+        title: "Invalid Text",
+        text: predictData.message || "Please enter a valid and meaningful sentence.",
+        confirmButtonText: "OK",
+        allowOutsideClick: false,
+      });
+
+      return; 
+    }
+
+    // ==========================
+    //  STEP 2: PREPARE DATA
+    // ==========================
     const newViolation = {
       student_name: studentName,
       student_id: Number(studentId),
@@ -745,6 +985,9 @@ async function handleSubmitViolation() {
       standard_text: predictData?.standard_text ?? "",
     };
 
+    // ==========================
+    // STEP 3: SUBMIT
+    // ==========================
     const res = await fetch("http://localhost:5000/violations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -778,7 +1021,9 @@ async function handleSubmitViolation() {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: data?.message || "Submission failed.",
+        text:
+          data?.message ||
+          "Submission failed: Invalid input detected. Please enter a meaningful sentence.",
       });
     }
   } catch (err) {
@@ -790,7 +1035,6 @@ async function handleSubmitViolation() {
     });
   }
 }
-
 // ------------------ View Student Info ------------------
 function viewStudentInfo(student) {
   setSelectedStudent(student);
@@ -1329,8 +1573,62 @@ const fetchFilteredViolations = async () => {
 useEffect(() => {
   fetchFilteredViolations();
 }, [query, courseFilter, dateFrom, dateTo, sortOrder]);
+useEffect(() => {
+  IsItLoading(true);
 
+  const loadData = async () => {
+    try {
 
+      // TRENDS (Dashboard)
+      if (activePage === "trends") {
+        await fetch("http://localhost:5000/violations");
+      }
+
+      //  RECORDS
+      else if (activePage === "records") {
+        const res = await fetch("http://localhost:5000/students/records");
+        const data = await res.json();
+        setStudents(data);
+      }
+
+      //  SEARCH VIOLATIONS
+      else if (activePage === "search") {
+        const res = await fetch("http://localhost:5000/violations");
+        const data = await res.json();
+        setViolations(data);
+      }
+
+      //  ENCODE VIOLATION (optional, usually no fetch)
+      else if (activePage === "violation") {
+          const res = await fetch("http://localhost:5000/violations");
+          const data = await res.json();
+          setViolations(data);
+        }
+
+      // FILE FORMAT / REQUESTS
+      else if (activePage === "uploadFileFormat") {
+        const res = await fetch("http://localhost:5000/good-moral/admin/requests?status=Pending");
+        const data = await res.json();
+        setPendingRequests(data);
+      }
+
+      //  NEWS
+      else if (activePage === "news") {
+        const res = await fetch("http://localhost:5000/api/news");
+        const data = await res.json();
+        setRssItems(data.articles || []);
+      }
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      IsItLoading(false);
+    }
+  };
+
+  loadData();
+
+}, [activePage]);
 // ------------------ Render ------------------
 return (
   <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
@@ -1529,10 +1827,21 @@ return (
         {activePage === "trends" && "Behavioral Trends"}
         {activePage === "records" && "Student Account Records"}
         {activePage === "search" && "Students Violation"}
-        {activePage === "violation" && "Encode Violation (NLP)"}
+        {activePage === "violation" && "Encode Violation"}
         {activePage === "uploadFileFormat" && "Upload File Format"}
         {activePage === "news" && "News Management"}
       </h2>
+         {isLoading && (
+            <div className="fixed bottom-10 right-10 flex flex-col items-center justify-center z-50">
+              <div className="relative">
+                {/* Large professional green spinner */}
+                <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-green-600 shadow-lg"></div>
+              </div>
+              <p className="text-green-700 mt-4 text-lg font-semibold text-center">
+                Loading...
+              </p>
+            </div>
+          )}
       
       {/* Trends */}
         {activePage === "trends" && (
@@ -1568,7 +1877,7 @@ return (
                       .reduce((sum, item) => sum + item.cases, 0)}
                   </p>
                   <button
-                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans"
+                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans cursor-pointer"
                     onClick={() => setShowModalMonthly(true)}
                   >
                     View Monthly Cases
@@ -1589,7 +1898,7 @@ return (
                       .reduce((sum, item) => sum + item.value, 0)}
                   </p>
                   <button
-                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans"
+                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans cursor-pointer"
                     onClick={() => setShowModalCourse(true)}
                   >
                     View Students by Course
@@ -1610,7 +1919,7 @@ return (
                       .reduce((sum, item) => sum + item.value, 0)}
                   </p>
                   <button
-                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans"
+                    className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans cursor-pointer"
                     onClick={() => setShowModalSection(true)}
                   >
                     View Cases per Section
@@ -1618,7 +1927,40 @@ return (
                 </div>
               </div>
             </div>
+            {/* Total Violations */}
+          <div className="relative bg-red-50 border border-red-200 rounded-2xl shadow-md p-6">
+            <div className="absolute left-0 top-0 h-full w-1.5 bg-red-600 rounded-l-2xl"></div>
 
+            <div className="pl-4">
+              <p className="text-sm text-gray-600 font-sans">
+                Total Violations ({selectedYear})
+              </p>
+
+              <p className="text-3xl font-bold text-red-900 mt-2 font-sans">
+                {violationData
+                  .filter((d) => d.year === selectedYear)
+                  .reduce((sum, item) => sum + item.value, 0)}
+              </p>
+
+              <button
+                  className="mt-3 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-700 transition font-sans cursor-pointer"
+                  onClick={() => {
+                    // RESET FLOW STATE
+                    setShowModalViolation(false);
+                    setShowViolationDetailsModal(false);
+
+                    // IMPORTANT: RESET DRILLDOWN POSITION
+                    setSelectedMonthIndex(null);
+                    setSelectedCourse(null);
+
+                    // BACK TO START
+                    setShowMonthModal(true);
+                  }}
+                >
+                  View Violations
+                </button>
+            </div>
+          </div>
         {/* ================= MAIN GRID (Charts) ================= */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* LINE CHART */}
@@ -1728,207 +2070,293 @@ return (
                 </BarChart>
               </ResponsiveContainer>
             </div>
+           {/* VIOLATION: PREDICTED LINE CHART */}
+          <div className="bg-red-50 border border-red-200 p-6 rounded-xl shadow-sm">
+            <h3 className="text-lg font-semibold text-red-800 mb-4 font-sans">
+              Violations Trend ({selectedYear})
+            </h3>
 
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart
+                data={predictedViolationData.filter(
+                  (d) => d.year === selectedYear
+                )}
+              >
+                <CartesianGrid stroke="#fee2e2" />
+                <XAxis dataKey="month" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+
+            
+                {/* PREDICTED LINE */}
+                <Line
+                  type="monotone"
+                  dataKey="predicted"
+                  stroke="#dc2626"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="Predicted Violations"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* ================= VIOLATION BAR CHART ================= */}
+          <div className="bg-red-50 border border-red-200 p-6 rounded-xl shadow-sm">
+            <h3 className="text-lg font-semibold text-red-800 mb-4 font-sans">
+              Violations Per Type ({selectedYear})
+            </h3>
+
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart
+                data={violationData.filter((d) => d.year === selectedYear)}
+                barCategoryGap="30%"
+              >
+                <CartesianGrid stroke="#fee2e2" />
+                <XAxis dataKey="violation" />
+                <YAxis />
+                <Tooltip />
+
+                <Legend
+                  verticalAlign="bottom"
+                  align="center"
+                  height={50}
+                  content={() => (
+                    <div className="flex flex-wrap justify-center gap-4 mt-2 text-sm font-sans">
+                      {violationData
+                        .filter((d) => d.year === selectedYear)
+                        .map((entry, index) => (
+                          <div
+                            key={entry.violation}
+                            className="flex items-center gap-1"
+                          >
+                            <span
+                              className="w-3 h-3 block rounded"
+                              style={{
+                                backgroundColor:
+                                  chartColors[index % chartColors.length],
+                              }}
+                            ></span>
+                            <span className="text-gray-700">
+                              {entry.violation}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                />
+
+                <Bar dataKey="value">
+                  {violationData
+                    .filter((d) => d.year === selectedYear)
+                    .map((entry, index) => (
+                      <Cell
+                        key={entry.violation}
+                        fill={chartColors[index % chartColors.length]}
+                      />
+                    ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
             {/* ================= DOWNLOAD BUTTON ================= */}
             <div className="flex justify-end">
               <button
-                className="bg-green-600 text-white px-6 py-3 rounded-xl font-medium shadow-md hover:bg-green-700 transition font-sans"
+                className="bg-green-600 text-white px-6 py-3 rounded-xl font-medium shadow-md hover:bg-green-700 transition font-sans cursor-pointer  "
                 onClick={downloadFullReport}
               >
                 Download Report
               </button>
             </div>
 
-            {/* ================= MODALS ================= */}
-           {/* Monthly Cases Modal */}
-              {showModalMonthly && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-black/50"></div>
-                  <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+         {/* ================= MODALS ================= */}
+         {/* Monthly Cases Modal */}
+          {showModalMonthly && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50"></div>
+
+              <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+
+                <button
+                  className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl cursor-pointer"
+                  onClick={() => setShowModalMonthly(false)}
+                >
+                  ×
+                </button>
+
+                <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
+                  Total Behavioral Cases:{" "}
+                  {lineData
+                    .filter((d) => d.year === selectedYear)
+                    .reduce((sum, item) => sum + item.cases, 0)}
+                </h3>
+
+                <div className="divide-y divide-gray-300">
+                  {lineData
+                    .filter((d) => d.year === selectedYear)
+                    .map((item) => {
+                      const hasCases = item.cases > 0;
+
+                      return (
+                        <div
+                          key={item.month}
+                          className={`flex justify-between py-2 font-medium cursor-${hasCases ? "pointer" : "default"} 
+                          ${hasCases ? "hover:bg-green-200" : "text-gray-400"}`}
+                          onClick={() => {
+                            if (!hasCases) return;
+
+                            setShowModalMonthly(false);
+                            setSelectedMonthDetail(item);
+                            setShowMonthDetailModal(true);
+                          }}
+                        >
+                          <span>{item.month}</span>
+                          <span>{item.cases}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          )}
+          {showMonthDetailModal && selectedMonthDetail && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50"></div>
+
+              <div className="relative bg-white rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+
+                <button
+                  className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl cursor-pointer"
+                  onClick={() => {
+                    setShowMonthDetailModal(false);
+                    setShowModalMonthly(true);
+                  }}
+                >
+                  ×
+                </button>
+
+                <h3 className="text-xl font-semibold text-green-800 mb-2 text-center">
+                  Cases for {selectedMonthDetail.month} {selectedYear}
+                </h3>
+
+                <div className="divide-y divide-gray-300">
+                  {selectedMonthDetail.details.length > 0 ? (
+                    selectedMonthDetail.details.map((course, idx) => (
+                      <div key={idx} className="py-2 text-green-800">
+                        <p className="font-semibold">{course.courseName}</p>
+                        <p>Section: {course.section}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-green-800 text-center py-4">
+                      No cases for this month
+                    </p>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+          {/* Students by Course Modal */}
+          {showModalCourse && (
+            <div className="fixed inset-0 z-[9999] w-screen h-screen flex items-center justify-center">
+
+              {/* BACKDROP */}
+              <div
+                className="fixed inset-0 bg-black/50"
+                onClick={() => setShowModalCourse(false)}
+              />
+
+              {/* MODAL */}
+              <div className="relative z-10 bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl">
+
+                <button
+                  className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl cursor-pointer"
+                  onClick={() => setShowModalCourse(false)}
+                >
+                  ×
+                </button>
+
+                <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
+                  Total Students by Course:{" "}
+                  {courseData
+                    .filter(d => d.year === selectedYear)
+                    .reduce((sum, item) => sum + item.value, 0)}
+                </h3>
+
+                <div className="divide-y divide-gray-300">
+                  {courseData
+                    .filter(d => d.year === selectedYear)
+                    .map(item => (
+                      <div
+                        key={item.course}
+                        className="flex justify-between py-2 text-green-900 font-medium cursor-pointer hover:bg-green-200 rounded px-2"
+                        onClick={() => openCourseSections(item)}
+                      >
+                        <span>{item.course}</span>
+                        <span>{item.value}</span>
+                      </div>
+                    ))}
+                </div>
+
+              </div>
+            </div>
+          )}
+            {/* Course Sections Modal */}
+              {showCourseSectionsModal && selectedCourseDetail && (
+                <div className="fixed inset-0 z-[9999] w-screen h-screen flex items-center justify-center">
+
+                  {/* BACKDROP */}
+                  <div
+                    className="fixed inset-0 bg-black/0"
+                    onClick={() => setShowCourseSectionsModal(false)}
+                  />
+
+                  {/* MODAL */}
+                  <div className="relative z-10 bg-white rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl">
+
                     <button
-                      className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
-                      onClick={() => setShowModalMonthly(false)}
+                      className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl cursor-pointer"
+                      onClick={() => setShowCourseSectionsModal(false)}
                     >
                       ×
                     </button>
-                    <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
-                      Total Behavioral Cases:{" "}
-                      {lineData
-                        .filter((d) => d.year === selectedYear)
-                        .reduce((sum, item) => sum + item.cases, 0)}
+
+                    <h3 className="text-xl font-semibold text-green-800 mb-2 text-center">
+                      Sections for {selectedCourseDetail.course} ({selectedYear})
                     </h3>
+
                     <div className="divide-y divide-gray-300">
-                      {lineData
-                        .filter((d) => d.year === selectedYear)
-                        .map((item) => {
-                          const hasCases = item.cases > 0;
-                          return (
-                            <div
-                              key={item.month}
-                              className={`flex justify-between py-2 font-medium cursor-${hasCases ? "pointer" : "default"} 
-                                          ${hasCases ? "hover:bg-green-100" : "text-gray-400"}`}
-                              onClick={() => hasCases && openMonthDetail(item)}
-                            >
-                              <span>{item.month}</span>
-                              <span>{item.cases}</span>
-                            </div>
-                          );
-                        })}
+                      {selectedCourseDetail.sections.length > 0 ? (
+                        selectedCourseDetail.sections.map((s, idx) => (
+                          <div key={idx} className="py-2 text-green-900">
+                            <p className="font-semibold">{s.section}</p>
+                            <p>Students: {s.value}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-green-500 text-center py-4">
+                          No sections for this course
+                        </p>
+                      )}
                     </div>
+
                   </div>
                 </div>
-              )}  
-          {/* Detailed Month Modal */}
-            {showMonthDetailModal && selectedMonthDetail && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/50"></div>
-                <div className="relative bg-white rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
-                  <button
-                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
-                    onClick={() => setShowMonthDetailModal(false)}
-                  >
-                    ×
-                  </button>
-
-                  <h3 className="text-xl font-semibold text-blue-800 mb-2 text-center">
-                    Cases for {selectedMonthDetail.month} {selectedYear}
-                  </h3>
-
-                  {/* Highlight the course with the most cases */}
-                  {selectedMonthDetail.details.length > 0 && (() => {
-                    // Count occurrences per course
-                    const courseCounts = {};
-                    selectedMonthDetail.details.forEach(d => {
-                      const key = d.courseName;
-                      courseCounts[key] = (courseCounts[key] || 0) + 1;
-                    });
-                    const maxCount = Math.max(...Object.values(courseCounts));
-                    const topCourses = Object.entries(courseCounts)
-                      .filter(([_, count]) => count === maxCount)
-                      .map(([course]) => course);
-
-                    return (
-                      <p className="text-center text-green-700 font-semibold mb-4">
-                        {topCourses.length === 1
-                          ? `Most Cases: ${topCourses[0]} (${maxCount})`
-                          : `Most Cases: ${topCourses.join(", ")} (${maxCount})`}
-                      </p>
-                    );
-                  })()}
-
-                  <div className="divide-y divide-gray-300">
-                    {selectedMonthDetail.details.length > 0 ? (
-                      selectedMonthDetail.details.map((course, idx) => (
-                        <div key={idx} className="py-2 text-gray-900">
-                          <p className="font-semibold">{course.courseName}</p>
-                          <p>Section: {course.section}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-4">No cases for this month</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          {/* Students by Course Modal */}
-            {showModalCourse && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/50"></div>
-                <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
-                  <button
-                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
-                    onClick={() => setShowModalCourse(false)}
-                  >
-                    ×
-                  </button>
-                  <h3 className="text-xl font-semibold text-yellow-800 mb-4 text-center">
-                    Total Students by Course:{" "}
-                    {courseData.filter(d => d.year === selectedYear)
-                      .reduce((sum, item) => sum + item.value, 0)}
-                  </h3>
-
-                  <div className="divide-y divide-gray-300">
-                    {courseData
-                      .filter(d => d.year === selectedYear)
-                      .map(item => (
-                        <div
-                          key={item.course}
-                          className="flex justify-between py-2 text-yellow-900 font-medium cursor-pointer hover:bg-yellow-100 rounded px-2"
-                          onClick={() => openCourseSections(item)}
-                        >
-                          <span>{item.course}</span>
-                          <span>{item.value}</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Course Sections Modal */}
-            {showCourseSectionsModal && selectedCourseDetail && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/50"></div>
-                <div className="relative bg-white rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
-                  <button
-                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
-                    onClick={() => setShowCourseSectionsModal(false)}
-                  >
-                    ×
-                  </button>
-
-                  <h3 className="text-xl font-semibold text-blue-800 mb-2 text-center">
-                    Sections for {selectedCourseDetail.course} ({selectedYear})
-                  </h3>
-
-                  {/* Most students section */}
-                  {selectedCourseDetail.sections.length > 0 && (() => {
-                    const sectionCounts = {};
-                    selectedCourseDetail.sections.forEach(s => {
-                      sectionCounts[s.section] = (sectionCounts[s.section] || 0) + 1;
-                    });
-                    const maxCount = Math.max(...Object.values(sectionCounts));
-                    const topSections = Object.entries(sectionCounts)
-                      .filter(([_, count]) => count === maxCount)
-                      .map(([sec]) => sec);
-
-                    return (
-                      <p className="text-center text-green-700 font-semibold mb-4">
-                        {topSections.length === 1
-                          ? `Most Students: ${topSections[0]} (${maxCount})`
-                          : `Most Students: ${topSections.join(", ")} (${maxCount})`}
-                      </p>
-                    );
-                  })()}
-
-                  <div className="divide-y divide-gray-300">
-                    {selectedCourseDetail.sections.length > 0 ? (
-                      selectedCourseDetail.sections.map((s, idx) => (
-                        <div key={idx} className="py-2 text-gray-900">
-                          <p className="font-semibold">{s.section}</p>
-                          <p>Students: {s.value}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-4">No sections for this course</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+              )}
           {/* Cases per Section Modal */}
             {showModalSection && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div className="absolute inset-0 bg-black/50"></div>
                 <div className="relative bg-blue-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
                   <button
-                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-xl"
+                    className="absolute top-3 right-3 text-gray-700 hover:text-gray-900 font-bold text-x cursor-pointer"
                     onClick={() => setShowModalSection(false)}
                   >
                     ×
                   </button>
 
-                  <h3 className="text-xl font-semibold text-purple-800 mb-2 text-center">
+                  <h3 className="text-xl font-semibold text-green-800 mb-2 text-center">
                     Total Cases per Section:{" "}
                     {sectionData
                       .filter(d => d.year === selectedYear)
@@ -1956,7 +2384,7 @@ return (
                       .map(item => (
                         <div
                           key={item.section}
-                          className="flex justify-between py-2 text-purple-900 font-medium"
+                          className="flex justify-between py-2 text-green-900 font-medium"
                         >
                           <span>{item.section}</span>
                           <span>{item.value}</span>
@@ -1966,8 +2394,156 @@ return (
                 </div>
               </div>
             )}
-                      </div>
+         </div>
         )}
+          {/* ================= MONTH MODAL ================= */}
+            {showMonthModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/50"></div>
+
+                <div className="relative bg-white p-6 rounded-2xl w-11/12 max-w-xl">
+
+                  <button
+                    className="absolute top-3 right-3 text-xl cursor-pointer"
+                    onClick={() => setShowMonthModal(false)}
+                  >
+                    ×
+                  </button>
+
+                  <h3 className="text-center text-green-800 font-bold mb-4">
+                    Select Month
+                  </h3>
+                  <div className="divide-y divide-gray-200">
+
+                    {lineData.map((m, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setSelectedMonthIndex(i);
+                          setShowMonthModal(false);
+                          setShowCourseModal(true);
+                        }}
+                        className="flex justify-between items-center py-3 px-2 cursor-pointer hover:bg-green-200 transition"
+                      >
+                        <span className="text-green-800 font-medium">
+                          {m.month}
+                        </span>
+
+                        <span className="text-sm text-gray-500">
+                          {m.cases}
+                        </span>
+                      </div>
+                    ))}
+
+                  </div>
+                </div>
+              </div>
+            )}
+          {/* ================= COURSE MODAL ================= */}
+          {showCourseModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50"></div>
+
+              <div className="relative bg-white rounded-2xl p-6 w-11/12 max-w-xl max-h-[60vh] overflow-y-auto shadow-xl font-sans">
+
+                <button
+                  className="absolute top-3 right-3 text-xl cursor-pointer"
+                  onClick={() => {
+                    setShowCourseModal(false);
+                    setShowMonthModal(true);
+                  }}
+                >
+                  ×
+                </button>
+
+                <h3 className="text-center text-green-800 font-bold mb-4">
+                  Courses ({lineData[selectedMonthIndex]?.month})
+                </h3>
+
+                {(() => {
+                  const monthDetails =
+                    lineData[selectedMonthIndex]?.details || [];
+
+                  const uniqueCourses = [
+                    ...new Set(monthDetails.map(d => d.courseName))
+                  ];
+
+                  return uniqueCourses.map((course, i) => {
+                    const count = monthDetails.filter(
+                      d => d.courseName === course
+                    ).length;
+
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setSelectedCourse(course);
+
+                          setShowCourseModal(false);
+                          setShowModalViolation(true);
+                        }}
+                        className="flex justify-between py-2 text-green-800 font-medium rounded px-2 hover:bg-green-200 cursor-pointer"
+                      >
+                        <span>{course}</span>
+                        <span>{count}</span>
+                      </div>
+                    );
+                  });
+                })()}
+
+              </div>
+            </div>
+          )}
+          {/* ================= VIOLATIONS MODAL ================= */}
+          {showModalViolation && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50"></div>
+
+              <div className="relative bg-red-50 rounded-2xl p-6 w-11/12 max-w-2xl max-h-[60vh] overflow-y-auto shadow-xl font-sans cursor-pointer">
+
+                <button
+                  className="absolute top-3 right-3 text-xl"
+                  onClick={() => {
+                    setShowModalViolation(false);
+                    setShowCourseModal(true);
+                  }}
+                >
+                  ×
+                </button>
+
+                <h3 className="text-center text-green-800 font-bold mb-4">
+                  Violations ({selectedCourse})
+                </h3>
+
+                {(() => {
+                  const monthDetails =
+                    lineData[selectedMonthIndex]?.details || [];
+
+                  const filtered = monthDetails.filter(
+                    d => d.courseName === selectedCourse
+                  );
+
+                  const violationMap = {};
+
+                  filtered.forEach(v => {
+                    const key = v.violationText || "Unknown";
+                    violationMap[key] = (violationMap[key] || 0) + 1;
+                  });
+
+                  return Object.entries(violationMap).map(([vio, count]) => (
+                    <div
+                      key={vio}
+                      className="flex justify-between py-2 text-green-800 font-medium"
+                    >
+                      <span>{vio}</span>
+                      <span>{count}</span>
+                    </div>
+                  ));
+                })()}
+
+              </div>
+            </div>
+          )}
           {/* News */}
           {activePage === "news" && (
             <div className="bg-white p-6 rounded-xl shadow-lg space-y-6">
@@ -2217,8 +2793,6 @@ return (
           </div>
         )}
 
-        
-
   {showViolationDetailsModal && currentViolation && (() => {
   const v = currentViolation;
 
@@ -2315,245 +2889,305 @@ return (
     <div className="mb-6">
       <button
         onClick={() => setShowViolationModal(true)}
-        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colorsv cursor-pointer"
       >
         Encode New Violation
       </button>
     </div>
 
-   {/* ======================= VIOLATION FORM MODAL ======================= */}
+  {/* ======================= VIOLATION FORM MODAL ======================= */}
 {showViolationModal && (
-<div className="fixed inset-0 z-[100] flex items-center justify-center">
+<div className="fixed inset-0 z-90 flex items-center justify-center">
 
-  {/* Dark Background (NO BLUR) */}+
-  <div className="absolute inset-0 bg-black/70"></div>
-  
+  {/* Dark Background (NO BLUR) */}
+  <div className="fixed inset-0 w-screen h-screen bg-black/70"
+    onClick={() => {
+      // RESET ALL FIELDS ON OUTSIDE CLICK
+      setShowViolationModal(false);
+      setStudentInfo(null);
 
-    {/* FORM MODAL */}
-      <div
-        className="w-full h-full max-w-4xl max-h-[90vh] overflow-y-auto
-        bg-[#e8f5e9] border border-green-300 rounded-2xl shadow-2xl
-        p-5 relative"
-      >
-      {/* Close Button */}
-      <button
-        onClick={() => {
-          setShowViolationModal(false);
-          setStudentInfo(null);
-        }}
-        className="absolute top-4 right-4 text-gray-600 hover:text-black text-xl"
-      >
-        ✕
-      </button>
+      setStudentName("");
+      setStudentId("");
+      setCourseYearSection("");
+      setGender("");
+      setViolationText("");
+      setViolationDate("");
 
-      <h3 className="text-2xl font-semibold text-green-700 mb-6">
-        Encode Student Violation
-      </h3>
+      setPredictedViolation("—");
+      setPredictedSection("—");
+      setPredictiveText("—");
+      setStandardText("No standard violation text available.");
 
-      {/* ================= FORM FIELDS ================ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      setIsGenerated(false);
+      setIsLoadingPredict(false);
+    }}
+  ></div>
 
-        {/* FIELD */}
-        <div>
-          <label className="block text-sm font-medium text-green-700 mb-1">
-            Student Name
-          </label>
-          <input
-            type="text"
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
-            placeholder="Enter student full name"
-            className="w-full p-2 border border-green-400 rounded-lg bg-white
-              focus:ring-2 focus:ring-green-500"
-          />
-        </div>
+  {/* FORM MODAL */}
+  <div
+  className="w-full h-full max-w-4xl max-h-[90vh] overflow-y-auto
+  bg-[#e8f5e9] border border-green-300 rounded-2xl shadow-2xl
+  p-7 relative mt-10">
 
-        <div>
-          <label className="block text-sm font-medium text-green-700 mb-1">
-            Student Number
-          </label>
-          <input
-            type="number"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            placeholder="Enter student number"
-            className="w-full p-2 border border-green-400 rounded-lg bg-white
-              focus:ring-2 focus:ring-green-500"
-          />
-        </div>
+    {/* Close Button */}
+    <button
+      onClick={() => {
+        setShowViolationModal(false);
+        setStudentInfo(null);
 
-        <div>
-          <label className="block text-sm font-medium text-green-700 mb-1">
-            Course/Year/Section
-          </label>
-          <input
-            type="text"
-            value={courseYearSection}
-            onChange={(e) => setCourseYearSection(e.target.value)}
-            placeholder="Enter Course/Year/Section"
-            className="w-full p-2 border border-green-400 rounded-lg bg-white
-              focus:ring-2 focus:ring-green-500"
-          />
-        </div>
+        // ================= RESET ALL FIELDS =================
+        setStudentName("");
+        setStudentId("");
+        setCourseYearSection("");
+        setGender("");
+        setViolationText("");
+        setViolationDate("");
 
-        <div>
-          <label className="block text-sm font-medium text-green-700 mb-1">
-            Gender
-          </label>
-          <select
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-            className="w-full p-2 border border-green-400 rounded-lg bg-white
-              focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">Select gender</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-          </select>
-        </div>
+        setPredictedViolation("—");
+        setPredictedSection("—");
+        setPredictiveText("—");
+        setStandardText("No standard violation text available.");
 
-      </div>
+        setIsGenerated(false);
+        setIsLoadingPredict(false);
+      }}
+      className="absolute top-4 right-4 text-gray-600 hover:text-black text-xl cursor-pointer"
+    >
+      ✕
+    </button>
 
-      {/* INTERVIEW TEXT */}
-      <div className="mb-4">
+    <h3 className="text-2xl font-semibold text-green-700 mb-6">
+      Encode Student Violation
+    </h3>
+
+    {/* ================= FORM FIELDS ================ */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+      {/* FIELD */}
+      <div>
         <label className="block text-sm font-medium text-green-700 mb-1">
-          Interview Text
-        </label>
-        <textarea
-          value={violationText}
-          onChange={async (e) => {
-            const value = e.target.value;
-            setViolationText(value);
-
-            if (value.trim() !== "") {
-              try {
-                const res = await fetch("http://127.0.0.1:5000/predict", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ text: value }),
-                });
-
-                const data = await res.json();
-                if (res.ok) {
-                  setPredictedViolation(data.predicted_violation || "—");
-                  setPredictedSection(data.predicted_section || "—");
-                  setPredictiveText(data.predictive_text || "—");
-                  setStandardText(data.standard_text || "No standard violation text available.");
-                }
-              } catch (err) {
-                console.error("Prediction error:", err);
-                setPredictedViolation("—");
-                setPredictedSection("—");
-                setPredictiveText("—");
-                setStandardText("No standard violation text available.");
-              }
-            } else {
-              setPredictedViolation("—");
-              setPredictedSection("—");
-              setPredictiveText("—");
-              setStandardText("No standard violation text available.");
-            }
-          }}
-          placeholder="Write interview details or violation text…"
-          className="w-full p-2 border border-green-400 rounded-lg bg-white
-            focus:ring-2 focus:ring-green-500"
-          rows={5}
-        />
-      </div>
-
-      {/* Predictions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-green-700 mb-1">
-            Predicted Violation
-          </label>
-          <input
-            type="text"
-            readOnly
-            value={predictedViolation || "—"}
-            className="w-full p-2 border border-green-300 rounded-lg bg-gray-100"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-green-700 mb-1">
-            Predicted Section
-          </label>
-          <input
-            type="text"
-            readOnly
-            value={predictedSection || "—"}
-            className="w-full p-2 border border-green-300 rounded-lg bg-gray-100"
-          />
-        </div>
-      </div>
-
-      {/* Predictive Text */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-green-700 mb-1">
-          Predictive Text (Top-3)
-        </label>
-        <textarea
-          value={predictiveText || "—"}
-          readOnly
-          className="w-full p-2 border border-green-300 rounded-lg bg-gray-100 resize-none"
-          rows={3}
-        />
-      </div>
-
-      {/* Standard Text */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-green-700 mb-1">
-          Standard Model-Generated Text
-        </label>
-        <textarea
-          value={standardText || "No standard violation text available."}
-          readOnly
-          className="w-full p-2 border border-green-300 rounded-lg bg-gray-100 resize-none"
-          rows={3}
-        />
-      </div>
-
-      {/* Date */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-green-700 mb-1">
-          Date
+          Student Name
         </label>
         <input
-          type="date"
-          value={violationDate}
-          onChange={(e) => setViolationDate(e.target.value)}
+          type="text"
+          value={studentName}
+          onChange={(e) => setStudentName(e.target.value)}
+          placeholder="Enter student full name"
           className="w-full p-2 border border-green-400 rounded-lg bg-white
             focus:ring-2 focus:ring-green-500"
         />
       </div>
 
-      {/* Buttons */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => {
-            setShowViolationModal(false);
-            setStudentInfo(null);
-          }}
-          className="px-4 py-2 rounded-lg border border-green-300 text-green-700 bg-white
-            hover:bg-green-50 transition"
-        >
-          Cancel
-        </button>
+      <div>
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Student Number
+        </label>
+        <input
+          type="number"
+          value={studentId}
+          onChange={(e) => setStudentId(e.target.value)}
+          placeholder="Enter student number"
+          className="w-full p-2 border border-green-400 rounded-lg bg-white
+            focus:ring-2 focus:ring-green-500"
+        />
+      </div>
 
-        <button
-          onClick={handleSubmitViolation}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+      <div>
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Course/Year/Section
+        </label>
+        <input
+          type="text"
+          value={courseYearSection}
+          onChange={(e) => setCourseYearSection(e.target.value)}
+          placeholder="Enter Course/Year/Section"
+          className="w-full p-2 border border-green-400 rounded-lg bg-white
+            focus:ring-2 focus:ring-green-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Gender
+        </label>
+        <select
+          value={gender}
+          onChange={(e) => setGender(e.target.value)}
+          className="w-full p-2 border border-green-400 rounded-lg bg-white
+            focus:ring-2 focus:ring-green-500"
         >
-          Submit Violation
-        </button>
+          <option value="">Select gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
       </div>
 
     </div>
 
-  </div>
-)}
+    {/* INTERVIEW TEXT */}
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-green-700 mb-1">
+        Interview Text
+      </label>
 
+      <textarea
+        value={violationText}
+        onChange={(e) => {
+          setViolationText(e.target.value);
+
+          setIsGenerated(false);
+
+          setPredictedViolation("—");
+          setPredictedSection("—");
+          setPredictiveText("—");
+          setStandardText("No standard violation text available.");
+        }}
+        placeholder="Write interview details or violation text…"
+        className="w-full p-2 border border-green-400 rounded-lg bg-white
+          focus:ring-2 focus:ring-green-500"
+        rows={5}
+      />
+    </div>
+
+    {/* Predictions */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Predicted Violation
+        </label>
+        <input
+          type="text"
+          readOnly
+          value={predictedViolation || "—"}
+          className="w-full p-2 border border-green-300 rounded-lg bg-gray-100"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-700 mb-1">
+          Predicted Section
+        </label>
+        <input
+          type="text"
+          readOnly
+          value={predictedSection || "—"}
+          className="w-full p-2 border border-green-300 rounded-lg bg-gray-100"
+        />
+      </div>
+    </div>
+
+    {/* Predictive Text */}
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-green-700 mb-1">
+        Predictive Text (Top-3)
+      </label>
+      <textarea
+        value={predictiveText || "—"}
+        readOnly
+        className="w-full p-2 border border-green-300 rounded-lg bg-gray-100 resize-none"
+        rows={3}
+      />
+    </div>
+
+    {/* Standard Text */}
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-green-700 mb-1">
+        Standard Model-Generated Text
+      </label>
+      <textarea
+        value={standardText || "No standard violation text available."}
+        readOnly
+        className="w-full p-2 border border-green-300 rounded-lg bg-gray-100 resize-none"
+        rows={3}
+      />
+    </div>
+
+    {/* Date */}
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-green-700 mb-1">
+        Date
+      </label>
+      <input
+        type="date"
+        value={violationDate}
+        onChange={(e) => setViolationDate(e.target.value)}
+        className="w-full p-2 border border-green-400 rounded-lg bg-white
+          focus:ring-2 focus:ring-green-500"
+      />
+    </div>
+
+    {/* BUTTONS */}
+    <div className="flex justify-end gap-2">
+
+     
+      {/* GENERATE BUTTON */}
+      {!isGenerated && (
+        <button
+          disabled={!violationText.trim() || isLoadingPredict}
+          onClick={async () => {
+            if (!violationText.trim()) return;
+
+            setIsLoadingPredict(true);
+
+            try {
+              const res = await fetch("http://127.0.0.1:5000/predict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: violationText }),
+              });
+
+              const data = await res.json();
+
+              if (res.ok) {
+                setPredictedViolation(data.predicted_violation || "—");
+                setPredictedSection(data.predicted_section || "—");
+                setPredictiveText(data.predictive_text || "—");
+                setStandardText(
+                  data.standard_text || "No standard violation text available."
+                );
+
+                setIsGenerated(true);
+              }
+            } catch (err) {
+              console.error("Prediction error:", err);
+            }
+
+            setIsLoadingPredict(false);
+          }}
+          className={`px-4 py-2 rounded-lg text-white transition
+            ${!violationText.trim() || isLoadingPredict
+              ? "bg-green-300 cursor-not-allowed"
+              : "bg-green-600 hover:bg-green-700"
+            }`}
+        >
+          {isLoadingPredict ? "Generating..." : "Generate"}
+        </button>
+      )}
+
+      {/* AFTER GENERATE */}
+      {isGenerated && (
+        <>
+          <button
+            onClick={() => setIsGenerated(false)}
+            className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 cursor-pointer"
+          >
+            Regenerate
+          </button>
+
+          <button
+            onClick={handleSubmitViolation}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-800 cursor-pointer"
+          >
+            Submit Violation
+          </button>
+        </>
+      )}
+    </div>
+
+  </div>
+
+</div>
+)}
     {/* ======================= VIOLATION CARDS ======================= */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
       {violations.length === 0 ? (
@@ -2569,7 +3203,7 @@ return (
           return (
             <div
               key={idx}
-              className="bg-white p-5 rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              className="bg-white p-5 rounded-xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer"
               onClick={() => {
                 setCurrentViolation({ ...v, formattedDate });
                 setShowViolationDetailsModal(true);
@@ -2681,261 +3315,310 @@ return (
     })()}
   </div>
 )}
- 
-   {/* ===== Upload File Section ===== */}
-  {activePage === "uploadFileFormat" && (
-  <div className="flex flex-col items-center space-y-6">
 
-    {/* SIDE-BY-SIDE WRAPPER */}
-    <div className="w-full flex justify-center gap-6">
+    {/* ===== Upload File Section ===== */}
+        {activePage === "uploadFileFormat" && (
+          <div className="flex flex-col items-center mt-9 space-y-6">
 
-      {/* ================== GOOD MORAL CERTIFICATE UI ================== */}
-      <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
-        <h3 className="text-lg font-semibold text-center">Good Moral Certificate</h3>
+            {/* SIDE-BY-SIDE WRAPPER (EQUAL HEIGHT FIXED) */}
+            <div className="w-full flex justify-center gap-10 items-stretch">
 
-        {/* View Request List Button with notification */}
-        <button
-          className="relative bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 self-end"
-          onClick={() => setShowRequestList(true)}
-        >
-          View Request List
-          {pendingRequests.length > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">
-              {pendingRequests.length}
-            </span>
-          )}
-        </button>
+              {/* ================== GOOD MORAL CERTIFICATE UI ================== */}
+              <div className="bg-white shadow-lg rounded-lg p-6 w-[550px] flex flex-col gap-4 h-full ">
 
-        {/* File Upload / Display */}
-        {currentGoodMoral ? (
-          <div className="flex flex-col gap-4 w-full">
-            <div className="flex flex-col gap-2 border p-2 rounded">
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const ext = currentGoodMoral.name?.split(".").pop().toLowerCase();
-                  switch (ext) {
-                    case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
-                    case "doc":
-                    case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
-                    case "jpg":
-                    case "jpeg":
-                    case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
-                    default: return <span className="text-gray-600 text-5xl">📁</span>;
-                  }
-                })()}
-                <span
-                  className="truncate font-medium cursor-pointer hover:underline"
-                  onClick={() => setPreviewFile(currentGoodMoral)}
+                <h3 className="text-lg font-semibold text-center">
+                  Good Moral Certificate
+                </h3>
+
+                {/* View Request List Button */}
+                <button
+                  className="relative bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 self-end cursor-pointer"
+                  onClick={() => setShowRequestList(true)}
                 >
-                  {currentGoodMoral.name || "Uploaded File"}
-                </span>
-              </div>
-              <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
-                {currentGoodMoral.name.endsWith(".pdf") ? (
-                  <embed src={currentGoodMoral.url} type="application/pdf" className="w-full h-full" />
+                  View Request List
+                  {pendingRequests.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">
+                      {pendingRequests.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* CONTENT AREA */}
+                {currentGoodMoral ? (
+                  <div className="flex flex-col gap-4 w-full flex-1">
+
+                    {/* FILE BOX */}
+                    <div className="flex flex-col gap-1 rounded flex-1">
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-red-600 text-5xl">📄</span>
+
+                        <span
+                          className="truncate font-medium cursor-pointer hover:underline"
+                          onClick={() => setPreviewFile(currentGoodMoral)}
+                        >
+                          {currentGoodMoral.name || "Uploaded File"}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 rounded-lg flex-1 overflow-auto flex items-center justify-center p-2 w-full">
+                        <embed
+                          src={currentGoodMoral.url}
+                          type="application/pdf"
+                          className="w-full h-full min-h-[320px]"
+                        />
+                      </div>
+
+                    </div>
+
+                    {/* FIXED CHANGE FILE ALIGNMENT */}
+                    <div className="flex justify-start items-center h-[44px]">
+
+                      <label className="bg-yellow-500 text-white mb-6 px-3 py-1 rounded hover:bg-yellow-600 cursor-pointer">
+                        Change File
+
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+
+                            setCurrentGoodMoral({ name: file.name, file });
+
+                            const uploaded = await uploadFile(file, "good_moral");
+                            if (uploaded?.url) {
+                              setCurrentGoodMoral((prev) => ({
+                                ...prev,
+                                url: uploaded.url,
+                              }));
+                            }
+                          }}
+                        />
+                      </label>
+
+                    </div>
+
+                  </div>
                 ) : (
-                  <img src={currentGoodMoral.url} className="w-full h-auto object-contain" />
-                )}
-              </div>
-            </div>
+                <label className="w-full flex flex-col items-center justify-center rounded-lg p-6 cursor-pointer text-center flex-1 hover:bg-gray-50 transition-colors">
+                    <span className="text-6xl mb-2">📁</span>
+                    <span className="text-gray-500 mb-2">Click here to upload PDF</span>
 
-            {/* Change File Button */}
-            <label className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2">
-              Change File
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
-
-                  setCurrentGoodMoral({ name: file.name, file });
-
-                  const uploaded = await uploadFile(file, "good_moral"); // your existing upload function
-                  if (uploaded?.url) {
-                    setCurrentGoodMoral((prev) => ({ ...prev, url: uploaded.url }));
-                  }
-                }}
-              />
-            </label>
-          </div>
-        ) : (
-          <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-green-500 transition-colors text-center">
-            <span className="text-6xl mb-2">📁</span>
-            <span className="text-gray-500 mb-2">Click here to upload</span>
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                setCurrentGoodMoral({ name: file.name, file });
-
-                const uploaded = await uploadFile(file, "good_moral");
-                if (uploaded?.url) {
-                  setCurrentGoodMoral((prev) => ({ ...prev, url: uploaded.url }));
-                }
-              }}
-            />
-            <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
-          </label>
-        )}
-      </div>
-
-      {/* ================== FULLSCREEN FILE PREVIEW ================== */}
-      {previewFile && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white/90 flex flex-col">
-            <button
-              onClick={() => setPreviewFile(null)}
-              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-colors z-10"
-            >
-              ✕
-            </button>
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-              {previewFile.name.endsWith(".pdf") ? (
-                <embed src={previewFile.url} type="application/pdf" className="w-full min-h-[500px] md:min-h-[600px]" />
-              ) : (
-                <img src={previewFile.url} className="max-w-full max-h-[80vh] object-contain" />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================== REQUEST LIST MODAL ================== */}
-      {showRequestList && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
-            <button
-              onClick={() => setShowRequestList(false)}
-              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
-            >
-              ✕
-            </button>
-
-            <h3 className="text-xl font-semibold text-center mt-4">Pending Requests</h3>
-
-            <div className="flex-1 overflow-auto p-4 space-y-2">
-              {pendingRequests.length === 0 ? (
-                <p className="text-center text-gray-500">No pending requests</p>
-              ) : (
-                pendingRequests.map((req, idx) => (
-                  <button
-                    key={idx}
-                    className="w-full text-left border p-2 rounded hover:bg-gray-100"
-                    onClick={() => {
-                      setSelectedRequest(req);
-                      setShowRequestDetails(true);
-                    }}
-                  >
-                    {req.student_name} ({req.student_number}) - {req.course || "N/A"}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-   {/* ================== REQUEST DETAILS MODAL ================== */}
-  {showRequestDetails && selectedRequest && (
-  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
-      <button
-        onClick={() => setShowRequestDetails(false)}
-        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-900 text-white"
-      >
-        ✕
-      </button>
-
-      <h3 className="text-lg font-semibold mb-4">Request Details</h3>
-
-      <div className="space-y-2">
-        <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
-        <p><strong>Name:</strong> {selectedRequest.student_name}</p>
-        <p><strong>Course:</strong> {selectedRequest.course || ""}</p>
-        <p><strong>Status:</strong> {selectedRequest.status}</p>
-
-        {/* Approve / Reject Buttons */}
-        {selectedRequest.status === "Pending" && (
-          <div className="flex gap-2 mt-4">
-            <button
-              className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-              onClick={() => handleApprove(selectedRequest)}
-            >
-              Approve
-            </button>
-
-            <button
-              className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-              onClick={() => handleReject(selectedRequest)}
-            >
-              Reject
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
-
-       {/* ===== CVSU Rules & Regulations ===== */}
-            <div className="bg-white shadow rounded-lg p-6 w-[500px] flex flex-col gap-4">
-              <h3 className="text-lg font-semibold text-center">CVSU Rules and Regulations</h3>
-              {currentRules ? (
-                <div className="flex flex-col gap-4 w-full">
-                <div className="flex flex-col gap-2 border p-2 rounded">
-                    <div className="flex items-center gap-3">
-                      {(() => {
-                        const ext = currentRules.name?.split(".").pop().toLowerCase();
-                        switch (ext) {
-                          case "pdf": return <span className="text-red-600 text-5xl">📄</span>;
-                          case "doc":
-                          case "docx": return <span className="text-blue-600 text-5xl">📝</span>;
-                          case "jpg":
-                          case "jpeg":
-                          case "png": return <span className="text-green-600 text-5xl">🖼️</span>;
-                          default: return <span className="text-gray-600 text-5xl">📁</span>;
-                        }
-                      })()}
-                      
-              <span
-                  className="truncate font-medium cursor-pointer hover:underline max-w-xs block"
-                  title={currentRules.name}
-                  onClick={() => setPreviewFile(currentRules)}
-                >
-                  {(() => {
-                    const parts = currentRules.name.split(".");
-                    if (parts.length > 1) {
-                      const ext = parts.pop(); // kunin ang extension
-                      let name = parts.join("."); // base name
-                      if (name.length > 30) name = name.slice(0, 35) + "..."; // mas mahaba na truncate
-                      return `${name}.${ext}`;
-                    }
-                    return currentRules.name;
-                  })()}
-                </span>
-              </div>
-
-              <div className="mt-2 border rounded-lg h-64 overflow-auto flex items-center justify-center p-2 w-full">
-                {currentRules.name.endsWith(".pdf") ? (
-                  <embed src={currentRules.url} type="application/pdf" className="w-full h-full" />
-                ) : (
-                  <img src={currentRules.url} className="w-full h-auto object-contain" />
-                )}
-              </div>
-            </div>
-                  <label
-                    className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition-colors cursor-pointer self-start mt-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Change File
                     <input
                       type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+
+                        setCurrentGoodMoral({ name: file.name, file });
+
+                        const uploaded = await uploadFile(file, "good_moral");
+                        if (uploaded?.url) {
+                          setCurrentGoodMoral((prev) => ({
+                            ...prev,
+                            url: uploaded.url,
+                          }));
+                        }
+                      }}
+                    />
+
+                    <span className="text-sm text-gray-400">PDF only</span>
+                  </label>
+                )}
+              </div>
+
+              {/* ================== FULLSCREEN FILE PREVIEW ================== */}
+              {previewFile && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white flex flex-col">
+
+                    <button
+                      onClick={() => setPreviewFile(null)}
+                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white"
+                    >
+                      ✕
+                    </button>
+
+                    <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                      <embed
+                        src={previewFile.url}
+                        type="application/pdf"
+                        className="w-full min-h-[500px] md:min-h-[600px]"
+                      />
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* ================== REQUEST LIST MODAL ================== */}
+              {showRequestList && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
+
+                    <button
+                      onClick={() => setShowRequestList(false)}
+                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white cursor-pointer"
+                    >
+                      ✕
+                    </button>
+
+                    <h3 className="text-xl font-semibold text-center mt-4">
+                      Pending Requests
+                    </h3>
+
+                    <div className="flex-1 overflow-auto p-4 space-y-2">
+                      {pendingRequests.length === 0 ? (
+                        <p className="text-center text-gray-500">
+                          No pending requests
+                        </p>
+                      ) : (
+                        pendingRequests.map((req, idx) => (
+                          <button
+                            key={idx}
+                            className="w-full text-left border p-2 rounded hover:bg-gray-100"
+                            onClick={() => {
+                              setSelectedRequest(req);
+                              setShowRequestDetails(true);
+                            }}
+                          >
+                            {req.student_name} ({req.student_number}) -{" "}
+                            {req.course || "N/A"}
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* ================== REQUEST DETAILS MODAL ================== */}
+              {showRequestDetails && selectedRequest && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
+
+                    <button
+                      onClick={() => setShowRequestDetails(false)}
+                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white cursor-pointer"
+                    >
+                      ✕
+                    </button>
+
+                    <h3 className="text-lg font-semibold mb-4">Request Details</h3>
+
+                    <div className="space-y-2">
+                      <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
+                      <p><strong>Name:</strong> {selectedRequest.student_name}</p>
+                      <p><strong>Course:</strong> {selectedRequest.course || ""}</p>
+                      <p><strong>Status:</strong> {selectedRequest.status}</p>
+
+                      {selectedRequest.status === "Pending" && (
+                        <div className="flex gap-2 mt-4">
+                          <button
+                            className="bg-green-500 text-white px-3 py-1 rounded cursor-pointer"
+                            onClick={() => handleApprove(selectedRequest)}
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer"
+                            onClick={() => handleReject(selectedRequest)}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+            {/* ================== CVSU RULES (PDF ONLY) ================== */}
+              <div className="bg-white shadow-lg rounded mb-20 p-6 w-[550px] flex flex-col gap-4 h-[600px] border border-gray-200">
+
+                <h3 className="text-lg font-semibold text-center">
+                  CVSU Rules and Regulations
+                </h3>
+
+                {currentRules ? (
+                  <div className="flex flex-col gap-4 w-full flex-1">
+
+                    {/* FILE PREVIEW BOX */}
+                    <div className="flex flex-col gap-2 border border-gray-300 p-3 rounded flex-1">
+
+                      {/* ICON + NAME */}
+                      <div className="flex items-center gap-3">
+
+                        <span className="text-red-600 text-4xl">📄</span>
+
+                        <span
+                          className="truncate font-medium cursor-pointer hover:underline"
+                          onClick={() => setPreviewFile(currentRules)}
+                        >
+                          CVSU Rules and Regulations.pdf
+                        </span>
+
+                      </div>
+
+                      {/* PDF VIEWER */}
+                      <div className="mt-2 border border-gray-300 rounded-lg flex-1 overflow-hidden flex items-center justify-center p-2 w-full bg-gray-50">
+
+                        <embed
+                          src={currentRules.url}
+                          type="application/pdf"
+                          className="w-full h-full min-h-[320px]"
+                        />
+
+                      </div>
+
+                    </div>
+
+                    {/* CHANGE FILE SECTION (PANTAY NA HEIGHT + CENTERED) */}
+                    <div className="flex items-center h-[70px] border-t border-gray-200 pt-3">
+
+                          <label className="bg-yellow-500 mb-4 text-white px-3 py-1 rounded hover:bg-yellow-600 cursor-pointer">
+                        Change File
+
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+
+                            setCurrentRules({ name: file.name, file });
+
+                            const uploaded = await uploadFile(file, "rules");
+                            if (uploaded?.url) {
+                              setCurrentRules((prev) => ({
+                                ...prev,
+                                url: uploaded.url,
+                              }));
+                            }
+                          }}
+                        />
+                      </label>
+
+                    </div>
+
+                  </div>
+                ) : (
+                  <label className="w-full flex flex-col tp items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 text-center flex-1">
+
+                    <span className="text-6xl mb-2">📁</span>
+                    <span className="text-gray-500 mb-2">Click here to upload PDF</span>
+
+                    <input
+                      type="file"
+                      accept="application/pdf"
                       className="hidden"
                       onChange={async (e) => {
                         const file = e.target.files[0];
@@ -2945,40 +3628,24 @@ return (
 
                         const uploaded = await uploadFile(file, "rules");
                         if (uploaded?.url) {
-                          setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
+                          setCurrentRules((prev) => ({
+                            ...prev,
+                            url: uploaded.url,
+                          }));
                         }
                       }}
                     />
+
+                    <span className="text-sm text-gray-400">PDF only</span>
+
                   </label>
-                </div>
-              ) : (
-                <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 transition-colors text-center">
-                  <span className="text-6xl mb-2">📁</span>
-                  <span className="text-gray-500 mb-2">Click here to upload</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files[0];
-                      if (!file) return;
+                )}
 
-                      setCurrentRules({ name: file.name, file });
+              </div>
 
-                      const uploaded = await uploadFile(file, "rules");
-                      if (uploaded?.url) {
-                        setCurrentRules((prev) => ({ ...prev, url: uploaded.url }));
-                      }
-                    }}
-                  />
-                  <span className="text-sm text-gray-400">Allowed: PDF, DOC, DOCX, JPG, PNG</span>
-                </label>
-              )}
             </div>
           </div>
-        </div>
         )}
-
             {/*STUDENT RECORDS*/}
                 {activePage === "records" && (
               <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">

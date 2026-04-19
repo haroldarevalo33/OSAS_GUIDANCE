@@ -163,7 +163,7 @@ if (!/^\d{9}$/.test(studentNumber)) {
           <label className="text-gray-700 font-medium">Student Number</label>
           <input
             type="number"
-            placeholder="Enter your student number"
+            placeholder="Enter your Student Number"
             value={studentNumber}
             onChange={(e) => setStudentNumber(e.target.value)}
             className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
@@ -172,7 +172,7 @@ if (!/^\d{9}$/.test(studentNumber)) {
           <label className="text-gray-700 font-medium">Student Name</label>
           <input
             type="text"
-            placeholder="Enter your student name"
+            placeholder="First Name / Middle Initial / Surname"
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
             className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
@@ -190,7 +190,7 @@ if (!/^\d{9}$/.test(studentNumber)) {
           <label className="text-gray-700 font-medium">Phone Number</label>
           <input
             type="number"
-            placeholder="Enter your phone number"
+            placeholder="Enter your Phone Number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
@@ -219,7 +219,7 @@ if (!/^\d{9}$/.test(studentNumber)) {
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
+              placeholder="Enter your Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="border p-3 rounded-full w-full pr-10 focus:ring-2 focus:ring-green-500"

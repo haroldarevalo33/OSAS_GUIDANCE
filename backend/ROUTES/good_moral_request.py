@@ -9,17 +9,92 @@ from pypdf import PdfReader, PdfWriter
 
 good_moral_bp = Blueprint("good_moral_bp", __name__, url_prefix="/good-moral")
 
-# =========================
-# PDF Generation Function
-# =========================
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from PyPDF2 import PdfReader, PdfWriter
+
+
+
 def generate_good_moral_pdf(template_path, student_name, student_number):
     overlay_buffer = io.BytesIO()
     c = canvas.Canvas(overlay_buffer, pagesize=A4)
     width, height = A4
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(240, height - 222, str(student_name))
-    c.drawString(146, height - 245, str(student_number))
+    c.setFont("Helvetica-Bold", 10)
+
+    # ==============================
+    # PARSE NAME
+    # ==============================
+    name_parts = student_name.replace(",", "").split()
+
+    surname = ""
+    first_middle = ""
+    middle_initial = ""
+
+    if len(name_parts) >= 3:
+        surname = name_parts[-1].upper()
+        first_middle_parts = name_parts[:-1]
+
+        if len(first_middle_parts[-1]) == 2 and first_middle_parts[-1].endswith("."):
+            middle_initial = first_middle_parts[-1].upper()
+            first_middle = " ".join(first_middle_parts[:-1])
+        else:
+            first_middle = " ".join(first_middle_parts)
+
+            words = first_middle.split()
+            if len(words) >= 2:
+                possible = words[-1]
+                if len(possible) == 1:
+                    middle_initial = possible.upper() + "."
+                    first_middle = " ".join(words[:-1])
+
+    elif len(name_parts) == 2:
+        surname = name_parts[-1].upper()
+        first_middle = name_parts[0]
+
+    else:
+        surname = student_name
+        first_middle = ""
+
+    # ==============================
+    # POSITIONS (FIRST COPY)
+    # ==============================
+    name_y = height - 152
+
+    surname_x = 250
+    firstmid_x = 385
+    middle_x = 510
+
+    # ==============================
+    # FUNCTION TO DRAW BLOCK
+    # ==============================
+    def draw_block(offset_y=0, offset_x=0):
+        y = name_y - offset_y
+
+        c.drawString(surname_x + offset_x, y, surname)
+
+        if first_middle:
+            c.drawString(firstmid_x + offset_x, y, first_middle)
+
+        if middle_initial:
+            c.drawString(middle_x + offset_x, y, middle_initial)
+
+        c.drawString(260 + offset_x, (height - 178) - offset_y, str(student_number))
+
+    # ==============================
+    # FIRST COPY (NORMAL POSITION)
+    # ==============================
+    draw_block(0, 0)
+
+    # ==============================
+    # SECOND COPY (SHIFTED POSITION)
+    # ==============================
+    draw_block(395, 0)  # ↓ moved down
+
+    # OPTIONAL: kung gusto mo din shift right
+    # draw_block(90, 20)
+
     c.save()
     overlay_buffer.seek(0)
 
@@ -34,8 +109,8 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
     output_buffer = io.BytesIO()
     writer.write(output_buffer)
     output_buffer.seek(0)
-    return output_buffer
 
+    return output_buffer
 # =========================
 # Auto-revoke helper
 # =========================
