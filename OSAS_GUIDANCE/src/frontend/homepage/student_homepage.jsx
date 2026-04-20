@@ -103,39 +103,77 @@ export default function StudentHome() {
       .catch(() => setLoading(false));
   }, [activePage, studentNumber]);
 
-  // Fetch summary
-  useEffect(() => {
-    if (!studentNumber) return;
-    async function fetchSummary() {
-      try {
-        const res = await fetch(
-          `http://localhost:5000/violations/summary/${studentNumber}`
-        );
-        const data = await res.json();
-        setViolation(data.predicted_violation ?? "—");
-        setSection(data.predicted_section ?? "—");
-        setLastVisit(data.violation_date ?? "—");
-        setVisits(data.visits ?? 0);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchSummary();
-  }, [studentNumber]);
+ // Fetch summary (AUTO UPDATE)
+useEffect(() => {
+  if (!studentNumber) return;
 
-  // History modal loader
-  async function openHistoryModal() {
+  let isMounted = true;
+
+  async function fetchSummary() {
+    try {
+      const res = await fetch(
+        `http://localhost:5000/violations/summary/${studentNumber}`
+      );
+      const data = await res.json();
+
+      if (!isMounted) return;
+
+      setViolation(data.predicted_violation ?? "—");
+      setSection(data.predicted_section ?? "—");
+      setLastVisit(data.violation_date ?? "—");
+      setVisits(data.visits ?? 0);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  fetchSummary();
+
+  const interval = setInterval(fetchSummary, 5000);
+
+  return () => {
+    isMounted = false;
+    clearInterval(interval);
+  };
+}, [studentNumber]);
+
+
+// History modal loader (AUTO UPDATE while open)
+useEffect(() => {
+  if (!studentNumber || !historyModalOpen) return;
+
+  let isMounted = true;
+
+  async function fetchHistory() {
     try {
       const res = await fetch(
         `http://localhost:5000/violations/history/${studentNumber}`
       );
       const data = await res.json();
+
+      if (!isMounted) return;
+
       setViolationHistory(data || []);
-      setHistoryModalOpen(true);
     } catch (err) {
       console.error("Error loading history:", err);
     }
   }
+
+  fetchHistory();
+
+  const interval = setInterval(fetchHistory, 5000);
+
+  return () => {
+    isMounted = false;
+    clearInterval(interval);
+  };
+}, [studentNumber, historyModalOpen]);
+
+
+// OPEN MODAL (simplified)
+async function openHistoryModal() {
+  setHistoryModalOpen(true);
+}
 
   // Profile upload
   async function handleProfileUpload(e) {
