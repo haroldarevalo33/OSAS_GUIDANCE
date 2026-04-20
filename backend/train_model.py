@@ -30,6 +30,15 @@ print("\nViolation distribution:")
 print(df['violation'].value_counts())
 
 # ==========================
+# FIX: REMOVE CLASSES WITH <2 SAMPLES (IMPORTANT FOR cv=2)
+# ==========================
+counts = df['violation'].value_counts()
+df = df[df['violation'].isin(counts[counts >= 2].index)]
+
+print("\nViolation distribution AFTER CLEANING:")
+print(df['violation'].value_counts())
+
+# ==========================
 # PREPROCESSING
 # ==========================
 def preprocess(text):
@@ -91,10 +100,15 @@ X_test_tfidf = vectorizer.transform(X_test)
 print(f"\nTotal features: {X_train_tfidf.shape[1]}")
 
 # ==========================
-# MODEL
+# MODEL (FIXED CV ISSUE)
 # ==========================
 base_model = LinearSVC(class_weight='balanced', max_iter=3000)
-model = CalibratedClassifierCV(base_model, cv=2, method='sigmoid')
+
+# TRAIN FIRST (IMPORTANT)
+base_model.fit(X_train_tfidf, y_train)
+
+# CALIBRATION SAFE MODE
+model = CalibratedClassifierCV(base_model, cv="prefit", method='sigmoid')
 model.fit(X_train_tfidf, y_train)
 
 # ==========================
