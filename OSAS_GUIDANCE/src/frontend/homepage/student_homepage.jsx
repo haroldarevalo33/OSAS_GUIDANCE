@@ -32,6 +32,8 @@ export default function StudentHome() {
   const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [badgeCount, setBadgeCount] = useState(0);
+  const [checkedNotifications, setCheckedNotifications] = useState([]);
+  const [isSelectAll, setIsSelectAll] = useState(false);
 
   // Rules preview
   const [currentRules, setCurrentRules] = useState(null);
@@ -499,7 +501,6 @@ useEffect(() => {
 // Constants
 // =========================
 const POLL_INTERVAL = 5000;
-
 // =========================
 // Fetch unread notification count (backend-based)
 // =========================
@@ -535,11 +536,7 @@ const fetchNotifications = async () => {
     const notifData = notifRes.ok ? await notifRes.json() : { notifications: [] };
     const historyData = historyRes.ok ? await historyRes.json() : { history: [] };
 
-    // =========================
-    // Normalize function
-    // =========================
     const normalize = (n, isHistory = false) => {
-      // Skip Pending / unknown notifications by returning null
       if (n.status !== "Approved" && n.status !== "Rejected") return null;
 
       return {
@@ -561,21 +558,14 @@ const fetchNotifications = async () => {
     const newNotifs = Array.isArray(notifData.notifications)
       ? notifData.notifications.map(n => normalize(n)).filter(Boolean)
       : [];
+
     const fullHistory = Array.isArray(historyData.history)
       ? historyData.history.map(r => normalize(r, true)).filter(Boolean)
       : [];
 
-    // =========================
-    // Merge & deduplicate
-    // =========================
-    const merged = [
-      ...notifications,
-      ...fullHistory,
-      ...newNotifs
-    ];
+    const merged = [...notifications, ...fullHistory, ...newNotifs];
 
     const updated = merged
-      // Keep local is_read/is_deleted
       .map(n => {
         const local = notifications.find(
           l => l.request_id === n.request_id && l.requested_at === n.requested_at
@@ -586,7 +576,6 @@ const fetchNotifications = async () => {
           is_deleted: local?.is_deleted ?? n.is_deleted
         };
       })
-      // Remove exact duplicates
       .filter((n, index, arr) =>
         index === arr.findIndex(m =>
           m.request_id === n.request_id &&
@@ -595,15 +584,12 @@ const fetchNotifications = async () => {
           m.requested_at === n.requested_at
         )
       )
-      // Remove deleted
       .filter(n => !n.is_deleted)
-      // Sort newest first
       .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
 
     setNotifications(updated);
     setBadgeCount(updated.filter(n => !n.is_read).length);
 
-    // Sync badge with backend
     fetchUnreadCount();
   } catch (err) {
     console.error("Error fetching notifications/history:", err);
@@ -611,7 +597,75 @@ const fetchNotifications = async () => {
 };
 
 // =========================
-// Mark notification as read (backend + local)
+// SELECT LOGIC
+// =========================
+const toggleSelect = (note) => {
+  const exists = checkedNotifications.find(
+    (n) =>
+      n.request_id === note.request_id &&
+      n.requested_at === note.requested_at
+  );
+
+  if (exists) {
+    setCheckedNotifications(prev =>
+      prev.filter(
+        (n) =>
+          !(
+            n.request_id === note.request_id &&
+            n.requested_at === note.requested_at
+          )
+      )
+    );
+  } else {
+    setCheckedNotifications(prev => [...prev, note]);
+  }
+};
+
+const handleSelectAll = () => {
+  if (isSelectAll) {
+    setCheckedNotifications([]);
+  } else {
+    setCheckedNotifications(notifications);
+  }
+  setIsSelectAll(!isSelectAll);
+};
+
+// auto sync select all
+useEffect(() => {
+  if (notifications.length === 0) {
+    setIsSelectAll(false);
+    return;
+  }
+
+  if (checkedNotifications.length === notifications.length) {
+    setIsSelectAll(true);
+  } else {
+    setIsSelectAll(false);
+  }
+}, [checkedNotifications, notifications]);
+
+// =========================
+// BULK DELETE
+// =========================
+const handleDeleteSelected = async () => {
+  if (checkedNotifications.length === 0) return;
+
+  const confirm = window.confirm(
+    `Delete ${checkedNotifications.length} notification(s)?`
+  );
+  if (!confirm) return;
+
+  for (let note of checkedNotifications) {
+    await deleteNotification(note.request_id, note.requested_at);
+  }
+
+  setCheckedNotifications([]);
+  setIsSelectAll(false);
+};
+
+// =========================
+// Mark notification as read
+// =========================
 const markAsRead = async (note) => {
   setNotifications(prev => {
     const updated = prev.map(n =>
@@ -634,14 +688,13 @@ const markAsRead = async (note) => {
 };
 
 // =========================
-// Open a notification (click card)
+// Open / Close
+// =========================
 const openNotification = async (note) => {
   setSelectedNotification(note);
   if (!note.is_read) await markAsRead(note);
 };
 
-// =========================
-// Close notification modal (X button)
 const closeNotification = (note) => {
   if (!note) return;
   setSelectedNotification(null);
@@ -649,14 +702,14 @@ const closeNotification = (note) => {
 };
 
 // =========================
-// Soft-delete a notification
+// Delete (existing)
+// =========================
 const deleteNotification = async (request_id, requested_at) => {
   try {
     await fetch(`${API_BASE}/good-moral/student/notifications/${request_id}`, {
       method: "DELETE",
     });
 
-    // Update notifications locally
     setNotifications(prev => {
       const updated = prev.filter(
         n => !(n.request_id === request_id && n.requested_at === requested_at)
@@ -667,7 +720,6 @@ const deleteNotification = async (request_id, requested_at) => {
 
     fetchUnreadCount();
 
-    // Clear selected notification if it's the deleted one
     if (
       selectedNotification?.request_id === request_id &&
       selectedNotification?.requested_at === requested_at
@@ -683,7 +735,7 @@ const deleteNotification = async (request_id, requested_at) => {
       showConfirmButton: false,
       position: "top-end",
       toast: true,
-      timerProgressBar: true, 
+      timerProgressBar: true,
     });
 
   } catch (err) {
@@ -703,7 +755,7 @@ const deleteNotification = async (request_id, requested_at) => {
 };
 
 // =========================
-// Poll notifications every POLL_INTERVAL ms
+// Polling
 // =========================
 useEffect(() => {
   if (!studentNumber) return;
@@ -1344,142 +1396,192 @@ useEffect(() => {
               </div>
             </div>
             )}
-  {/* ======================== NOTIFICATIONS PAGE ========================= */}
-    {activePage === "Notifications" && (
-      <div className="w-full">
-        <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">
-          Notifications
-        </h2>
+                  {/* ======================== NOTIFICATIONS PAGE ========================= */}
+                  {activePage === "Notifications" && (
+                    <div className="w-full">
+                      <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">
+                        Notifications
+                      </h2>
 
-        {notifications.length === 0 ? (
-          <p className="text-gray-700 text-center">
-            No notifications at the moment.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {notifications.map((note) => {
-              const { request_id, message, status, is_read } = note;
-              const isOpened = is_read;
+                      {notifications.length === 0 ? (
+                        <p className="text-gray-700 text-center">
+                          No notifications at the moment.
+                        </p>
+                      ) : (
+                        <>
+                          {/* ===== TOP CONTROLS ===== */}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelectAll}
+                                onChange={handleSelectAll}
+                                className="w-5 h-5 cursor-pointer"
+                              />
+                              <span className="text-gray-700 font-medium">Select All</span>
+                            </div>
 
-              // Border & dot colors based on status & read state
-              let borderColor = "border-gray-300";
-              let dotColor = "bg-gray-400";
+                            {checkedNotifications.length > 0 && (
+                              <button
+                                onClick={handleDeleteSelected}
+                                className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition"
+                              >
+                                Delete Selected ({checkedNotifications.length})
+                              </button>
+                            )}
+                          </div>
 
-              if (!isOpened) {
-                if (status === "Approved") {
-                  borderColor = "border-green-600";
-                  dotColor = "bg-green-600";
-                } else if (status === "Rejected") {
-                  borderColor = "border-red-600";
-                  dotColor = "bg-red-600";
-                }
-              }
+                          {/* ===== LIST ===== */}
+                          <div className="space-y-4">
+                            {notifications.map((note) => {
+                              const { request_id, message, status, is_read } = note;
+                              const isOpened = is_read;
 
-              const handleOpen = async () => {
-                setSelectedNotification(note); // open modal
+                              // Border & dot colors
+                              let borderColor = "border-gray-300";
+                              let dotColor = "bg-gray-400";
 
-                if (!note.is_read) {
-                  await openNotification(note); // mark as read & update badge/backend
-                }
-              };
+                              if (!isOpened) {
+                                if (status === "Approved") {
+                                  borderColor = "border-green-600";
+                                  dotColor = "bg-green-600";
+                                } else if (status === "Rejected") {
+                                  borderColor = "border-red-600";
+                                  dotColor = "bg-red-600";
+                                }
+                              }
 
-              return (
-                <div
-                  key={request_id}
-                  onClick={handleOpen}
-                  className={`cursor-pointer p-4 bg-white rounded-2xl shadow-md border-2 ${borderColor} flex items-center justify-between hover:scale-[1.02] transition-transform duration-200`}
-                >
-                  {/* Left: Dot + Message */}
-                  <div className="flex items-center space-x-3">
-                    <span className={`w-3 h-3 rounded-full ${dotColor}`}></span>
-                    <p className="font-semibold text-gray-800">{message}</p>
-                  </div>
+                              const isChecked = checkedNotifications.some(
+                                (n) =>
+                                  n.request_id === note.request_id &&
+                                  n.requested_at === note.requested_at
+                              );
 
-                  {/* Right: Status + NEW Badge */}
-                  <div className="flex items-center space-x-2">
-                    <p className="text-gray-600 font-medium">{status}</p>
-                    {!isOpened && (
-                      <span className="px-2 py-0.5 text-xs font-semibold text-white bg-blue-500 rounded-full">
-                        NEW
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    )}
+                              const handleOpen = async () => {
+                                setSelectedNotification(note);
 
-    {/* ======================== MODAL FOR SELECTED NOTIFICATION ========================= */}
-    {selectedNotification && (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-white rounded-3xl p-8 w-[95%] max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl relative animate-fadeIn">
-          {/* X BUTTON */}
-          <button
-            onClick={async () => {
-              if (!selectedNotification) return;
-              await closeNotification(selectedNotification); // mark as read + update badge/backend
-            }}
-            className="absolute top-4 right-5 text-gray-500 hover:text-red-500 text-2xl font-bold"
-          >
-            ✕
-          </button>
+                                if (!note.is_read) {
+                                  await openNotification(note);
+                                }
+                              };
 
-          {/* HEADER & STATUS */}
-          {(() => {
-            let iconBg = "bg-gray-100";
-            let contentBg = "bg-gray-50";
-            let textColor = "text-gray-700";
+                              return (
+                                <div
+                                  key={request_id + note.requested_at}
+                                  onClick={handleOpen}
+                                   className={`cursor-pointer p-4 bg-white rounded-2xl shadow-md flex items-center justify-between hover:scale-[1.02] transition-transform duration-200 ${
+                                    isChecked
+                                      ? "border-black border-2"
+                                      : `border-2 ${borderColor}`
+                                  }`}
+                                >
+                                  {/* LEFT */}
+                                  <div className="flex items-center space-x-3">
+                                    
+                                    {/* CHECKBOX */}
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={() => toggleSelect(note)}
+                                      className="w-4 h-4 cursor-pointer"
+                                    />
 
-            if (selectedNotification.status === "Approved") {
-              iconBg = "bg-green-100";
-              contentBg = "bg-green-50";
-              textColor = "text-green-700";
-            } else if (selectedNotification.status === "Rejected") {
-              iconBg = "bg-red-100";
-              contentBg = "bg-red-50";
-              textColor = "text-red-700";
-          
-            }
+                                    <span className={`w-3 h-3 rounded-full ${dotColor}`}></span>
+                                    <p className="font-semibold text-gray-800">{message}</p>
+                                  </div>
 
-            return (
-              <>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className={`w-14 h-14 flex items-center justify-center rounded-full text-2xl ${iconBg}`}>
-                    🔔
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-800">Notification Details</h3>
-                </div>
+                                  {/* RIGHT */}
+                                  <div className="flex items-center space-x-2">
+                                    <p className="text-gray-600 font-medium">{status}</p>
+                                    {!isOpened && (
+                                      <span className="px-2 py-0.5 text-xs font-semibold text-white bg-blue-500 rounded-full">
+                                        NEW
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
 
-                <div className={`${contentBg} p-6 rounded-2xl mb-6`}>
-                  <p className="text-gray-800 text-lg font-semibold mb-3">
-                    {selectedNotification.message}
-                  </p>
-                  <p className={`text-base font-semibold ${textColor}`}>
-                    Status: {selectedNotification.status}
-                  </p>
-                </div>
-              </>
-            );
-          })()}
+                  {/* ======================== MODAL FOR SELECTED NOTIFICATION ========================= */}
+                  {selectedNotification && (
+                    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+                      <div className="bg-white rounded-3xl p-8 w-[95%] max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl relative animate-fadeIn">
+                        
+                        {/* X BUTTON */}
+                        <button
+                          onClick={async () => {
+                            if (!selectedNotification) return;
+                            await closeNotification(selectedNotification);
+                          }}
+                          className="absolute top-4 right-5 text-gray-500 hover:text-red-500 text-2xl font-bold"
+                        >
+                          ✕
+                        </button>
 
-          {/* ACTIONS */}
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={async () => {
-                await deleteNotification(selectedNotification.request_id);
-                setSelectedNotification(null);
-              }}
-              className="px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+                        {/* HEADER */}
+                        {(() => {
+                          let iconBg = "bg-gray-100";
+                          let contentBg = "bg-gray-50";
+                          let textColor = "text-gray-700";
+
+                          if (selectedNotification.status === "Approved") {
+                            iconBg = "bg-green-100";
+                            contentBg = "bg-green-50";
+                            textColor = "text-green-700";
+                          } else if (selectedNotification.status === "Rejected") {
+                            iconBg = "bg-red-100";
+                            contentBg = "bg-red-50";
+                            textColor = "text-red-700";
+                          }
+
+                          return (
+                            <>
+                              <div className="flex items-center gap-4 mb-6">
+                                <div className={`w-14 h-14 flex items-center justify-center rounded-full text-2xl ${iconBg}`}>
+                                  🔔
+                                </div>
+                                <h3 className="text-2xl font-bold text-gray-800">
+                                  Notification Details
+                                </h3>
+                              </div>
+
+                              <div className={`${contentBg} p-6 rounded-2xl mb-6`}>
+                                <p className="text-gray-800 text-lg font-semibold mb-3">
+                                  {selectedNotification.message}
+                                </p>
+                                <p className={`text-base font-semibold ${textColor}`}>
+                                  Status: {selectedNotification.status}
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+
+                        {/* ACTIONS */}
+                        <div className="flex justify-end gap-3">
+                          <button
+                            onClick={async () => {
+                              await deleteNotification(
+                                selectedNotification.request_id,
+                                selectedNotification.requested_at
+                              );
+                              setSelectedNotification(null);
+                            }}
+                            className="px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </main>
               </div>
 
