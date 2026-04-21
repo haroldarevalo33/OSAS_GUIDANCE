@@ -19,6 +19,8 @@ export default function StudentHome() {
   const [violationHistory, setViolationHistory] = useState([]);
   const [accountModal, setAccountModal] = useState(false);
   const [profilePreview, setProfilePreview] = useState(null);
+  const [selectedHistory, setSelectedHistory] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Good moral
   const [notifications, setNotifications] = useState([]);
@@ -82,30 +84,42 @@ export default function StudentHome() {
     return () => clearInterval(intervalId);
   }, [activePage]);
 
-  // Fetch student record
-  useEffect(() => {
-    if (!studentNumber) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    fetch(`http://localhost:5000/students/by-number/${studentNumber}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.profile_pic && !data.profile_pic.startsWith("http")) {
-          data.profile_pic = `http://localhost:5000/uploads/${data.profile_pic}`;
-        }
-        setStudentRecord(data);
-        setLoading(false);
-        localStorage.setItem(
-          "student",
-          JSON.stringify({ ...studentData, profile_pic: data.profile_pic })
-        );
-      })
-      .catch(() => setLoading(false));
-  }, [activePage, studentNumber]);
 
- // Fetch summary (AUTO UPDATE)
+// ==========================
+// Fetch student record
+// ==========================
+useEffect(() => {
+  if (!studentNumber) {
+    setLoading(false);
+    return;
+  }
+
+  setLoading(true);
+
+  fetch(`http://localhost:5000/students/by-number/${studentNumber}`)
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.profile_pic && !data.profile_pic.startsWith("http")) {
+        data.profile_pic = `http://localhost:5000/uploads/${data.profile_pic}`;
+      }
+
+      setStudentRecord(data);
+      setLoading(false);
+
+      localStorage.setItem(
+        "student",
+        JSON.stringify({
+          ...studentData,
+          profile_pic: data.profile_pic,
+        })
+      );
+    })
+    .catch(() => setLoading(false));
+}, [activePage, studentNumber]);
+
+// ==========================
+// Fetch summary (AUTO UPDATE)
+// ==========================
 useEffect(() => {
   if (!studentNumber) return;
 
@@ -139,8 +153,30 @@ useEffect(() => {
   };
 }, [studentNumber]);
 
+// ==========================
+// MANUAL REFRESH (HISTORY)
+// ==========================
+const refreshHistory = async () => {
+  if (!studentNumber) return;
 
+  try {
+    const res = await fetch(
+      `http://localhost:5000/violations/history/${studentNumber}`
+    );
+
+    const data = await res.json();
+
+    // IMPORTANT FIX: always normalize empty response
+    setViolationHistory(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error("Error refreshing history:", err);
+    setViolationHistory([]);
+  }
+};
+
+// ==========================
 // History modal loader (AUTO UPDATE while open)
+// ==========================
 useEffect(() => {
   if (!studentNumber || !historyModalOpen) return;
 
@@ -151,19 +187,22 @@ useEffect(() => {
       const res = await fetch(
         `http://localhost:5000/violations/history/${studentNumber}`
       );
+
       const data = await res.json();
 
       if (!isMounted) return;
 
-      setViolationHistory(data || []);
+      // IMPORTANT FIX: backend [] = UI reset to empty
+      setViolationHistory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error loading history:", err);
+      setViolationHistory([]);
     }
   }
 
   fetchHistory();
 
-  const interval = setInterval(fetchHistory, 5000);
+  const interval = setInterval(fetchHistory, 3000);
 
   return () => {
     isMounted = false;
@@ -171,12 +210,15 @@ useEffect(() => {
   };
 }, [studentNumber, historyModalOpen]);
 
-
-// OPEN MODAL (simplified)
-async function openHistoryModal() {
+// ==========================
+// OPEN MODAL
+// ==========================
+function openHistoryModal() {
   setHistoryModalOpen(true);
-}
 
+  // instant sync with backend
+  refreshHistory();
+}
   // Profile upload
   async function handleProfileUpload(e) {
     const file = e.target.files[0];
@@ -645,22 +687,55 @@ useEffect(() => {
 }, [checkedNotifications, notifications]);
 
 // =========================
-// BULK DELETE
+// Select Deleted
 // =========================
 const handleDeleteSelected = async () => {
   if (checkedNotifications.length === 0) return;
 
-  const confirm = window.confirm(
-    `Delete ${checkedNotifications.length} notification(s)?`
-  );
-  if (!confirm) return;
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: `Delete ${checkedNotifications.length} selected notification(s)?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+  });
 
-  for (let note of checkedNotifications) {
-    await deleteNotification(note.request_id, note.requested_at);
+  if (!result.isConfirmed) return;
+
+  try {
+    for (let note of checkedNotifications) {
+      await deleteNotification(note.request_id, note.requested_at);
+    }
+
+    setCheckedNotifications([]);
+    setIsSelectAll(false);
+
+    Swal.fire({
+      title: "Deleted!",
+      text: "Selected notifications have been deleted.",
+      icon: "success",
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: "top-end",
+    });
+
+  } catch (err) {
+    console.error("Bulk delete error:", err);
+
+    Swal.fire({
+      title: "Error!",
+      text: "Failed to delete selected notifications.",
+      icon: "error",
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: "top-end",
+    });
   }
-
-  setCheckedNotifications([]);
-  setIsSelectAll(false);
 };
 
 // =========================
@@ -848,6 +923,16 @@ useEffect(() => {
           </span>
         )}
       </button>
+
+        <button
+            onClick={() => setActivePage("ManageAccount")}
+            className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+              activePage === "ManageAccount" ? "bg-green-600" : "hover:bg-gray-700/60"
+            }`}
+          >
+            <UserCircleIcon className="w-5 h-5" />
+            <span className="font-medium">Account Settings</span>
+          </button>
         </nav><br></br>
 
     {/* DESKTOP LOGOUT BUTTON */}
@@ -959,6 +1044,18 @@ useEffect(() => {
                   {notifications.filter(n => !n.is_read).length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => {
+                setActivePage("ManageAccount");
+                setSidebarOpen(false);
+              }}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${
+                activePage === "ManageAccount" ? "bg-green-600" : "hover:bg-white/10"
+              }`}
+            >
+              <UserCircleIcon className="w-5 h-5" />
+              <span className="font-medium">Account Settings</span>
             </button>
           </nav><br></br>
 
@@ -1082,10 +1179,6 @@ useEffect(() => {
                   <p className="text-sm text-gray-300 mb-1">
                     {studentRecord?.course || "—"}
                   </p>
-
-                  <button className="w-full bg-green-600 text-white cursor-pointer py-2 rounded-lg hover:bg-green-700 mt-3">
-                    Manage Account
-                  </button>
                 </div>
               </div>
             )}
@@ -1585,25 +1678,99 @@ useEffect(() => {
                 </main>
               </div>
 
-            {/* HISTORY MODAL */}
+           {/* HISTORY MODAL */}
             {historyModalOpen && (
-              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
-                  <h2 className="text-2xl font-bold text-gray-700 mb-4">Visit History</h2>
-                  <div className="max-h-80 overflow-auto border rounded-lg p-3 bg-gray-50">
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+
+                <div className="w-full max-w-lg bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-6">
+
+                  <h2 className="text-2xl font-bold text-gray-800 mb-5 flex items-center gap-2">
+                    📜 Visit History
+                  </h2>
+
+                  <div className="max-h-80 overflow-y-auto space-y-3 pr-2">
                     {violationHistory.length === 0 ? (
-                      <p className="text-gray-500 text-center py-6">No visit history found.</p>
+                      <p className="text-gray-500 text-center py-10">
+                        No visit history found.
+                      </p>
                     ) : (
                       violationHistory.map((item, index) => (
-                        <div key={index} className="p-3 bg-white rounded-lg shadow mb-3 border">
-                          <p className="font-semibold">{item.predicted_violation}</p>
-                          <p className="text-sm text-gray-600">Section: {item.predicted_section}</p>
-                          <p className="text-sm text-gray-600">Date: {item.violation_date || "—"}</p>
+                        <div
+                          key={index}
+                          onClick={() => {
+                            setSelectedHistory(item);
+                            setHistoryModalOpen(false);
+                            setDetailModalOpen(true);
+                          }}
+                          className="p-4 bg-gray-200 hover:bg-green-100 rounded-xl border border-gray-300 shadow-md cursor-pointer transition-all hover:scale-[1.02]"
+                        >
+                          <p className="font-semibold text-gray-900">
+                            {item.predicted_violation}
+                          </p>
+
+                          <p className="text-sm text-gray-700">
+                            Section: <span className="font-medium">{item.predicted_section}</span>
+                          </p>
+
+                          <p className="text-xs text-gray-600 mt-1">
+                            Last Visit Date: {item.violation_date || "—"}
+                          </p>
                         </div>
                       ))
                     )}
                   </div>
-                  <button onClick={() => setHistoryModalOpen(false)} className="mt-5 w-full bg-green-600 text-white py-2 rounded-lg">Close</button>
+
+                  <button
+                    onClick={() => setHistoryModalOpen(false)}
+                    className="mt-6 w-full bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl transition"
+                  >
+                    Close
+                  </button>
+
+                </div>
+              </div>
+            )}
+
+            {/* DETAIL MODAL */}
+            {detailModalOpen && selectedHistory && (
+              <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+
+                <div className="w-full max-w-md bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 p-6">
+
+                  <h2 className="text-xl font-bold text-gray-800 mb-5 flex items-center gap-2">
+                    🔍 Visit Details
+                  </h2>
+
+                  <div className="space-y-4 text-gray-700">
+
+                    <div className="p-3 bg-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-500">Violation</p>
+                      <p className="font-semibold">{selectedHistory.predicted_violation}</p>
+                    </div>
+
+                    <div className="p-3 bg-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-500">Section</p>
+                      <p className="font-semibold">{selectedHistory.predicted_section}</p>
+                    </div>
+
+                   <div className="p-3 bg-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-500">Last Visit Date</p>
+                      <p className="font-semibold">
+                        {selectedHistory.violation_date || "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setDetailModalOpen(false);
+                      setHistoryModalOpen(true); 
+                    }}
+                    className="mt-6 w-full bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl transition"
+                  >
+                    ← Back
+                  </button>
+
                 </div>
               </div>
             )}

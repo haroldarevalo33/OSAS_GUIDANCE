@@ -769,8 +769,87 @@ useEffect(() => {
 
   if (!user) return <p>Loading...</p>;
 
+  //Resolve
+  async function handleResolveViolation(v) {
+  // PREVENT DOUBLE RESOLVE
+  if (v.is_resolved === "Resolved") return;
 
-//delete
+  // CONFIRMATION FIRST
+  const result = await Swal.fire({
+    title: "Resolve Violation",
+    text: `Mark violation of ${v.student_name} as resolved?`,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Yes, resolve",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#16a34a",
+    cancelButtonColor: "#d33",
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/violations/resolve/${v.id}`,
+      { method: "PUT" }
+    );
+
+    if (!res.ok) {
+      const data = await res.json();
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: data?.message || "Resolve failed",
+      });
+      return;
+    }
+
+    // SUCCESS TOAST
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "Violation resolved",
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true,
+    });
+
+    // SMOOTH UI UPDATE
+    setViolations((prev) =>
+      prev.map((item) =>
+        item.id === v.id
+          ? {
+              ...item,
+              is_resolved: "Resolved",
+              _anim: true,
+            }
+          : item
+      )
+    );
+
+    // REMOVE ANIMATION FLAG
+    setTimeout(() => {
+      setViolations((prev) =>
+        prev.map((item) =>
+          item.id === v.id
+            ? { ...item, _anim: false }
+            : item
+        )
+      );
+    }, 800);
+
+  } catch (err) {
+    console.error(err);
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Failed to resolve violation",
+    });
+  }
+}
+
+// Delete Violations
 async function handleDeleteViolation(v) {
   // Confirmation modal (center)
   Swal.fire({
@@ -2778,13 +2857,18 @@ return (
                       View
                     </button>
 
-                    {/* RESOLVE */}
-                    <button
-                      onClick={() => handleResolveViolation(v)}
-                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
-                    >
-                      Resolve
-                    </button>
+                  {/* RESOLVE */}
+                      <button
+                        onClick={() => handleResolveViolation(v)}
+                        disabled={v.is_resolved === "Resolved"}
+                        className={`px-3 py-1 rounded text-white transition ${
+                          v.is_resolved === "Resolved"
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-green-600 hover:bg-green-700"
+                        }`}
+                      >
+                        {v.is_resolved === "Resolved" ? "Resolved" : "Resolve"}
+                      </button>
                       {/* CLICK OUTSIDE OVERLAY */}
                         {openMenuId !== null && (
                           <div
@@ -3240,46 +3324,68 @@ return (
 
 </div>
 )}
-    {/* ======================= VIOLATION CARDS ======================= */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-      {violations.length === 0 ? (
-        <p className="text-gray-500 col-span-full">No violation records yet.</p>
-      ) : (
-        violations.map((v, idx) => {
-          const date = new Date(v.violation_date);
-          const mm = String(date.getMonth() + 1).padStart(2, "0");
-          const dd = String(date.getDate()).padStart(2, "0");
-          const yy = String(date.getFullYear()).slice(-2);
-          const formattedDate = `${mm}/${dd}/${yy}`;
+   {/* ======================= VIOLATION CARDS ======================= */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+  {violations.length === 0 ? (
+    <p className="text-gray-500 col-span-full">No violation records yet.</p>
+  ) : (
+    violations.map((v, idx) => {
+      const date = new Date(v.violation_date);
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const yy = String(date.getFullYear()).slice(-2);
+      const formattedDate = `${mm}/${dd}/${yy}`;
 
-          return (
-            <div
-              key={idx}
-              className="bg-white p-5 rounded-xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer"
-              onClick={() => {
-                setCurrentViolation({ ...v, formattedDate });
-                setShowViolationDetailsModal(true);
-              }}
-            >
-              <p className="font-semibold text-gray-700 text-lg mb-2">
-                {v.student_name} (Number: {v.student_id})
-              </p>
-              <p className="text-gray-600 mb-1">Gender: {v.gender}</p>
-              <p className="text-gray-600 mb-1">CYS: {v.course_year_section}</p>
+      const isResolved = v.is_resolved === "Resolved";
 
-              <p className="text-gray-600 mb-1 truncate" title={v.violation_text}>
-                Admin Note: {v.violation_text}
-              </p>
+      return (
+        <div
+          key={idx}
+          className={`p-5 rounded-xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer
+            bg-white
+            ${isResolved ? "border-l-4 border-green-500" : "border border-transparent"}
+          `}
+          onClick={() => {
+            setCurrentViolation({ ...v, formattedDate });
+            setShowViolationDetailsModal(true);
+          }}
+        >
+          <p className="font-semibold text-gray-700 text-lg mb-2">
+            {v.student_name} (Number: {v.student_id})
+          </p>
 
-              <p className="text-gray-600 mb-1">Section: {v.predicted_section || "—"}</p>
-              <p className="text-gray-600 mb-2">Violation: {v.predicted_violation || "—"}</p>
+          <p className="text-gray-600 mb-1">Gender: {v.gender}</p>
+          <p className="text-gray-600 mb-1">CYS: {v.course_year_section}</p>
 
-              <p className="text-sm text-gray-400">Date: {formattedDate}</p>
-            </div>
-          );
-        })
-      )}
-    </div>
+          <p className="text-gray-600 mb-1 truncate" title={v.violation_text}>
+            Admin Note: {v.violation_text}
+          </p>
+
+          <p className="text-gray-600 mb-1">
+            Section: {v.predicted_section || "—"}
+          </p>
+
+          <p className="text-gray-600 mb-2">
+            Violation: {v.predicted_violation || "—"}
+          </p>
+
+          <p className="text-sm text-gray-400">
+            Date: {formattedDate}
+          </p>
+
+          {/* STATUS LABEL */}
+          <p
+            className={`text-xs mt-2 font-semibold ${
+              isResolved ? "text-green-600" : "text-yellow-600"
+            }`}
+          >
+            {isResolved ? "Resolved" : "Pending"}
+          </p>
+        </div>
+      );
+    })
+  )}
+</div>
 
     {/* ======================= SWEETALERT VIEW DETAILS ======================= */}
     {showViolationDetailsModal && currentViolation && (() => {

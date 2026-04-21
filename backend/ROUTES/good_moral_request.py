@@ -115,21 +115,30 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
 # Auto-revoke helper
 # =========================
 def auto_revoke_if_violations(student_number):
-    violation_count = Violation.query.filter_by(student_id=student_number).count()
+
+    # ONLY COUNT ACTIVE (Pending) violations
+    violation_count = Violation.query.filter_by(
+        student_id=student_number,
+        is_resolved="Pending"
+    ).count()
+
     if violation_count >= 3:
         requests = GoodMoralRequest.query.filter(
             GoodMoralRequest.student_number == student_number,
             GoodMoralRequest.status.in_(["Pending", "Approved"])
         ).all()
+
         for r in requests:
             if "Auto-revoked" not in (r.remarks or ""):
                 r.status = "Rejected"
                 r.remarks = "Auto-revoked due to 3 or more violations"
-                r.is_notified = False  # ensures new notification
+                r.is_notified = False
                 r.is_read = False
                 db.session.add(r)
+
         db.session.commit()
         return True
+
     return False
 
 # =========================
@@ -148,7 +157,10 @@ def good_moral_request():
     if not student:
         return jsonify({"message": "Student not found"}), 404
 
-    violation_count = Violation.query.filter_by(student_id=student_number).count()
+    violation_count = Violation.query.filter_by(
+    student_id=student_number,
+    is_resolved="Pending"
+        ).count()
     if violation_count >= 3:
         return jsonify({"message": "Cannot submit: 3 or more violations"}), 403
 
@@ -209,7 +221,10 @@ def student_history():
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
 
-    violation_count = Violation.query.filter_by(student_id=student_number).count()
+    violation_count = Violation.query.filter_by(
+    student_id=student_number,
+    is_resolved="Pending"
+    ).count()
     auto_revoke_if_violations(student_number)
 
     requests = GoodMoralRequest.query.filter_by(student_number=student_number)\

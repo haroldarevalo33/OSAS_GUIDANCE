@@ -117,6 +117,9 @@ class Violation(db.Model):
     predicted_section = db.Column(db.String(100), nullable=True)
     predictive_text = db.Column(db.Text, nullable=True)
     standard_text = db.Column(db.Text, nullable=True)
+
+    is_resolved = db.Column(db.String(20), nullable=False, default="Pending")
+
     encoded_by = db.Column(
         db.Integer,
         db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL"),

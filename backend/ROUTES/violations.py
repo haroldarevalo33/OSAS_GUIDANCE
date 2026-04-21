@@ -209,11 +209,11 @@ def get_all_violations():
             "predicted_violation": r.predicted_violation or "—",
             "predicted_section": r.predicted_section or "—",
             "predictive_text": r.predictive_text or "—",
-            "standard_text": r.standard_text or "—"
+            "standard_text": r.standard_text or "—",
+            "is_resolved": r.is_resolved or ""
         }
         for r in records
     ])
-
 # ==========================
 # ADD VIOLATION
 # ==========================
@@ -335,6 +335,30 @@ def update_violation(id):
     db.session.commit()
     return jsonify({"message": "Violation updated successfully"})
 
+# ==========================
+# Resolve
+# ==========================
+@violation_bp.put("/resolve/<int:id>")
+def resolve_violation(id):
+
+    record = Violation.query.get(id)
+
+    if not record:
+        return jsonify({"message": "Violation not found"}), 404
+
+    # check if already resolved
+    if record.is_resolved == "Resolved":
+        return jsonify({"message": "Already resolved"}), 400
+
+    record.is_resolved = "Resolved"
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Violation marked as resolved",
+        "id": record.id,
+        "is_resolved": record.is_resolved or "Pending:"
+    }), 200
 
 # ==========================
 # DELETE
@@ -350,8 +374,9 @@ def delete_violation(id):
     db.session.commit()
 
     return jsonify({"message": "Violation deleted successfully"})
+
 # ==========================
-# SUMMARY 
+# SUMMARY
 # ==========================
 @violation_bp.get("/summary/<string:student_number>")
 def get_student_summary(student_number):
@@ -366,8 +391,10 @@ def get_student_summary(student_number):
             "violation_date": "—"
         }), 200
 
-    records = Violation.query.filter_by(
-        student_id=str(student.student_number)
+    # ONLY ACTIVE violations (not resolved)
+    records = Violation.query.filter(
+        Violation.student_id == str(student.student_number),
+        Violation.is_resolved != "Resolved"
     ).order_by(Violation.violation_date.desc()).all()
 
     if not records:
@@ -386,9 +413,8 @@ def get_student_summary(student_number):
         "predicted_section": latest.predicted_section or "—",
         "violation_date": latest.violation_date.strftime("%Y-%m-%d") if latest.violation_date else "—"
     }), 200
-
 # ==========================
-# HISTORY (UNCHANGED)
+# HISTORY 
 # ==========================
 @violation_bp.get("/history/<student_number>")
 def get_student_history(student_number):
@@ -397,9 +423,14 @@ def get_student_history(student_number):
     if not student:
         return jsonify([]), 200
 
-    records = Violation.query.filter_by(
-        student_id=str(student.student_number)
+    records = Violation.query.filter(
+        Violation.student_id == str(student.student_number),
+        Violation.is_resolved != "Resolved"
     ).order_by(Violation.violation_date.desc()).all()
+
+    # if no active violations, return empty list (0 behavior)
+    if not records:
+        return jsonify([]), 200
 
     return jsonify([
         {
