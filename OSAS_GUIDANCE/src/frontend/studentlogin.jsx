@@ -26,6 +26,8 @@ export default function StudentLogin() {
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -225,36 +227,65 @@ return (
           className="border p-3 rounded-lg w-full mb-3"
         />
 
-        {/* NEW PASSWORD */}
+         {/* NEW PASSWORD */}
         <label className="font-semibold text-gray-700">
-          New Password
-        </label>
-        <input
-          type="password"
-          placeholder="Enter new password"
-          value={newPass}
-          onChange={(e) => setNewPass(e.target.value)}
-          className="border p-3 rounded-lg w-full mb-3"
-        />
+            New Password
+          </label>
+
+          <div className="relative mb-3">
+            <input
+              type={showNewPass ? "text" : "password"}
+              placeholder="Enter new password"
+              value={newPass}
+              onChange={(e) => setNewPass(e.target.value)}
+              className="border p-3 pr-10 rounded-lg w-full"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowNewPass(!showNewPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+            >
+              {showNewPass ? (
+                <EyeSlashIcon className="w-5 h-5" />
+              ) : (
+                <EyeIcon className="w-5 h-5" />
+              )}
+            </button>
+          </div>
 
         {/* CONFIRM PASSWORD */}
         <label className="font-semibold text-gray-700">
           Confirm Password
         </label>
-        <input
-          type="password"
-          placeholder="Confirm password"
-          value={confirmPass}
-          onChange={(e) => setConfirmPass(e.target.value)}
-          className="border p-3 rounded-lg w-full mb-4"
-        />
 
+        <div className="relative mb-4">
+          <input
+            type={showConfirmPass ? "text" : "password"}
+            placeholder="Confirm password"
+            value={confirmPass}
+            onChange={(e) => setConfirmPass(e.target.value)}
+            className="border p-3 pr-10 rounded-lg w-full"
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowConfirmPass(!showConfirmPass)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+          >
+            {showConfirmPass ? (
+              <EyeSlashIcon className="w-5 h-5" />
+            ) : (
+              <EyeIcon className="w-5 h-5" />
+            )}
+          </button>
+        </div>
         {/* BUTTONS */}
         <div className="flex justify-between mt-2">
 
           {/* CANCEL */}
           <button
-            className="bg-gray-400 text-white px-4 py-2 rounded-lg"
+            className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg"
             onClick={() => {
               setShowForgotModal(false);
               setStudentNumber("");
@@ -267,7 +298,7 @@ return (
 
           {/* SUBMIT */}
           <button
-            className="bg-green-600 text-white px-4 py-2 rounded-lg"
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
             onClick={handleForgotPassword}
           >
             Submit
