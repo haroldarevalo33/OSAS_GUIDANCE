@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from "react";
-import {Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
+import { EyeIcon, EyeSlashIcon, Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 
 export default function StudentHome() {
   // Page + data states
   const [activePage, setActivePage] = useState("Info");
   const [studentRecord, setStudentRecord] = useState(null);
+  const [studentName, setStudentName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [password, setPassword] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [originalPasswordHash, setOriginalPasswordHash] = useState("");
   
 
   // Small states
@@ -21,6 +31,10 @@ export default function StudentHome() {
   const [profilePreview, setProfilePreview] = useState(null);
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [profilePic, setProfilePic] = useState("");
+  const [savedProfilePic, setSavedProfilePic] = useState(null);
+  const [tempProfilePic, setTempProfilePic] = useState(null);
+  const [studentProfile, setStudentProfile] = useState(null); // SAVED (used by header)
 
   // Good moral
   const [notifications, setNotifications] = useState([]);
@@ -85,8 +99,219 @@ export default function StudentHome() {
   }, [activePage]);
 
 
+const isPasswordMatch = password === confirmPassword;
+const isPasswordValid = password && confirmPassword && isPasswordMatch;
+
+// GET All Student Manage Account
+const handleSaveChanges = async () => {
+  try {
+    if (!studentNumber) {
+      Swal.fire({
+        toast: true,
+        position: "bottom-end",
+        icon: "error",
+        title: "Student number is missing",
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+      });
+      return;
+    }
+
+    const isPasswordMatch = password === confirmPassword;
+
+    if (password && password.trim() !== "") {
+      const strength = getPasswordStrength(password);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+      // ================= CONFIRM PASSWORD =================
+      if (!isPasswordMatch) {
+        Swal.fire({
+          toast: true,
+          position: "bottom-end",
+          icon: "warning",
+          title: "Passwords do not match",
+          showConfirmButton: false,
+          timer: 2000,
+        });
+        return;
+      }
+
+      // ================= SPECIAL CHARACTER =================
+      if (!hasSpecial) {
+        Swal.fire({
+          toast: true,
+          position: "bottom-end",
+          icon: "warning",
+          title: "Password must contain special characters",
+          showConfirmButton: false,
+          timer: 2000,
+        });
+        return;
+      }
+
+      // ================= WEAK PASSWORD =================
+      if (strength.label === "Weak") {
+        Swal.fire({
+          toast: true,
+          position: "bottom-end",
+          icon: "warning",
+          title: "Password is too weak",
+          showConfirmButton: false,
+          timer: 2000,
+        });
+        return;
+      }
+
+      // ================= SAME PASSWORD CHECK =================
+      //  REMOVED FRONTEND HASH CHECK (WRONG APPROACH)
+      // Backend na ang magva-validate nito (correct & secure)
+    }
+
+    // ================= PAYLOAD =================
+    const payload = {
+      student_number: studentNumber,
+      student_name: studentName,
+      email,
+      phone,
+      course: selectedCourse,
+    };
+
+    if (password && password.trim() !== "") {
+      payload.password = password;
+    }
+
+    const res = await fetch("http://127.0.0.1:5000/students/update", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      Swal.fire({
+        toast: true,
+        position: "bottom-end",
+        icon: "error",
+        title: data.message || "Update failed",
+        showConfirmButton: false,
+        timer: 1500,
+      });
+      return;
+    }
+
+    Swal.fire({
+      toast: true,
+      position: "bottom-end",
+      icon: "success",
+      title: "Updated Successfully",
+      showConfirmButton: false,
+      timer: 1500,
+    });
+
+    const updatedProfile =
+      studentRecord?.profile_pic || studentProfile;
+
+    setStudentRecord((prev) => ({
+      ...prev,
+      student_name: studentName,
+      email,
+      phone,
+      course: selectedCourse,
+    }));
+
+    setStudentProfile(updatedProfile);
+    setIsEditing(false);
+
+    setPassword("");
+    setConfirmPassword("");
+
+    localStorage.setItem(
+      "student",
+      JSON.stringify({
+        student_number: studentNumber,
+        profile_pic: updatedProfile,
+        student_name: studentName,
+      })
+    );
+
+  } catch (err) {
+    console.error("Update error:", err);
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "error",
+      title: "Server error",
+      showConfirmButton: false,
+      timer: 1500,
+    });
+  }
+};
+// =========================
+// PASSWORD STRENGTH CHECK
+// =========================
+const getPasswordStrength = (password) => {
+  let score = 0;
+
+  if (!password) {
+    return { label: "", color: "text-gray-400" };
+  }
+
+  // length check
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+
+  // lowercase + uppercase
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+
+  // numbers
+  if (/\d/.test(password)) score++;
+
+  // special characters
+  if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++;
+
+  if (score <= 2) {
+    return { label: "Weak", color: "text-red-500" };
+  } else if (score === 3 || score === 4) {
+    return { label: "Medium", color: "text-yellow-500" };
+  } else {
+    return { label: "Strong", color: "text-green-600" };
+  }
+};
+
+useEffect(() => {
+  if (!studentNumber) return;
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:5000/students/full/${studentNumber}`
+      );
+
+      const data = await res.json();
+
+      if (res.ok && data) {
+        setStudentName(data.student_name || "");
+        setEmail(data.email || "");
+        setPhone(data.phone || "");
+        setSelectedCourse(data.course || "");
+
+        setPassword("");
+      } else {
+        console.warn(data.message || "Failed to fetch student data");
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+    }
+  };
+
+  fetchData();
+}, [studentNumber]);
+
 // ==========================
-// Fetch student record
+// FETCH STUDENT RECORD (PROFILE PIC + DISPLAY)
 // ==========================
 useEffect(() => {
   if (!studentNumber) {
@@ -96,27 +321,38 @@ useEffect(() => {
 
   setLoading(true);
 
-  fetch(`http://localhost:5000/students/by-number/${studentNumber}`)
+  fetch(`http://127.0.0.1:5000/students/by-number/${studentNumber}`)
     .then((res) => res.json())
     .then((data) => {
-      if (data.profile_pic && !data.profile_pic.startsWith("http")) {
-        data.profile_pic = `http://localhost:5000/uploads/${data.profile_pic}`;
-      }
+      const fixedProfile =
+        data.profile_pic && !data.profile_pic.startsWith("http")
+          ? `http://127.0.0.1:5000/students/uploads/${data.profile_pic}`
+          : data.profile_pic;
 
-      setStudentRecord(data);
+      setStudentRecord({
+        ...data,
+        profile_pic: fixedProfile,
+      });
+
+  
+      setStudentProfile(fixedProfile);
+
       setLoading(false);
 
       localStorage.setItem(
         "student",
         JSON.stringify({
-          ...studentData,
-          profile_pic: data.profile_pic,
+          student_number: studentNumber,
+          profile_pic: fixedProfile,
+          student_name: data.student_name,
         })
       );
     })
-    .catch(() => setLoading(false));
+    .catch((err) => {
+      console.error("Fetch error:", err);
+      setLoading(false);
+    });
 }, [activePage, studentNumber]);
-
 // ==========================
 // Fetch summary (AUTO UPDATE)
 // ==========================
@@ -1129,56 +1365,71 @@ useEffect(() => {
               {/* placeholder so header spacing matches desktop */}
             </div>
           </div>
-
-          {/* Right: user avatar */}
+        {/* Right: user avatar */}
           <div className="relative">
             <div
               onClick={() => setAccountModal(!accountModal)}
               className="cursor-pointer flex items-center gap-2 p-2 rounded-full hover:bg-gray-700/40"
             >
-              {getProfileImage() ? (
+              {studentProfile ? (
                 <img
-                  src={getProfileImage()}
+                  src={studentProfile}
                   alt="user"
                   className="w-10 h-10 rounded-full object-cover border border-gray-400"
                 />
               ) : (
-                <UserCircleIcon className="w-10 h-10 text-white" />
+                <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
+                  {studentRecord?.student_name
+                    ? studentRecord.student_name
+                        .trim()
+                        .split(" ")
+                        .slice(0, 10)
+                        .map((word) => word[0])
+                        .join("")
+                        .toUpperCase()
+                    : "S"}
+                </div>
               )}
             </div>
 
             {accountModal && (
               <div className="absolute right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
                 <div className="flex flex-col items-center">
+
                   <div className="relative">
-                    {getProfileImage() ? (
-                      <img
-                        src={getProfileImage()}
-                        className="w-20 h-20 rounded-full border border-gray-400 object-cover"
-                        alt="pfp"
-                      />
-                    ) : (
-                      <UserCircleIcon className="w-20 h-20 text-gray-400" />
-                    )}
-                    <label className="absolute bottom-0 right-0 bg-green-600 text-white w-6 h-6 rounded-full flex items-center justify-center cursor-pointer hover:bg-green-700">
-                      +
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleProfileUpload}
-                      />
-                    </label>
-                  </div>
+                     {studentProfile ? (
+                <img
+                  src={studentProfile}
+                  alt="user"
+                  className="w-10 h-10 rounded-full object-cover border border-gray-400"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
+                  {studentRecord?.student_name
+                    ? studentRecord.student_name
+                        .trim()
+                        .split(" ")
+                        .slice(0, 10)
+                        .map((word) => word[0])
+                        .join("")
+                        .toUpperCase()
+                    : "S"}
+                </div>
+              )}
+            </div>
+
                   <p className="mt-3 text-lg text-white">
-                    Hi, <span className="font-bold">{studentRecord?.student_name || fallbackName}</span>
+                    Hi, <span className="font-bold">{studentRecord?.student_name || "—"}</span>
                   </p>
+
                   <p className="text-sm text-gray-300 mb-1">
-                    {studentData.student_number}
+                    {studentRecord?.student_number}
                   </p>
+
                   <p className="text-sm text-gray-300 mb-1">
                     {studentRecord?.course || "—"}
                   </p>
+
                 </div>
               </div>
             )}
@@ -1489,6 +1740,359 @@ useEffect(() => {
               </div>
             </div>
             )}
+            {/* ======================== MANAGE ACCOUNT ========================= */}
+                    {activePage === "ManageAccount" && (
+                      <div className="w-full p-4 md:p-6">
+
+                        {/* ================= HEADER ================= */}
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 pb-6">
+
+                       {/* LEFT HEADER (HIGHER + CLEAN POSITION) */}
+                          <div className="text-left -mt-4 md:-mt-6">
+
+                            <h2 className="text-2xl md:text-4xl font-bold text-green-800 leading-tight">
+                              Manage Account
+                            </h2>
+
+                            <p className="text-gray-500 mt-1 text-sm md:text-base">
+                              View and manage your account details
+                            </p>
+
+                          </div>
+
+                          {/* RIGHT BUTTON (FIXED: compact + responsive) */}
+                          <div className="flex justify-start md:justify-end w-full md:w-auto">
+                            <button
+                              onClick={() => setIsEditing(!isEditing)}
+                              className="flex items-center justify-center gap-1 
+                                        bg-green-600 hover:bg-green-700 
+                                        text-white text-sm md:text-base
+                                        px-4 py-2 rounded-full shadow-md
+                                        w-auto min-w-[90px]"
+                            >
+                              
+                              <span className="truncate">
+                                {isEditing ? "Cancel" : "Edit"}
+                              </span>
+                            </button>
+                          </div>
+
+                        </div>
+
+                        {/* ================= CONTENT CARD ================= */}
+                        <div className="bg-green-50 p-4 md:p-6 rounded-2xl shadow-inner">
+
+                          {/* PROFILE PIC */}
+                            <div className="flex flex-col items-center mb-8">
+                              <div className="relative">
+
+                                {(() => {
+                                  const getInitials = (name) => {
+                                    if (!name) return "S";
+
+                                    return name
+                                      .trim()
+                                      .split(/\s+/) // handles multiple spaces
+                                      .map(word => word[0])
+                                      .join("")
+                                      .toUpperCase()
+                                      .slice(0, 3);
+                                  };
+
+                                  const initials = getInitials(studentRecord?.student_name);
+
+                                  return (
+                                    <img
+                                      src={
+                                        studentRecord?.profile_pic
+                                          ? studentRecord.profile_pic
+                                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                              initials
+                                            )}&bold=true&length=3`
+                                      }
+                                      alt="Profile"
+                                      className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl"
+                                    />
+                                  );
+                                })()}
+                              {/* UPLOAD */}
+                               {isEditing && (
+                               <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg">
+                                  +
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={async (e) => {
+                                      const file = e.target.files[0];
+                                      if (!file) return;
+
+                                      const formData = new FormData();
+                                      formData.append("profile_pic", file);
+
+                                      try {
+                                        const res = await fetch(
+                                          `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
+                                          { method: "POST", body: formData }
+                                        );
+
+                                        const data = await res.json();
+
+                                        if (res.ok) {
+                                          setStudentRecord(prev => ({
+                                            ...prev,
+                                            profile_pic: data.profile_pic
+                                          }));
+                                        } else {
+                                          alert(data.message || "Upload failed");
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                        alert("Server error");
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+
+                            </div>
+
+                            <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
+                              {isEditing ? "Click plus icon to change profile picture" : "Profile Picture"}
+                            </p>
+
+                          </div>
+
+                          {/* ================= FIELDS ================= */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+
+                            {/* NAME */}
+                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200">
+                              <p className="text-sm text-gray-500">Student Name</p>
+
+                              {isEditing ? (
+                                <input
+                                  value={studentName}
+                                  onChange={(e) => setStudentName(e.target.value)}
+                                  className="w-full border p-2 rounded-lg mt-2"
+                                />
+                              ) : (
+                                <p className="text-lg md:text-xl font-bold text-green-900 truncate">
+                                  {studentName || "No Name"}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* EMAIL */}
+                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200">
+                              <p className="text-sm text-gray-500">Email</p>
+
+                              {isEditing ? (
+                                <input
+                                  value={email}
+                                  onChange={(e) => setEmail(e.target.value)}
+                                  className="w-full border p-2 rounded-lg mt-2"
+                                />
+                              ) : (
+                                <p className="text-lg md:text-xl font-bold text-green-900 truncate">
+                                  {email || "No Email"}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* PHONE */}
+                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200">
+                              <p className="text-sm text-gray-500">Phone</p>
+
+                              {isEditing ? (
+                                <input
+                                  value={phone}
+                                  onChange={(e) => setPhone(e.target.value)}
+                                  className="w-full border p-2 rounded-lg mt-2"
+                                />
+                              ) : (
+                                <p className="text-lg md:text-xl font-bold text-green-900 truncate">
+                                  {phone || "No Phone"}
+                                </p>
+                              )}
+                            </div>
+
+                          {/* COURSE */}
+                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+                              <p className="text-sm text-gray-500">Course</p>
+
+                              {isEditing ? (
+                                <select
+                                  value={selectedCourse}
+                                  onChange={(e) => setSelectedCourse(e.target.value)}
+                                  className="w-full mt-2 border border-gray-300 rounded-lg p-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-gray-600"
+                                >
+                                  <option value="">-- Select Course --</option>
+
+                                  <option value="BS Information Technology">
+                                    BS Information Technology
+                                  </option>
+
+                                  <option value="BS Computer Science">
+                                    BS Computer Science
+                                  </option>
+
+                                  <option value="BS Business Management">
+                                    BS Business Management
+                                  </option>
+
+                                  <option value="Bachelor of Secondary Education">
+                                    Bachelor of Secondary Education
+                                  </option>
+
+                                  <option value="Bachelor of Elementary Education">
+                                    Bachelor of Elementary Education
+                                  </option>
+
+                                  <option value="BS Hospitality Management (formerly BS Hotel and Restaurant Management)">
+                                    BS Hospitality Management (formerly BS Hotel and Restaurant Management)
+                                  </option>
+
+                                  <option value="BS Fisheries">
+                                    BS Fisheries
+                                  </option>
+
+                                  <option value="Basic Seaman Training Course">
+                                    Basic Seaman Training Course
+                                  </option>
+                                </select>
+                              ) : (
+                                <p className="text-lg md:text-xl font-bold text-green-900 truncate">
+                                  {selectedCourse || "No Course"}
+                                </p>
+                              )}
+                            </div>
+                             {/* PASSWORD */}
+                                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200 md:col-span-2">
+
+                                  <p className="text-sm text-gray-500">Password</p>
+
+                                  {isEditing ? (
+                                    <>
+                                      {/* PASSWORD INPUT */}
+                                      <div className="relative mt-2">
+                                        <input
+                                          type={showPassword ? "text" : "password"}
+                                          value={password}
+                                          onChange={(e) => setPassword(e.target.value)}
+                                          placeholder="Enter new password"
+                                          autoComplete="new-password"
+                                          className="w-full p-2 border rounded-lg text-green-900 pr-10"
+                                        />
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowPassword(!showPassword)}
+                                          className="absolute right-3 top-2.5 text-gray-500 hover:text-green-700"
+                                        >
+                                          {showPassword ? (
+                                            <EyeSlashIcon className="w-5 h-5" />
+                                          ) : (
+                                            <EyeIcon className="w-5 h-5" />
+                                          )}
+                                        </button>
+                                      </div>
+
+                                      {/* CONFIRM PASSWORD */}
+                                      <div className="relative mt-3">
+                                        <input
+                                          type={showConfirmPassword ? "text" : "password"}
+                                          value={confirmPassword}
+                                          onChange={(e) => setConfirmPassword(e.target.value)}
+                                          placeholder="Confirm password"
+                                          className="w-full p-2 border rounded-lg text-green-900 pr-10"
+                                        />
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                          className="absolute right-3 top-2.5 text-gray-500 hover:text-green-700"
+                                        >
+                                          {showConfirmPassword ? (
+                                            <EyeSlashIcon className="w-5 h-5" />
+                                          ) : (
+                                            <EyeIcon className="w-5 h-5" />
+                                          )}
+                                        </button>
+                                      </div>
+
+                                      {/* VALIDATIONS */}
+                                      {confirmPassword && password !== confirmPassword && (
+                                        <p className="text-xs mt-1 text-red-500 font-semibold">
+                                          Passwords do not match
+                                        </p>
+                                      )}
+
+                                      {confirmPassword && password === confirmPassword && password && (
+                                        <p className="text-xs mt-1 text-green-600 font-semibold">
+                                          Passwords match
+                                        </p>
+                                      )}
+
+                                      {password && (
+                                        <p className={`text-xs mt-2 font-semibold ${getPasswordStrength(password).color}`}>
+                                          {getPasswordStrength(password).label} password
+                                        </p>
+                                      )}
+
+                                      {password && !/[!@#$%^&*(),.?":{}|<>]/.test(password) && (
+                                        <p className="text-xs mt-1 text-red-500 font-semibold">
+                                          Must include a special character (!@#$ etc.)
+                                        </p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <div className="mt-2">
+                                      <p className="text-lg md:text-xl font-bold text-green-900 tracking-widest break-all">
+                                        {password ? "•".repeat(Math.min(password.length, 12)) : "••••••••"}
+                                      </p>
+
+                                      {password && (
+                                        <p className={`text-xs mt-1 font-semibold ${getPasswordStrength(password).color}`}>
+                                          {getPasswordStrength(password).label} password
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    Password must include uppercase, numbers, and special characters
+                                  </p>
+                                </div>
+
+                                {/* ================= SAVE BUTTON ================= */}
+                                {isEditing && (
+                                  <div className="mt-6 flex justify-end">
+                                    <button
+                                      onClick={handleSaveChanges}
+                                      disabled={
+                                        password &&
+                                        password.trim() !== "" &&
+                                        password !== confirmPassword
+                                      }
+                                      className={`w-full md:w-auto px-5 py-2 rounded-full text-sm md:text-base text-white transition
+                                        ${
+                                          password &&
+                                          password.trim() !== "" &&
+                                          password !== confirmPassword
+                                            ? "bg-gray-400 cursor-not-allowed"
+                                            : "bg-green-700 hover:bg-green-800"
+                                        }`}
+                                    >
+                                      Save Changes
+                                    </button>
+                                  </div>
+                                )}
+
+                        </div>
+                        </div>
+                      </div>
+                    )}
                   {/* ======================== NOTIFICATIONS PAGE ========================= */}
                   {activePage === "Notifications" && (
                     <div className="w-full">
@@ -1733,7 +2337,7 @@ useEffect(() => {
 
             {/* DETAIL MODAL */}
             {detailModalOpen && selectedHistory && (
-              <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
 
                 <div className="w-full max-w-md bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 p-6">
 
@@ -1766,7 +2370,7 @@ useEffect(() => {
                       setDetailModalOpen(false);
                       setHistoryModalOpen(true); 
                     }}
-                    className="mt-6 w-full bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl transition"
+                    className="mt-6 w-full bg-gray-900 hover:bg-gray-800 text-white py-2.5 rounded-xl transition"
                   >
                     ← Back
                   </button>
@@ -1790,6 +2394,9 @@ useEffect(() => {
                 </div>
               </div>
             )}
+            
+  
           </div>
+          
         );
       }

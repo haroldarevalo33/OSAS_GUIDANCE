@@ -11,13 +11,21 @@ export default function StudentLogin() {
 
   const navigate = useNavigate();
 
+  // ==================
+  // LOGIN STATES
+  // ==================
   const [studentNumber, setStudentNumber] = useState("");
   const [password, setPassword] = useState("");
 
+  // ==================
+  // FORGOT PASSWORD STATES (FIXED)
+  // ==================
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const [email, setEmail] = useState("");
+  const [studentNumberForgot, setStudentNumberForgot] = useState("");
+  const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -32,7 +40,7 @@ export default function StudentLogin() {
   }, []);
 
   // ==================
-  //     LOGIN FIX
+  // LOGIN
   // ==================
   const handleLogin = async () => {
     if (!studentNumber || !password) {
@@ -57,7 +65,6 @@ export default function StudentLogin() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        // 🔥 SAVE TO LOCAL STORAGE (IMPORTANT!)
         localStorage.setItem(
           "student",
           JSON.stringify({
@@ -74,21 +81,14 @@ export default function StudentLogin() {
         }).then(() => {
           navigate("/student_homepage");
         });
-      } else if (res.status === 401) {
-        Swal.fire({
-          icon: "error",
-          title: "Invalid Credentials",
-          text: "Incorrect student number or password",
-        });
       } else {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: data.message || "Something went wrong",
+          text: data.message || "Invalid credentials",
         });
       }
     } catch (err) {
-      console.error(err);
       Swal.fire({
         icon: "error",
         title: "Server Error",
@@ -96,89 +96,188 @@ export default function StudentLogin() {
       });
     }
   };
-
-  const handleForgotPassword = () => {
-    if (!email || !newPass) {
-      Swal.fire({
-        icon: "warning",
-        title: "Missing Fields",
-        text: "Please complete the form",
-      });
-      return;
-    }
-
+// ==================
+// FORGOT PASSWORD (FINAL FIXED)
+// ==================
+const handleForgotPassword = async () => {
+  if (!studentNumber || !newPass || !confirmPass) {
     Swal.fire({
-      icon: "success",
-      title: "Password Reset",
-      text: "Your password has been updated",
-      confirmButtonColor: "#22c55e",
+      icon: "warning",
+      title: "Missing Fields",
+      text: "Please complete all fields",
     });
+    return;
+  }
 
-    setShowForgotModal(false);
-  };
+  if (newPass.trim() !== confirmPass.trim()) {
+    Swal.fire({
+      icon: "error",
+      title: "Password Mismatch",
+      text: "New password and confirm password do not match",
+    });
+    return;
+  }
 
-  return (
-    <div className="w-screen h-screen bg-gray-900 flex overflow-visible">
-      {showForgotModal && (
-        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-80 shadow-lg animate-fadein">
-            <div className="flex items-center justify-center mb-4 space-x-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-7 h-7 text-yellow-500"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a1.71 1.71 0 001.47 2.57h17.42A1.71 1.71 0 0022.18 18L13.71 3.86a1.71 1.71 0 00-2.97 0z"
-                />
-              </svg>
+  // REQUIRE at least 1 special character
+  const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
 
-              <h2 className="text-xl font-bold text-gray-700">
-                Reset Password
-              </h2>
-            </div>
+  if (!specialCharRegex.test(newPass)) {
+    Swal.fire({
+      icon: "error",
+      title: "Invalid Password",
+      text: "Password must contain at least 1 special character",
+    });
+    return;
+  }
 
-            <label className="font-semibold text-gray-700">CVSU Email</label>
-            <input
-              type="email"
-              placeholder="Enter your CVSU email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="border p-3 rounded-lg w-full mb-3"
+  if (newPass.length < 6) {
+    Swal.fire({
+      icon: "error",
+      title: "Weak Password",
+      text: "Password must be at least 6 characters",
+    });
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      "http://localhost:5000/students/forgot-password",
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          student_number: studentNumber,
+          new_password: newPass,
+        }),
+      }
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      Swal.fire({
+        icon: "success",
+        title: "Password Updated",
+        text: data.message,
+        confirmButtonColor: "#22c55e",
+      });
+
+      setShowForgotModal(false);
+      setStudentNumber("");
+      setNewPass("");
+      setConfirmPass("");
+    } else {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: data.message || "Reset failed",
+      });
+    }
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Server Error",
+      text: "Cannot connect to backend",
+    });
+  }
+};
+
+return (
+<div className="w-screen h-screen bg-gray-900 flex overflow-visible">
+  {showForgotModal && (
+    <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50">
+
+      <div className="bg-white p-6 rounded-lg w-80 shadow-lg animate-fadein">
+
+        {/* HEADER */}
+        <div className="flex items-center justify-center mb-4 space-x-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-7 h-7 text-yellow-500"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a1.71 1.71 0 001.47 2.57h17.42A1.71 1.71 0 0022.18 18L13.71 3.86a1.71 1.71 0 00-2.97 0z"
             />
+          </svg>
 
-            <label className="font-semibold text-gray-700">New Password</label>
-            <input
-              type="password"
-              placeholder="Enter new password"
-              value={newPass}
-              onChange={(e) => setNewPass(e.target.value)}
-              className="border p-3 rounded-lg w-full mb-4"
-            />
-
-            <div className="flex justify-between mt-2">
-              <button
-                className="bg-gray-400 text-white px-4 py-2 rounded-lg"
-                onClick={() => setShowForgotModal(false)}
-              >
-                Cancel
-              </button>
-
-              <button
-                className="bg-green-600 text-white px-4 py-2 rounded-lg"
-                onClick={handleForgotPassword}
-              >
-                Submit
-              </button>
-            </div>
-          </div>
+          <h2 className="text-xl font-bold text-gray-700">
+            Reset Password
+          </h2>
         </div>
-      )}
+
+        {/* STUDENT NUMBER */}
+        <label className="font-semibold text-gray-700">
+          Student Number
+        </label>
+        <input
+          type="text"
+          placeholder="Enter student number"
+          value={studentNumber}
+          onChange={(e) => setStudentNumber(e.target.value)}
+          className="border p-3 rounded-lg w-full mb-3"
+        />
+
+        {/* NEW PASSWORD */}
+        <label className="font-semibold text-gray-700">
+          New Password
+        </label>
+        <input
+          type="password"
+          placeholder="Enter new password"
+          value={newPass}
+          onChange={(e) => setNewPass(e.target.value)}
+          className="border p-3 rounded-lg w-full mb-3"
+        />
+
+        {/* CONFIRM PASSWORD */}
+        <label className="font-semibold text-gray-700">
+          Confirm Password
+        </label>
+        <input
+          type="password"
+          placeholder="Confirm password"
+          value={confirmPass}
+          onChange={(e) => setConfirmPass(e.target.value)}
+          className="border p-3 rounded-lg w-full mb-4"
+        />
+
+        {/* BUTTONS */}
+        <div className="flex justify-between mt-2">
+
+          {/* CANCEL */}
+          <button
+            className="bg-gray-400 text-white px-4 py-2 rounded-lg"
+            onClick={() => {
+              setShowForgotModal(false);
+              setStudentNumber("");
+              setNewPass("");
+              setConfirmPass("");
+            }}
+          >
+            Cancel
+          </button>
+
+          {/* SUBMIT */}
+          <button
+            className="bg-green-600 text-white px-4 py-2 rounded-lg"
+            onClick={handleForgotPassword}
+          >
+            Submit
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  )}
 
       {/* LEFT SIDE */}
       <div className="w-full md:w-[55%] h-full flex flex-col items-center justify-center p-6 bg-white">
@@ -263,7 +362,7 @@ export default function StudentLogin() {
           </button>
 
           <p className="text-center text-gray-600 mt-2">
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <span
               onClick={() => navigate("/student_register")}
               className="text-green-600 font-semibold cursor-pointer underline"
@@ -273,7 +372,7 @@ export default function StudentLogin() {
           </p>
         </div>
       </div>
- {/* RIGHT SIDE */}
+      {/* RIGHT SIDE */}
       <div className="hidden md:block w-[100%] h-full relative">
         <img
           src="./cvsu-background.png"

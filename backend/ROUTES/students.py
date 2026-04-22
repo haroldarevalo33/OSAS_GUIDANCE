@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, send_from_directory
+import re
 from extension import db
 from models import Student
 import hashlib
@@ -6,7 +7,8 @@ from flask_cors import cross_origin
 import traceback
 import os
 import uuid
-from sqlalchemy import func
+from sqlalchemy import func, and_
+
 
 # ===========================
 # Blueprint
@@ -308,9 +310,192 @@ def update_profile_pic(student_number):
         db.session.rollback()
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500
+    
+# ===========================
+# UPDATE STUDENT INFO (MANAGE ACCOUNT)
+# ===========================
+@student_bp.route("/update", methods=["PUT", "OPTIONS"])
+@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+def update_student():
+    if request.method == "OPTIONS":
+        return jsonify({"msg": "CORS OK"}), 200
+
+    try:
+        data = request.get_json() or {}
+
+        student_number_raw = data.get("student_number")
+        if not student_number_raw:
+            return jsonify({"message": "Student number is required"}), 400
+
+        try:
+            student_number = int(student_number_raw)
+        except:
+            return jsonify({"message": "Invalid student number"}), 400
+
+        # ================= FIELDS =================
+        student_name = (data.get("student_name") or "").strip()
+        email = (data.get("email") or "").strip()
+        phone = (data.get("phone") or "").strip()
+        course = (data.get("course") or "").strip()
+        new_password = (data.get("password") or "").strip()
+
+        student = Student.query.filter_by(student_number=student_number).first()
+
+        if not student:
+            return jsonify({"message": "Student not found"}), 404
+
+        # ================= VALIDATION =================
+        if phone and not phone.isdigit():
+            return jsonify({"message": "Phone must be numeric"}), 400
+
+        if email:
+            existing_email = Student.query.filter(
+                Student.email == email,
+                Student.id != student.id
+            ).first()
+
+            if existing_email:
+                return jsonify({"message": "Email already used"}), 409
+
+        # ================= UPDATE FIELDS =================
+        if student_name:
+            student.student_name = student_name
+        if email:
+            student.email = email
+        if phone:
+            student.phone = phone
+        if course:
+            student.course = course
+
+        # ================= PASSWORD UPDATE =================
+        if new_password:
+            if len(new_password) < 6:
+                return jsonify({"message": "Password must be at least 6 characters"}), 400
+
+            new_password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+
+            # PREVENT SAME PASSWORD
+            if new_password_hash == student.password:
+                return jsonify({
+                    "message": "New password must be different from current password"
+                }), 400
+
+            student.password = new_password_hash
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Account updated successfully",
+            "student": {
+                "student_number": student.student_number,
+                "student_name": student.student_name,
+                "email": student.email,
+                "phone": student.phone,
+                "course": student.course,
+                "profile_pic": profile_url(student.profile_pic)
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()
+        return jsonify({
+            "message": "Internal Server Error",
+            "error": str(e)
+        }), 500
+# ===========================
+# GET FULL STUDENT DETAILS
+# ===========================
+@student_bp.route("/full/<student_number>", methods=["GET"])
+def get_full_student(student_number):
+    try:
+        student = Student.query.filter_by(student_number=student_number).first()
+
+        if not student:
+            return jsonify({"message": "Student not found"}), 404
+
+        return jsonify({
+            "student_number": student.student_number,
+            "student_name": student.student_name,
+            "email": student.email,
+            "phone": student.phone,
+            "course": student.course,
+            "password_hash": student.password,
+            "profile_pic": profile_url(student.profile_pic)
+        }), 200
+
+    except Exception:
+        traceback.print_exc()
+        return jsonify({"message": "Internal Server Error"}), 500
+    
+# ===========================
+# FORGOT / RESET PASSWORD (SHA256 VERSION FIXED)
+# ===========================
+@student_bp.route("/forgot-password", methods=["PUT", "OPTIONS"])
+@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+def forgot_password():
+    if request.method == "OPTIONS":
+        return jsonify({"msg": "CORS OK"}), 200
+
+    try:
+        data = request.get_json() or {}
+
+        student_number = (data.get("student_number") or "").strip()
+        new_password = (data.get("new_password") or "").strip()
+
+        if not student_number or not new_password:
+            return jsonify({"message": "Missing fields"}), 400
+
+        if not student_number.isdigit():
+            return jsonify({"message": "Invalid student number"}), 400
+
+        student = Student.query.filter_by(student_number=student_number).first()
+
+        if not student:
+            return jsonify({"message": "Student not found"}), 404
+
+       # must be at least 1 special char
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', new_password):
+            return jsonify({
+                "message": "Password must contain at least 1 special character"
+            }), 400
+
+        # optional: no spaces
+        if " " in new_password:
+            return jsonify({
+                "message": "Password must not contain spaces"
+            }), 400
+
+        if len(new_password) < 6:
+            return jsonify({
+                "message": "Password must be at least 6 characters"
+            }), 400
+
+        new_password_hash = hash_password(new_password)
+
+        # CHECK OLD PASSWORD (IMPORTANT FIX)
+        if new_password_hash == student.password:
+            return jsonify({
+                "message": "New password must be different from old password"
+            }), 400
+
+        student.password = new_password_hash
+        db.session.commit()
+
+        return jsonify({
+            "message": "Password reset successful"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()
+        return jsonify({
+            "message": "Internal Server Error",
+            "error": str(e)
+        }), 500
 
 # ===========================
-# FILTERED STUDENT RECORDS (FIXED)
+# FILTERED STUDENT RECORDS
 # ===========================
 @student_bp.route("/records", methods=["GET"])
 @cross_origin(origin="http://localhost:5173", supports_credentials=True)
