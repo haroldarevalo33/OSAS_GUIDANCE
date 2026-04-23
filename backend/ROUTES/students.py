@@ -311,6 +311,44 @@ def update_profile_pic(student_number):
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500
     
+    # ===========================
+# DELETE PROFILE PICTURE
+# ===========================
+@student_bp.route("/<student_number>/profile-pic", methods=["DELETE", "OPTIONS"])
+@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+def delete_profile_pic(student_number):
+    if request.method == "OPTIONS":
+        return jsonify({"msg": "CORS OK"}), 200
+
+    try:
+        student = Student.query.filter_by(student_number=student_number).first()
+
+        if not student:
+            return jsonify({"message": "Student not found"}), 404
+
+        # delete file from server if exists
+        if student.profile_pic:
+            file_path = os.path.join(UPLOAD_FOLDER, student.profile_pic)
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        # remove from database
+        student.profile_pic = None
+        db.session.commit()
+
+        return jsonify({
+            "message": "Profile picture deleted successfully"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()
+        return jsonify({
+            "message": "Internal Server Error",
+            "error": str(e)
+        }), 500
+    
 # ===========================
 # UPDATE STUDENT INFO (MANAGE ACCOUNT)
 # ===========================

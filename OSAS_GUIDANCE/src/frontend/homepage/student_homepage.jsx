@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { EyeIcon, EyeSlashIcon, Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
+import { Trash2 } from "lucide-react";
 
 export default function StudentHome() {
   // Page + data states
@@ -353,6 +354,53 @@ useEffect(() => {
       setLoading(false);
     });
 }, [activePage, studentNumber]);
+
+// delete profile picture
+
+const handleDeleteProfilePic = async () => {
+  Swal.fire({
+    title: "Delete Profile Picture?",
+    text: "This action cannot be undone.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Yes, delete it",
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
+        { method: "DELETE" }
+      );
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const updatedRes = await fetch(
+          `http://127.0.0.1:5000/students/by-number/${studentNumber}`
+        );
+
+        const updatedData = await updatedRes.json();
+
+        setStudentRecord((prev) => ({
+          ...prev,
+          ...updatedData, // safe merge
+        }));
+
+        setTempProfilePic(null);
+
+        Swal.fire("Deleted!", data.message, "success");
+      } else {
+        Swal.fire("Error", data.message, "error");
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Server error", "error");
+    }
+  });
+};
 // ==========================
 // Fetch summary (AUTO UPDATE)
 // ==========================
@@ -1365,15 +1413,40 @@ useEffect(() => {
               {/* placeholder so header spacing matches desktop */}
             </div>
           </div>
-        {/* Right: user avatar */}
-          <div className="relative">
-            <div
-              onClick={() => setAccountModal(!accountModal)}
-              className="cursor-pointer flex items-center gap-2 p-2 rounded-full hover:bg-gray-700/40"
-            >
-              {studentProfile ? (
+    {/* Right: user avatar */}
+    <div className="relative">
+      <div
+        onClick={() => setAccountModal(!accountModal)}
+        className="cursor-pointer flex items-center gap-2 p-2 rounded-full hover:bg-gray-700/40"
+      >
+        {studentRecord?.profile_pic ? (
+          <img
+            src={studentRecord.profile_pic}
+            alt="user"
+            className="w-10 h-10 rounded-full object-cover border border-gray-400"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
+            {studentRecord?.student_name
+              ? studentRecord.student_name
+                  .trim()
+                  .split(" ")
+                  .map((word) => word[0])
+                  .join("")
+                  .toUpperCase()
+              : "S"}
+          </div>
+        )}
+      </div>
+
+      {accountModal && (
+        <div className="absolute right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
+          <div className="flex flex-col items-center">
+
+            <div className="relative">
+              {studentRecord?.profile_pic ? (
                 <img
-                  src={studentProfile}
+                  src={studentRecord.profile_pic}
                   alt="user"
                   className="w-10 h-10 rounded-full object-cover border border-gray-400"
                 />
@@ -1383,7 +1456,6 @@ useEffect(() => {
                     ? studentRecord.student_name
                         .trim()
                         .split(" ")
-                        .slice(0, 10)
                         .map((word) => word[0])
                         .join("")
                         .toUpperCase()
@@ -1391,33 +1463,6 @@ useEffect(() => {
                 </div>
               )}
             </div>
-
-            {accountModal && (
-              <div className="absolute right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
-                <div className="flex flex-col items-center">
-
-                  <div className="relative">
-                     {studentProfile ? (
-                <img
-                  src={studentProfile}
-                  alt="user"
-                  className="w-10 h-10 rounded-full object-cover border border-gray-400"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
-                  {studentRecord?.student_name
-                    ? studentRecord.student_name
-                        .trim()
-                        .split(" ")
-                        .slice(0, 10)
-                        .map((word) => word[0])
-                        .join("")
-                        .toUpperCase()
-                    : "S"}
-                </div>
-              )}
-            </div>
-
                   <p className="mt-3 text-lg text-white">
                     Hi, <span className="font-bold">{studentRecord?.student_name || "—"}</span>
                   </p>
@@ -1781,88 +1826,112 @@ useEffect(() => {
 
                         {/* ================= CONTENT CARD ================= */}
                         <div className="bg-green-50 p-4 md:p-6 rounded-2xl shadow-inner">
+{/* PROFILE PIC */}
+<div className="flex flex-col items-center mb-8">
+  <div className="relative group">
 
-                          {/* PROFILE PIC */}
-                            <div className="flex flex-col items-center mb-8">
-                              <div className="relative">
+    {(() => {
+      const getInitials = (name) => {
+        if (!name) return "S";
 
-                                {(() => {
-                                  const getInitials = (name) => {
-                                    if (!name) return "S";
+        return name
+          .trim()
+          .split(/\s+/)
+          .map((word) => word[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 3);
+      };
 
-                                    return name
-                                      .trim()
-                                      .split(/\s+/) // handles multiple spaces
-                                      .map(word => word[0])
-                                      .join("")
-                                      .toUpperCase()
-                                      .slice(0, 3);
-                                  };
+      const initials = getInitials(studentRecord?.student_name);
 
-                                  const initials = getInitials(studentRecord?.student_name);
+      const displayPic =
+        studentRecord?.profile_pic; // 🔥 FIX: REMOVE tempProfilePic
 
-                                  return (
-                                    <img
-                                      src={
-                                        studentRecord?.profile_pic
-                                          ? studentRecord.profile_pic
-                                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                              initials
-                                            )}&bold=true&length=3`
-                                      }
-                                      alt="Profile"
-                                      className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl"
-                                    />
-                                  );
-                                })()}
-                              {/* UPLOAD */}
-                               {isEditing && (
-                               <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg">
-                                  +
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={async (e) => {
-                                      const file = e.target.files[0];
-                                      if (!file) return;
+      return (
+        <img
+          src={
+            displayPic
+              ? displayPic
+              : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  initials
+                )}&bold=true&length=3`
+          }
+          alt="Profile"
+          className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl transition duration-300"
+        />
+      );
+    })()}
 
-                                      const formData = new FormData();
-                                      formData.append("profile_pic", file);
+    {/* DARK HOVER OVERLAY */}
+    {isEditing && (
+      <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition duration-300"></div>
+    )}
 
-                                      try {
-                                        const res = await fetch(
-                                          `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
-                                          { method: "POST", body: formData }
-                                        );
+    {/* TRASH ICON */}
+    {isEditing && (
+      <div
+        onClick={handleDeleteProfilePic}
+        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer z-20"
+      >
+        <div className="bg-black/60 rounded-full p-4 backdrop-blur-sm hover:scale-110 transition">
+          <Trash2 className="text-white w-8 h-8" />
+        </div>
+      </div>
+    )}
 
-                                        const data = await res.json();
+    {/* UPLOAD BUTTON */}
+    {isEditing && (
+      <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg z-30">
+        +
+        <input
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-                                        if (res.ok) {
-                                          setStudentRecord(prev => ({
-                                            ...prev,
-                                            profile_pic: data.profile_pic
-                                          }));
-                                        } else {
-                                          alert(data.message || "Upload failed");
-                                        }
-                                      } catch (err) {
-                                        console.error(err);
-                                        alert("Server error");
-                                      }
-                                    }}
-                                  />
-                                </label>
-                              )}
+            const formData = new FormData();
+            formData.append("profile_pic", file);
 
-                            </div>
+            try {
+              const res = await fetch(
+                `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
+                { method: "POST", body: formData }
+              );
 
-                            <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
-                              {isEditing ? "Click plus icon to change profile picture" : "Profile Picture"}
-                            </p>
+              const data = await res.json();
 
-                          </div>
+              if (res.ok) {
+   
+                setStudentRecord((prev) => ({
+                  ...prev,
+                  profile_pic: data.profile_pic,
+                }));
 
+                // optional cleanup
+                setTempProfilePic(null);
+
+                Swal.fire("Success", "Profile updated", "success");
+              } else {
+                Swal.fire("Error", data.message || "Upload failed", "error");
+              }
+            } catch (err) {
+              console.error(err);
+              Swal.fire("Error", "Server error", "error");
+            }
+          }}
+        />
+      </label>
+    )}
+
+  </div>
+
+  <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
+    {isEditing ? "Hover image to delete or click + to change" : "Profile Picture"}
+  </p>
+</div>
                           {/* ================= FIELDS ================= */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
 
