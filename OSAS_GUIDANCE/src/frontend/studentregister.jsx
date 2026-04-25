@@ -96,14 +96,14 @@ if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.
   }
 
   // CvSU Email Validation
-  const cvsuEmailRegex = /^nc(\.[a-zA-Z]+){1,3}@cvsu\.edu\.ph$/;
+  const cvsuEmailRegex = /^([a-zA-Z]+(\.[a-zA-Z]+){1,3})@cvsu\.edu\.ph$/;
   const normalizedEmail = email.toLowerCase();
 
   if (!cvsuEmailRegex.test(normalizedEmail)) {
     Swal.fire({
       icon: "error",
       title: "Invalid Email",
-      text: "Only CvSU Email Account (e.g., nc.example@cvsu.edu.ph) are allowed.",
+      text: "Only CvSU Email Account (e.g., example@cvsu.edu.ph) are allowed.",
     });
     return;
   }
@@ -237,7 +237,7 @@ if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="nc.example@cvsu.edu.ph"
+            placeholder="example@cvsu.edu.ph"
             className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
