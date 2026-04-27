@@ -108,10 +108,12 @@ const downloadFullReport = () => {
   const totalSectionCases = filteredSectionData.reduce((sum, item) => sum + item.value, 0);
   
   const paragraphs = [];
-  const schoolYear = `${reportYear}-${reportYear + 1}`; 
+
+const schoolYear = `${reportYear}-${reportYear + 1}`;
+const semesterText = selectedSemester || "All Semesters";
 
 paragraphs.push(
-  `This report summarizes guidance-related data for the academic school year ${schoolYear}. ` +
+  `This report summarizes guidance-related data for the academic school year ${schoolYear}, ${semesterText}. ` +
   `It includes behavioral cases, student distribution by course, section case counts, and recorded as well as system-predicted violations. ` +
   `The purpose is to help guidance staff understand student behavior trends, identify issues, and improve support programs for students.`
 );
@@ -127,7 +129,7 @@ if (filteredLineData.length > 0) {
   );
 
   paragraphs.push(
-    `A total of ${totalCases} behavioral cases were recorded this year. ` +
+    `A total of ${totalCases} behavioral cases were recorded this year under ${semesterText}. ` +
     `The highest was in ${peakMonth.month} with ${peakMonth.cases} cases, while the lowest was in ${lowestMonth.month} with ${lowestMonth.cases} cases. ` +
     `This shows that some months need more attention and guidance support than others.`
   );
@@ -140,7 +142,7 @@ if (filteredCourseData.length > 0) {
   );
 
   paragraphs.push(
-    `There are ${totalStudents} students in total across all courses. ` +
+    `There are ${totalStudents} students in total across all courses for ${semesterText}. ` +
     `The course '${topCourse.course}' has the most students with ${topCourse.value}. ` +
     `This helps in planning school resources and support programs.`
   );
@@ -157,14 +159,13 @@ if (filteredSectionData.length > 0 && violationData && violationData.length > 0)
   );
 
   paragraphs.push(
-    `Section '${topSection.section}' recorded the highest number of cases with ${topSection.value}. ` +
+    `Section '${topSection.section}' recorded the highest number of cases with ${topSection.value} during ${semesterText}. ` +
     `In this section, the most common violation observed was '${topViolation.violation}'. ` +
     `This suggests that students in section '${topSection.section}' are mostly involved in '${topViolation.violation}' cases, ` +
     `which may require focused monitoring and targeted intervention. ` +
     `Overall, there are ${totalSectionCases} cases from all sections combined.`
   );
 }
-
 // ================= VIOLATION ANALYSIS (NOW LINKED TO SECTION) =================
 if (violationData && violationData.length > 0) {
 
