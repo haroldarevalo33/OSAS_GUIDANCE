@@ -16,11 +16,12 @@ export default function AdminHome() {
   const [isLoading, IsItLoading] = useState(true);
 
 
-const [predictedViolation, setPredictedViolation] = useState("");
-const [predictedSection, setPredictedSection] = useState("");
-  // Upload File State
-const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
-const [currentRules, setCurrentRules] = useState(null);
+  const [predictedViolation, setPredictedViolation] = useState("");
+  const [predictedSection, setPredictedSection] = useState("");
+
+    // Upload File State
+  const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
+  const [currentRules, setCurrentRules] = useState(null);
 
   // Violation form state
   const [studentName, setStudentName] = useState("");
@@ -42,6 +43,8 @@ const [currentRules, setCurrentRules] = useState(null);
   const [showMonthModal, setShowMonthModal] = useState(false);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [semester, setSemester] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("");
   
 
   // auto-filled student info fetched from /student?query=
@@ -103,10 +106,12 @@ const downloadFullReport = () => {
   const totalCases = filteredLineData.reduce((sum, item) => sum + item.cases, 0);
   const totalStudents = filteredCourseData.reduce((sum, item) => sum + item.value, 0);
   const totalSectionCases = filteredSectionData.reduce((sum, item) => sum + item.value, 0);
+  
   const paragraphs = [];
+  const schoolYear = `${reportYear}-${reportYear + 1}`; 
 
 paragraphs.push(
-  `This report summarizes guidance-related data for the academic year ${reportYear}. ` +
+  `This report summarizes guidance-related data for the academic school year ${schoolYear}. ` +
   `It includes behavioral cases, student distribution by course, section case counts, and recorded as well as system-predicted violations. ` +
   `The purpose is to help guidance staff understand student behavior trends, identify issues, and improve support programs for students.`
 );
@@ -389,6 +394,7 @@ useEffect(() => {
       ];
 
       const currentYear = selectedYear;
+      const currentSemester = selectedSemester;
 
       // ================= MONTHLY DATA =================
       const monthlyCounts = months.map((m, i) => {
@@ -398,7 +404,8 @@ useEffect(() => {
           return (
             !isNaN(d) &&
             d.getMonth() === i &&
-            d.getFullYear() === currentYear
+            d.getFullYear() === currentYear &&
+            (!currentSemester || currentSemester === "" || v.semester === currentSemester)
           );
         });
 
@@ -432,6 +439,7 @@ useEffect(() => {
       uniqueData.forEach(v => {
         const d = new Date(v.violation_date);
         if (isNaN(d) || d.getFullYear() !== currentYear) return;
+        if (currentSemester && currentSemester !== "" && v.semester !== currentSemester) return;
 
         const sec =
           v.predicted_section && v.predicted_section !== "—"
@@ -459,6 +467,7 @@ useEffect(() => {
         const d = new Date(v.violation_date);
 
         if (isNaN(d) || d.getFullYear() !== currentYear) return;
+        if (currentSemester && currentSemester !== "" && v.semester !== currentSemester) return;
         if (!v.course_year_section) return;
 
         const course =
@@ -501,6 +510,7 @@ useEffect(() => {
         const d = new Date(v.violation_date);
 
         if (isNaN(d) || d.getFullYear() !== currentYear) return;
+        if (currentSemester && currentSemester !== "" && v.semester !== currentSemester) return;
 
         const violation =
           v.predicted_violation && v.predicted_violation !== "—"
@@ -526,6 +536,7 @@ useEffect(() => {
         const d = new Date(v.violation_date);
 
         if (isNaN(d) || d.getFullYear() !== currentYear) return;
+        if (currentSemester && currentSemester !== "" && v.semester !== currentSemester) return;
 
         const violation =
           v.predicted_violation && v.predicted_violation !== "—"
@@ -558,7 +569,8 @@ useEffect(() => {
             return (
               !isNaN(d) &&
               d.getMonth() === i &&
-              d.getFullYear() === currentYear
+              d.getFullYear() === currentYear &&
+              (!currentSemester || currentSemester === "" || v.semester === currentSemester)
             );
           }).length;
 
@@ -594,8 +606,7 @@ useEffect(() => {
   intervalId = setInterval(fetchViolations, 5000);
 
   return () => clearInterval(intervalId);
-
-}, [activePage, selectedYear]);
+}, [activePage, selectedYear, selectedSemester]);
 
 //// ================= HANDLERS =================
 const openMonthDetail = (monthItem) => {
@@ -951,7 +962,7 @@ const menuItems = [
     }
   }
 
-  // ------------------ Fetch Violations ------------------
+ // ------------------ Fetch Violations ------------------
 useEffect(() => {
   fetchViolations();
 }, []);
@@ -959,8 +970,22 @@ useEffect(() => {
 async function fetchViolations() {
   try {
     const res = await fetch("http://localhost:5000/violations");
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
     const data = await res.json();
-    setViolations(Array.isArray(data) ? data : []);
+
+    // extra safety: ensure array + normalize semester field
+    const cleanedData = Array.isArray(data)
+      ? data.map(v => ({
+          ...v,
+          semester: v.semester ?? "—",
+        }))
+      : [];
+
+    setViolations(cleanedData);
   } catch (err) {
     console.error("Error fetching violations:", err);
     setViolations([]);
@@ -999,7 +1024,8 @@ async function handleSubmitViolation() {
     !courseYearSection ||
     !gender ||
     !violationText ||
-    !violationDate
+    !violationDate ||
+    !semester
   ) {
     Swal.fire({
       icon: "warning",
@@ -1021,7 +1047,6 @@ async function handleSubmitViolation() {
 
     const predictData = await predictRes.json();
 
-    //  SERVER ERROR
     if (!predictRes.ok) {
       Swal.fire({
         icon: "error",
@@ -1031,23 +1056,22 @@ async function handleSubmitViolation() {
       return;
     }
 
-    // ==========================
-    // INVALID INPUT (IMPORTANT FIX)
-    // ==========================
     if (predictData.status === "error") {
       await Swal.fire({
         icon: "error",
         title: "Invalid Text",
-        text: predictData.message || "Please enter a valid and meaningful sentence.",
+        text:
+          predictData.message ||
+          "Please enter a valid and meaningful sentence.",
         confirmButtonText: "OK",
         allowOutsideClick: false,
       });
 
-      return; 
+      return;
     }
 
     // ==========================
-    //  STEP 2: PREPARE DATA
+    // STEP 2: PREPARE DATA (FIXED)
     // ==========================
     const newViolation = {
       student_name: studentName,
@@ -1056,6 +1080,7 @@ async function handleSubmitViolation() {
       gender: gender,
       violation_text: violationText,
       violation_date: violationDate,
+      semester: semester,
 
       predicted_violation: predictData?.predicted_violation ?? "",
       predicted_section: predictData?.predicted_section ?? "",
@@ -1094,6 +1119,8 @@ async function handleSubmitViolation() {
       setGender("");
       setViolationText("");
       setViolationDate("");
+      setSemester("");
+
       setStudentInfo(null);
 
       await fetchViolations();
@@ -1926,22 +1953,45 @@ return (
       {/* Trends */}
         {activePage === "trends" && (
           <div className="space-y-8">
-            {/* ================= YEAR DROPDOWN ================= */}
-            <div className="flex items-center justify-end space-x-2">
-              <label className="font-sans font-medium text-gray-700">Select Year:</label>
-              <select
-                className="border rounded px-2 py-1 font-sans"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* ================= YEAR + SEMESTER DROPDOWN ================= */}
+           <div className="flex items-center justify-end space-x-4">
+                {/* School Year */}
+                <div className="flex items-center space-x-2">
+                  <label className="font-sans font-medium text-gray-700">
+                    School Year:
+                  </label>
 
+                  <select
+                    className="border rounded px-2 py-1 font-sans"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}-{y + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Semester Dropdown */}
+                <div className="flex items-center space-x-2">
+                  <label className="font-sans font-medium text-gray-700">
+                    Semester:
+                  </label>
+
+                  <select
+                    className="border rounded px-2 py-1 font-sans"
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    <option value="1st Semester">1st Semester</option>
+                    <option value="2nd Semester">2nd Semester</option>
+                    <option value="Summer">Summer</option>
+                  </select>
+                </div>
+              </div>
             {/* ================= SUMMARY CARDS ================= */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Total Behavioral Cases */}
@@ -3157,9 +3207,25 @@ return (
           <option value="Female">Female</option>
         </select>
       </div>
-
     </div>
+  <div>
+    <label className="block text-sm font-medium text-green-700 mb-1">
+      Semester
+    </label>
 
+    <select
+      value={semester || ""}
+      onChange={(e) => setSemester(e.target.value)}
+      className="w-full p-2 border border-green-400 rounded-lg bg-white
+        focus:ring-2 focus:ring-green-500"
+    >
+      <option value="">Select semester</option>
+
+      <option value="1st Semester">1st Semester</option>
+      <option value="2nd Semester">2nd Semester</option>
+      <option value="Summer">Summer</option>
+    </select>
+  </div>
     {/* INTERVIEW TEXT */}
     <div className="mb-4">
       <label className="block text-sm font-medium text-green-700 mb-1">
@@ -3325,18 +3391,18 @@ return (
 </div>
 )}
    {/* ======================= VIOLATION CARDS ======================= */}
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-  {violations.length === 0 ? (
-    <p className="text-gray-500 col-span-full">No violation records yet.</p>
-  ) : (
-    violations.map((v, idx) => {
-      const date = new Date(v.violation_date);
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const dd = String(date.getDate()).padStart(2, "0");
-      const yy = String(date.getFullYear()).slice(-2);
-      const formattedDate = `${mm}/${dd}/${yy}`;
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+    {violations.length === 0 ? (
+      <p className="text-gray-500 col-span-full">No violation records yet.</p>
+    ) : (
+      violations.map((v, idx) => {
+        const date = new Date(v.violation_date);
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        const yy = String(date.getFullYear()).slice(-2);
+        const formattedDate = `${mm}/${dd}/${yy}`;
 
-      const isResolved = v.is_resolved === "Resolved";
+        const isResolved = v.is_resolved === "Resolved";
 
       return (
         <div
@@ -3372,22 +3438,24 @@ return (
           <p className="text-sm text-gray-400">
             Date: {formattedDate}
           </p>
+          <p className="text-gray-600 mb-1">
+          <span className="font-semibold">Semester:</span> {v.semester || "—"}
+        </p>
+            {/* STATUS LABEL */}
+            <p
+              className={`text-xs mt-2 font-semibold ${
+                isResolved ? "text-green-600" : "text-yellow-600"
+              }`}
+            >
+              {isResolved ? "Resolved" : "Pending"}
+            </p>
+          </div>
+        );
+      })
+    )}
+  </div>
 
-          {/* STATUS LABEL */}
-          <p
-            className={`text-xs mt-2 font-semibold ${
-              isResolved ? "text-green-600" : "text-yellow-600"
-            }`}
-          >
-            {isResolved ? "Resolved" : "Pending"}
-          </p>
-        </div>
-      );
-    })
-  )}
-</div>
-
-    {/* ======================= SWEETALERT VIEW DETAILS ======================= */}
+   {/* ======================= SWEETALERT VIEW DETAILS ======================= */}
     {showViolationDetailsModal && currentViolation && (() => {
       const v = currentViolation;
 
@@ -3411,6 +3479,8 @@ return (
                 new Paragraph(`Student ID: ${v.student_id}`),
                 new Paragraph(`Course/Year/Section: ${v.course_year_section}`),
                 new Paragraph(`Gender: ${v.gender}`),
+                new Paragraph(`Semester: ${v.semester || "—"}`),
+
                 new Paragraph(`Violation: ${v.predicted_violation}`),
                 new Paragraph(`Section: ${v.predicted_section}`),
                 new Paragraph(`Admin Note: ${v.violation_text}`),
@@ -3449,6 +3519,8 @@ return (
             <p><b>Student ID:</b> ${v.student_id}</p>
             <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
             <p><b>Gender:</b> ${v.gender}</p>
+
+            <p><b>Semester:</b> ${v.semester || "—"}</p>
 
             <hr style="margin:10px 0;">
 

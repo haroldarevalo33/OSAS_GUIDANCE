@@ -118,6 +118,11 @@ class Violation(db.Model):
     predictive_text = db.Column(db.Text, nullable=True)
     standard_text = db.Column(db.Text, nullable=True)
 
+    semester = db.Column(
+        db.Enum('1st Semester', '2nd Semester', 'Summer'),
+        nullable=True
+    )
+
     is_resolved = db.Column(db.String(20), nullable=False, default="Pending")
 
     encoded_by = db.Column(

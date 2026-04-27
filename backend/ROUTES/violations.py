@@ -204,6 +204,7 @@ def get_all_violations():
             "student_id": r.student_id,
             "course_year_section": r.course_year_section,
             "gender": r.gender,
+            "semester": r.semester or "",
             "violation_text": r.violation_text,
             "violation_date": (r.violation_date or date.today()).strftime("%Y-%m-%d"),
             "predicted_violation": r.predicted_violation or "—",
@@ -228,7 +229,8 @@ def add_violation():
         "course_year_section",
         "gender",
         "violation_text",
-        "violation_date"
+        "violation_date",
+        "semester"
     ]
 
     for key in required:
@@ -278,12 +280,13 @@ def add_violation():
         student_id=str(data["student_id"]),
         course_year_section=data["course_year_section"],
         gender=data["gender"],
+        semester=data.get("semester"),
         violation_text=text,
         violation_date=parse_date_flexible(data["violation_date"]),
         predicted_violation=pred,
         predicted_section=section,
         predictive_text=top_preds,
-        standard_text=standard_text
+        standard_text=standard_text  
     )
 
     db.session.add(new_record)
@@ -311,6 +314,7 @@ def update_violation(id):
     record.student_id = str(data.get("student_id", record.student_id))
     record.course_year_section = data.get("course_year_section", record.course_year_section)
     record.gender = data.get("gender", record.gender)
+    record.semester = data.get("semester", record.semester)
 
     if "violation_text" in data:
         record.violation_text = data["violation_text"]
@@ -411,7 +415,8 @@ def get_student_summary(student_number):
         "visits": len(records),
         "predicted_violation": latest.predicted_violation or "—",
         "predicted_section": latest.predicted_section or "—",
-        "violation_date": latest.violation_date.strftime("%Y-%m-%d") if latest.violation_date else "—"
+        "violation_date": latest.violation_date.strftime("%Y-%m-%d") if latest.violation_date else "—",
+        "semester": latest.semester or ""
     }), 200
 # ==========================
 # HISTORY 
@@ -436,7 +441,8 @@ def get_student_history(student_number):
         {
             "predicted_violation": r.predicted_violation or "—",
             "predicted_section": r.predicted_section or "—",
-            "violation_date": r.violation_date.strftime("%Y-%m-%d") if r.violation_date else "—"
+            "violation_date": r.violation_date.strftime("%Y-%m-%d") if r.violation_date else "—",
+            "semester": r.semester or "" 
         }
         for r in records
     ]), 200
@@ -465,7 +471,8 @@ def search_violations():
                 db.func.upper(Violation.student_id.cast(db.String)).like(like_q),
                 db.func.upper(Violation.course_year_section).like(like_q),
                 db.func.upper(Violation.violation_text).like(like_q),
-                db.func.upper(Violation.gender).like(like_q)
+                db.func.upper(Violation.gender).like(like_q),
+                db.func.upper(Violation.semester).like(like_q) 
             )
         )
 
@@ -495,6 +502,7 @@ def search_violations():
             "student_id": r.student_id,
             "course_year_section": r.course_year_section,
             "gender": r.gender,
+            "semester": r.semester or "",  
             "violation_text": r.violation_text,
             "violation_date": (r.violation_date or date.today()).strftime("%Y-%m-%d"),
             "predicted_violation": r.predicted_violation,
