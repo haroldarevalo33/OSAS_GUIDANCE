@@ -2748,20 +2748,36 @@ return (
                         <option value="BSFAS">BSFAS</option>
                       </select>
 
-                      {/* Date Range */}
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
-                      />
+                        {/* Date Range */}
+                        <div className="flex items-center gap-4">
 
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
-                      />
+                          <div className="flex items-center gap-2">
+                            <label className="text-blue-700 text-sm font-medium">
+                              From
+                            </label>
+                            <input
+                              type="date"
+                              value={dateFrom}
+                              onChange={(e) => setDateFrom(e.target.value)}
+                              className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow
+                              focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label className="text-blue-700 text-sm font-medium">
+                              To
+                            </label>
+                            <input
+                              type="date"
+                              value={dateTo}
+                              onChange={(e) => setDateTo(e.target.value)}
+                              className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow
+                              focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                        </div>
 
                       {/* Sort ASC / DESC */}
                       <select
@@ -2772,6 +2788,35 @@ return (
                         <option value="ASC">A → Z</option>
                         <option value="DESC">Z → A</option>
                       </select>
+                      {/* Reset Filters Button */}
+                        <button
+                          onClick={() => {
+                            setQuery("");
+                            setCourseFilter("ALL");
+                            setDateFrom("");
+                            setDateTo("");
+                            setSortOrder("ASC");
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
+                        >
+                          {/* refresh icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 4v6h6M20 20v-6h-6M4 10a8 8 0 0114.32-4.906M20 14a8 8 0 01-14.32 4.906"
+                            />
+                          </svg>
+
+                          Reset Filters
+                        </button>
                     </div>
 
                     {/* TABLE */}
@@ -2889,9 +2934,12 @@ return (
                                       title={v.violation_text}
                                     >
                                       {v.violation_text}
+                                      
                                     </div>
                                   </td>
                                 )}
+
+                                
 
                                 {/* ACTIONS */}
                                 <td className="py-3 px-4">
@@ -3881,34 +3929,65 @@ return (
               <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
 
                 {/* ================= FILTER BAR ================= */}
-                <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-lg 
-                border border-green-300 shadow-sm">
+                <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-green-300 shadow-sm">
 
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search student..."
-                    className="flex-1 min-w-[200px] px-3 py-2 border border-green-300 rounded-lg 
-                    focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+                  {/* TOP ROW: Search + Course */}
+                  <div className="flex flex-wrap items-center gap-3">
 
-                  <select
-                    value={courseFilter}
-                    onChange={(e) => setCourseFilter(e.target.value)}
-                    className="px-3 py-2 border border-green-300 rounded-lg bg-white 
-                    focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="all">All Courses</option>
-                      <option value="Bachelor of Elementary Education">Bachelor of Elementary Education</option>
-                        <option value="Bachelor of Secondary Education">Bachelor of Secondary Education</option>
-                        <option value="BS Business Management">BS Business Management</option>
-                        <option value="BS Computer Science">BS Computer Science</option>
-                        <option value="BS Fisheries">BS Fisheries</option>
-                        <option value="BS Hospitality Management">BS Hospitality Management (formerly BS Hotel and Restaurant Management)</option>
-                        <option value="BS Information Technology">BS Information Technology</option>
-                      </select>
-                    <div className="flex items-center gap-2">
+                    {/* SEARCH */}
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search student..."
+                      className="flex-[2] min-w-[250px] px-1 py-2 border border-green-300 rounded-lg 
+                      focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+
+                    {/* COURSE ( */}
+                    <select
+                      value={courseFilter}
+                      onChange={(e) => setCourseFilter(e.target.value)}
+                      className="flex-[1] min-w-[260px] px-3 py-2 border border-green-300 rounded-lg bg-white 
+                      focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="all">All Courses</option>
+
+                      <option value="Bachelor of Elementary Education">
+                        Bachelor of Elementary Education
+                      </option>
+
+                      <option value="Bachelor of Secondary Education">
+                        Bachelor of Secondary Education
+                      </option>
+
+                      <option value="BS Business Management">
+                        BS Business Management
+                      </option>
+
+                      <option value="BS Computer Science">
+                        BS Computer Science
+                      </option>
+
+                      <option value="BS Fisheries">
+                        BS Fisheries
+                      </option>
+
+                      <option value="BS Hospitality Management">
+                        BS Hospitality Management (formerly BS HRM)
+                      </option>
+
+                      <option value="BS Information Technology">
+                        BS Information Technology
+                      </option>
+                    </select>
+
+                </div>
+
+                {/* SECOND ROW: DATE FILTERS */}
+                <div className="flex flex-wrap items-center gap-4">
+
+                  <div className="flex items-center gap-2">
                     <span className="text-green-700 font-medium">From:</span>
                     <input
                       type="date"
@@ -3930,6 +4009,7 @@ return (
                     />
                   </div>
 
+                  {/* SORT */}
                   <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value)}
@@ -3940,7 +4020,37 @@ return (
                     <option value="desc">Sort Z → A</option>
                   </select>
 
+                  {/* RESET */}
+                  <button
+                    onClick={() => {
+                      setQuery("");
+                      setCourseFilter("ALL");
+                      setDateFrom("");
+                      setDateTo("");
+                      setSortOrder("ASC");
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v6h6M20 20v-6h-6M4 10a8 8 0 0114.32-4.906M20 14a8 8 0 01-14.32 4.906"
+                      />
+                    </svg>
+                    Reset Filters
+                  </button>
+
                 </div>
+
+              </div>
 
                 {/* ================= TABLE ================= */}
                 <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
