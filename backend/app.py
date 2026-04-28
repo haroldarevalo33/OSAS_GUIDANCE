@@ -163,7 +163,7 @@ def create_app():
         # ==========================
         # VALIDATION
         # ==========================
-        if is_gibberish(text_proc) or is_weird_phrase(text_proc):
+        if is_weird_phrase(text_proc):
             return jsonify({
                 "input": text,
                 "predicted_violation": "unknown",
@@ -173,7 +173,7 @@ def create_app():
                 "standard_text": "invalid input (Invalid Format detected)"
             })
 
-        if len(text_proc.split()) < 3:
+        if len(text_proc.split()) < 2:
             return jsonify({
                 "input": text,
                 "predicted_violation": "unknown",

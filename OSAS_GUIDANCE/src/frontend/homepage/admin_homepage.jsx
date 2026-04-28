@@ -95,7 +95,7 @@ const downloadFullReport = () => {
   doc.text("Guidance Analytics Report", margin, 20);
 
   // ================= USE SELECTED YEAR =================
-  const reportYear = selectedYear; // <- fix here
+  const reportYear = selectedYear;
 
   // Filtered data
   const filteredLineData = lineData.filter(d => d.year === selectedYear);
