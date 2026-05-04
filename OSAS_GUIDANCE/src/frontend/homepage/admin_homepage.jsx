@@ -3053,6 +3053,7 @@ return (
                                   new Paragraph(`Student ID: ${v.student_id}`),
                                   new Paragraph(`Course/Year/Section: ${v.course_year_section}`),
                                   new Paragraph(`Gender: ${v.gender}`),
+                                  new Paragraph(`Semester: ${v.semester || "—"}`),
                                   new Paragraph(`Violation: ${v.predicted_violation || "—"}`),
                                   new Paragraph(`Section: ${v.predicted_section || "—"}`),
                                   new Paragraph(`Admin Note: ${v.violation_text || "—"}`),
@@ -3069,54 +3070,54 @@ return (
 
           // ===== SWEETALERT POPUP ===== //
          Swal.fire({
-  title: `<strong style="font-size:22px;">Violation Details</strong>`,
-  width: 750,
-  background: "#ffffff",
-  showCloseButton: true,
-  confirmButtonText: "Close",
-  confirmButtonColor: "#d33",
+            title: `<strong style="font-size:22px;">Violation Details</strong>`,
+            width: 750,
+            background: "#ffffff",
+            showCloseButton: true,
+            confirmButtonText: "Close",
+            confirmButtonColor: "#d33",
 
-  showDenyButton: true,
-  denyButtonText: "Download DOCX",
-  denyButtonColor: "#3085d6",
+            showDenyButton: true,
+            denyButtonText: "Download DOCX",
+            denyButtonColor: "#3085d6",
 
-  html: `
-    <div style="text-align:left; font-size:15px;">
+            html: `
+              <div style="text-align:left; font-size:15px;">
 
-      <div style="font-size:20px; font-weight:bold; margin-bottom:10px; text-align:center;">
-        ${v.student_name}
-      </div>
+                <div style="font-size:20px; font-weight:bold; margin-bottom:10px; text-align:center;">
+                  ${v.student_name}
+                </div>
 
-      <hr style="margin:10px 0;">
+                <hr style="margin:10px 0;">
 
-      <p><b>Student ID:</b> ${v.student_id}</p>
-      <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
-      <p><b>Gender:</b> ${v.gender}</p>
-      <p><b>Semester:</b> ${v.semester || "—"}</p>
-      <hr style="margin:10px 0;"
+                <p><b>Student ID:</b> ${v.student_id}</p>
+                <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
+                <p><b>Gender:</b> ${v.gender}</p>
+                <p><b>Semester:</b> ${v.semester || "—"}</p>
+                <hr style="margin:10px 0;"
 
-      <hr style="margin:10px 0;">
+                <hr style="margin:10px 0;">
 
-      <p><b>Violation:</b> ${v.predicted_violation || "—"}</p>
-      <p><b>Section:</b> ${v.predicted_section || "—"}</p>
+                <p><b>Violation:</b> ${v.predicted_violation || "—"}</p>
+                <p><b>Section:</b> ${v.predicted_section || "—"}</p>
 
-      <p style="margin-top:10px;"><b>Admin Note:</b><br>
-      ${v.violation_text || "No violation text available."}</p>
+                <p style="margin-top:10px;"><b>Admin Note:</b><br>
+                ${v.violation_text || "No violation text available."}</p>
 
-      <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
-      ${v.standard_text || "No standard violation text available."}</p>
+                <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
+                ${v.standard_text || "No standard violation text available."}</p>
 
-      <p style="margin-top:10px;"><b>Date:</b> ${v.violation_date || "—"}</p>
+                <p style="margin-top:10px;"><b>Date:</b> ${v.violation_date || "—"}</p>
 
-    </div>
-  `,
-}).then((result) => {
-  if (result.isDenied) {
-    downloadDocx();
-  }
-});
+              </div>
+            `,
+          }).then((result) => {
+            if (result.isDenied) {
+              downloadDocx();
+            }
+          });
 
-setShowViolationDetailsModal(false);
+          setShowViolationDetailsModal(false);
         })()}
         {/* ======================= VIOLATION SECTION ======================= */}
         {activePage === "violation" && (
@@ -3542,7 +3543,6 @@ setShowViolationDetailsModal(false);
                 new Paragraph(`Course/Year/Section: ${v.course_year_section}`),
                 new Paragraph(`Gender: ${v.gender}`),
                 new Paragraph(`Semester: ${v.semester || "—"}`),
-
                 new Paragraph(`Violation: ${v.predicted_violation}`),
                 new Paragraph(`Section: ${v.predicted_section}`),
                 new Paragraph(`Admin Note: ${v.violation_text}`),
