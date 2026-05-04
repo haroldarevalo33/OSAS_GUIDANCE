@@ -2000,7 +2000,7 @@ return (
                 <div className="absolute left-0 top-0 h-full w-1.5 bg-green-600 rounded-l-2xl"></div>
                 <div className="pl-4">
                   <p className="text-sm text-gray-600 font-sans">
-                    Total Behavioral Cases ({selectedYear})
+                    Total Behavioral Cases ({selectedYear}-{selectedYear + 1})
                   </p>
                   <p className="text-3xl font-bold text-green-900 mt-2 font-sans">
                     {lineData
@@ -2021,7 +2021,7 @@ return (
                 <div className="absolute left-0 top-0 h-full w-1.5 bg-yellow-500 rounded-l-2xl"></div>
                 <div className="pl-4">
                   <p className="text-sm text-gray-600 font-sans">
-                    Total Students by Course ({selectedYear})
+                    Total Students by Course ({selectedYear}-{selectedYear + 1})
                   </p>
                   <p className="text-3xl font-bold text-yellow-800 mt-2 font-sans">
                     {courseData
@@ -2041,9 +2041,9 @@ return (
               <div className="relative bg-purple-50 border border-purple-200 rounded-2xl shadow-md p-6">
                 <div className="absolute left-0 top-0 h-full w-1.5 bg-purple-600 rounded-l-2xl"></div>
                 <div className="pl-4">
-                  <p className="text-sm text-gray-600 font-sans">
-                    Total Cases per Section ({selectedYear})
-                  </p>
+               <p className="text-sm text-gray-600 font-sans">
+                  Total Cases per Section ({selectedYear}-{selectedYear + 1})
+                </p>
                   <p className="text-3xl font-bold text-purple-900 mt-2 font-sans">
                     {sectionData
                       .filter((d) => d.year === selectedYear)
@@ -2064,7 +2064,7 @@ return (
 
             <div className="pl-4">
               <p className="text-sm text-gray-600 font-sans">
-                Total Violations ({selectedYear})
+                Total Violations ({selectedYear}-{selectedYear + 1})
               </p>
 
               <p className="text-3xl font-bold text-red-900 mt-2 font-sans">
@@ -2097,7 +2097,7 @@ return (
             {/* LINE CHART */}
             <div className="lg:col-span-2 bg-green-50 border border-green-200 p-6 rounded-xl shadow-sm">
               <h3 className="text-lg font-semibold text-green-800 mb-4 font-sans">
-                Monthly Behavioral Case Trends ({selectedYear})
+                Monthly Behavioral Case Trends ({selectedYear}-{selectedYear + 1})
               </h3>
               <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={lineData.filter((d) => d.year === selectedYear)}>
@@ -2122,7 +2122,7 @@ return (
               {/* PIE CHART */}
               <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-xl shadow-sm">
                 <h3 className="text-lg font-semibold text-yellow-800 mb-4 text-center font-sans">
-                  Course Distribution ({selectedYear})
+                  Course Distribution ({selectedYear}-{selectedYear + 1})
                 </h3>
                 <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
@@ -2154,7 +2154,7 @@ return (
             {/* ================= BAR CHART ================= */}
             <div className="bg-purple-50 border border-purple-200 p-6 rounded-xl shadow-sm">
               <h3 className="text-lg font-semibold text-purple-800 mb-4 font-sans">
-                Case Count Per Section ({selectedYear})
+                Case Count Per Section ({selectedYear}-{selectedYear + 1})
               </h3>
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart
@@ -2204,7 +2204,7 @@ return (
            {/* VIOLATION: PREDICTED LINE CHART */}
           <div className="bg-red-50 border border-red-200 p-6 rounded-xl shadow-sm">
             <h3 className="text-lg font-semibold text-red-800 mb-4 font-sans">
-              Violations Trend ({selectedYear})
+              Violations Trend ({selectedYear}-{selectedYear + 1})
             </h3>
 
             <ResponsiveContainer width="100%" height={320}>
@@ -2235,7 +2235,7 @@ return (
           {/* ================= VIOLATION BAR CHART ================= */}
           <div className="bg-red-50 border border-red-200 p-6 rounded-xl shadow-sm">
             <h3 className="text-lg font-semibold text-red-800 mb-4 font-sans">
-              Violations Per Type ({selectedYear})
+              Violations Per Type ({selectedYear}-{selectedYear + 1})
             </h3>
 
             <ResponsiveContainer width="100%" height={320}>
@@ -2318,7 +2318,7 @@ return (
                 <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
                   Total Behavioral Cases:{" "}
                   {lineData
-                    .filter((d) => d.year === selectedYear)
+                    .filter((d) => d.year === school)
                     .reduce((sum, item) => sum + item.cases, 0)}
                 </h3>
 
@@ -3068,53 +3068,55 @@ return (
                         };
 
           // ===== SWEETALERT POPUP ===== //
-          Swal.fire({
-            title: `<strong style="font-size:22px;">Violation Details</strong>`,
-            width: 750,
-            background: "#ffffff",
-            showCloseButton: true,
-            confirmButtonText: "Close",
-            confirmButtonColor: "#d33",
+         Swal.fire({
+  title: `<strong style="font-size:22px;">Violation Details</strong>`,
+  width: 750,
+  background: "#ffffff",
+  showCloseButton: true,
+  confirmButtonText: "Close",
+  confirmButtonColor: "#d33",
 
-            showDenyButton: true,
-            denyButtonText: "Download DOCX",
-            denyButtonColor: "#3085d6",
+  showDenyButton: true,
+  denyButtonText: "Download DOCX",
+  denyButtonColor: "#3085d6",
 
-            html: `
-              <div style="text-align:left; font-size:15px;">
+  html: `
+    <div style="text-align:left; font-size:15px;">
 
-                <div style="font-size:20px; font-weight:bold; margin-bottom:10px; text-align:center;">
-                  ${v.student_name}
-                </div>
+      <div style="font-size:20px; font-weight:bold; margin-bottom:10px; text-align:center;">
+        ${v.student_name}
+      </div>
 
-                <hr style="margin:10px 0;">
+      <hr style="margin:10px 0;">
 
-                <p><b>Student ID:</b> ${v.student_id}</p>
-                <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
-                <p><b>Gender:</b> ${v.gender}</p>
+      <p><b>Student ID:</b> ${v.student_id}</p>
+      <p><b>Course/Year/Section:</b> ${v.course_year_section}</p>
+      <p><b>Gender:</b> ${v.gender}</p>
+      <p><b>Semester:</b> ${v.semester || "—"}</p>
+      <hr style="margin:10px 0;"
 
-                <hr style="margin:10px 0;">
+      <hr style="margin:10px 0;">
 
-                <p><b>Violation:</b> ${v.predicted_violation || "—"}</p>
-                <p><b>Section:</b> ${v.predicted_section || "—"}</p>
+      <p><b>Violation:</b> ${v.predicted_violation || "—"}</p>
+      <p><b>Section:</b> ${v.predicted_section || "—"}</p>
 
-                <p style="margin-top:10px;"><b>Admin Note:</b><br>
-                ${v.violation_text || "No violation text available."}</p>
+      <p style="margin-top:10px;"><b>Admin Note:</b><br>
+      ${v.violation_text || "No violation text available."}</p>
 
-                <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
-                ${v.standard_text || "No standard violation text available."}</p>
+      <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
+      ${v.standard_text || "No standard violation text available."}</p>
 
-                <p style="margin-top:10px;"><b>Date:</b> ${v.violation_date || "—"}</p>
+      <p style="margin-top:10px;"><b>Date:</b> ${v.violation_date || "—"}</p>
 
-              </div>
-            `,
-          }).then((result) => {
-            if (result.isDenied) {
-              downloadDocx();
-            }
-          });
+    </div>
+  `,
+}).then((result) => {
+  if (result.isDenied) {
+    downloadDocx();
+  }
+});
 
-          setShowViolationDetailsModal(false);
+setShowViolationDetailsModal(false);
         })()}
         {/* ======================= VIOLATION SECTION ======================= */}
         {activePage === "violation" && (
@@ -3353,19 +3355,30 @@ return (
       />
     </div>
 
-    {/* Date */}
-    <div className="mb-6">
-      <label className="block text-sm font-medium text-green-700 mb-1">
-        Date
-      </label>
-      <input
-        type="date"
-        value={violationDate}
-        onChange={(e) => setViolationDate(e.target.value)}
-        className="w-full p-2 border border-green-400 rounded-lg bg-white
-          focus:ring-2 focus:ring-green-500"
-      />
-    </div>
+  {/* Date */}
+  <div className="mb-6">
+    <label className="block text-sm font-medium text-green-700 mb-1">
+      Date
+    </label>
+
+    <input
+      type="date"
+      value={violationDate}
+      onChange={(e) => setViolationDate(e.target.value)}
+      min={new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        1
+      )
+        .toLocaleDateString("en-CA")} 
+      className="w-full p-2 border border-green-400 rounded-lg bg-white
+        focus:ring-2 focus:ring-green-500"
+    />
+
+    <p className="text-xs text-gray-400 mt-1">
+      Only dates from the current month onwards are allowed.
+    </p>
+  </div>
 
     {/* BUTTONS */}
     <div className="flex justify-end gap-2">

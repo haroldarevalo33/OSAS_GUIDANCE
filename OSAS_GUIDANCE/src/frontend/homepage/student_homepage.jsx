@@ -1826,112 +1826,112 @@ useEffect(() => {
 
                         {/* ================= CONTENT CARD ================= */}
                         <div className="bg-green-50 p-4 md:p-6 rounded-2xl shadow-inner">
-{/* PROFILE PIC */}
-<div className="flex flex-col items-center mb-8">
-  <div className="relative group">
+                        {/* PROFILE PIC */}
+                        <div className="flex flex-col items-center mb-8">
+                          <div className="relative group">
 
-    {(() => {
-      const getInitials = (name) => {
-        if (!name) return "S";
+                            {(() => {
+                              const getInitials = (name) => {
+                                if (!name) return "S";
 
-        return name
-          .trim()
-          .split(/\s+/)
-          .map((word) => word[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 3);
-      };
+                                return name
+                                  .trim()
+                                  .split(/\s+/)
+                                  .map((word) => word[0])
+                                  .join("")
+                                  .toUpperCase()
+                                  .slice(0, 3);
+                              };
 
-      const initials = getInitials(studentRecord?.student_name);
+                              const initials = getInitials(studentRecord?.student_name);
 
-      const displayPic =
-        studentRecord?.profile_pic; // 🔥 FIX: REMOVE tempProfilePic
+                              const displayPic =
+                                studentRecord?.profile_pic; // 🔥 FIX: REMOVE tempProfilePic
 
-      return (
-        <img
-          src={
-            displayPic
-              ? displayPic
-              : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  initials
-                )}&bold=true&length=3`
-          }
-          alt="Profile"
-          className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl transition duration-300"
-        />
-      );
-    })()}
+                              return (
+                                <img
+                                  src={
+                                    displayPic
+                                      ? displayPic
+                                      : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                          initials
+                                        )}&bold=true&length=3`
+                                  }
+                                  alt="Profile"
+                                  className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl transition duration-300"
+                                />
+                              );
+                            })()}
 
-    {/* DARK HOVER OVERLAY */}
-    {isEditing && (
-      <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition duration-300"></div>
-    )}
+                            {/* DARK HOVER OVERLAY */}
+                            {isEditing && (
+                              <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition duration-300"></div>
+                            )}
 
-    {/* TRASH ICON */}
-    {isEditing && (
-      <div
-        onClick={handleDeleteProfilePic}
-        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer z-20"
-      >
-        <div className="bg-black/60 rounded-full p-4 backdrop-blur-sm hover:scale-110 transition">
-          <Trash2 className="text-white w-8 h-8" />
-        </div>
-      </div>
-    )}
+                            {/* TRASH ICON */}
+                            {isEditing && (
+                              <div
+                                onClick={handleDeleteProfilePic}
+                                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer z-20"
+                              >
+                                <div className="bg-black/60 rounded-full p-4 backdrop-blur-sm hover:scale-110 transition">
+                                  <Trash2 className="text-white w-8 h-8" />
+                                </div>
+                              </div>
+                            )}
 
-    {/* UPLOAD BUTTON */}
-    {isEditing && (
-      <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg z-30">
-        +
-        <input
-          type="file"
-          className="hidden"
-          accept="image/*"
-          onChange={async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+                            {/* UPLOAD BUTTON */}
+                            {isEditing && (
+                              <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg z-30">
+                                +
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={async (e) => {
+                                    const file = e.target.files[0];
+                                    if (!file) return;
 
-            const formData = new FormData();
-            formData.append("profile_pic", file);
+                                    const formData = new FormData();
+                                    formData.append("profile_pic", file);
 
-            try {
-              const res = await fetch(
-                `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
-                { method: "POST", body: formData }
-              );
+                                    try {
+                                      const res = await fetch(
+                                        `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
+                                        { method: "POST", body: formData }
+                                      );
 
-              const data = await res.json();
+                                      const data = await res.json();
 
-              if (res.ok) {
-   
-                setStudentRecord((prev) => ({
-                  ...prev,
-                  profile_pic: data.profile_pic,
-                }));
+                                      if (res.ok) {
+                          
+                                        setStudentRecord((prev) => ({
+                                          ...prev,
+                                          profile_pic: data.profile_pic,
+                                        }));
 
-                // optional cleanup
-                setTempProfilePic(null);
+                                        // optional cleanup
+                                        setTempProfilePic(null);
 
-                Swal.fire("Success", "Profile updated", "success");
-              } else {
-                Swal.fire("Error", data.message || "Upload failed", "error");
-              }
-            } catch (err) {
-              console.error(err);
-              Swal.fire("Error", "Server error", "error");
-            }
-          }}
-        />
-      </label>
-    )}
+                                        Swal.fire("Success", "Profile updated", "success");
+                                      } else {
+                                        Swal.fire("Error", data.message || "Upload failed", "error");
+                                      }
+                                    } catch (err) {
+                                      console.error(err);
+                                      Swal.fire("Error", "Server error", "error");
+                                    }
+                                  }}
+                                />
+                              </label>
+                            )}
 
-  </div>
+                          </div>
 
-  <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
-    {isEditing ? "Hover image to delete or click + to change" : "Profile Picture"}
-  </p>
-</div>
+                          <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
+                            {isEditing ? "Hover image to delete or click + to change" : "Profile Picture"}
+                          </p>
+                        </div>
                           {/* ================= FIELDS ================= */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
 
@@ -1986,182 +1986,195 @@ useEffect(() => {
                               )}
                             </div>
 
-                          {/* COURSE */}
-                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-gray-200 overflow-hidden">
-                              <p className="text-sm text-gray-500">Course</p>
+                            {/* COURSE */}
+                              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+                                <p className="text-sm text-gray-500">Course</p>
 
-                              {isEditing ? (
-                                <select
-                                  value={selectedCourse}
-                                  onChange={(e) => setSelectedCourse(e.target.value)}
-                                  className="w-full mt-2 border border-gray-300 rounded-lg p-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-gray-600"
-                                >
-                                  <option value="">-- Select Course --</option>
+                                {isEditing ? (
+                                  <select
+                                    value={selectedCourse}
+                                    onChange={(e) => setSelectedCourse(e.target.value)}
+                                    className="w-full mt-2 border border-gray-300 rounded-lg p-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-gray-600"
+                                  >
+                                    <option value="">-- Select Course --</option>
 
-                                  <option value="BS Information Technology">
-                                    BS Information Technology
-                                  </option>
+                                    <option value="BS Information Technology">
+                                      BS Information Technology
+                                    </option>
 
-                                  <option value="BS Computer Science">
-                                    BS Computer Science
-                                  </option>
+                                    <option value="BS Computer Science">
+                                      BS Computer Science
+                                    </option>
 
-                                  <option value="BS Business Management">
-                                    BS Business Management
-                                  </option>
+                                    <option value="BS Business Management">
+                                      BS Business Management
+                                    </option>
 
-                                  <option value="Bachelor of Secondary Education">
-                                    Bachelor of Secondary Education
-                                  </option>
+                                    <option value="Bachelor of Secondary Education">
+                                      Bachelor of Secondary Education
+                                    </option>
 
-                                  <option value="Bachelor of Elementary Education">
-                                    Bachelor of Elementary Education
-                                  </option>
+                                    <option value="Bachelor of Elementary Education">
+                                      Bachelor of Elementary Education
+                                    </option>
 
-                                  <option value="BS Hospitality Management (formerly BS Hotel and Restaurant Management)">
-                                    BS Hospitality Management (formerly BS Hotel and Restaurant Management)
-                                  </option>
+                                    <option value="BS Hospitality Management (formerly BS Hotel and Restaurant Management)">
+                                      BS Hospitality Management (formerly BS Hotel and Restaurant Management)
+                                    </option>
 
-                                  <option value="BS Fisheries">
-                                    BS Fisheries
-                                  </option>
+                                    <option value="BS Fisheries">
+                                      BS Fisheries
+                                    </option>
 
-                                  <option value="Basic Seaman Training Course">
-                                    Basic Seaman Training Course
-                                  </option>
-                                </select>
-                              ) : (
-                                <p className="text-lg md:text-xl font-bold text-green-900 truncate">
-                                  {selectedCourse || "No Course"}
-                                </p>
-                              )}
-                            </div>
-                             {/* PASSWORD */}
-                                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200 md:col-span-2">
-
-                                  <p className="text-sm text-gray-500">Password</p>
-
-                                  {isEditing ? (
-                                    <>
-                                      {/* PASSWORD INPUT */}
-                                      <div className="relative mt-2">
-                                        <input
-                                          type={showPassword ? "text" : "password"}
-                                          value={password}
-                                          onChange={(e) => setPassword(e.target.value)}
-                                          placeholder="Enter new password"
-                                          autoComplete="new-password"
-                                          className="w-full p-2 border rounded-lg text-green-900 pr-10"
-                                        />
-
-                                        <button
-                                          type="button"
-                                          onClick={() => setShowPassword(!showPassword)}
-                                          className="absolute right-3 top-2.5 text-gray-500 hover:text-green-700"
-                                        >
-                                          {showPassword ? (
-                                            <EyeSlashIcon className="w-5 h-5" />
-                                          ) : (
-                                            <EyeIcon className="w-5 h-5" />
-                                          )}
-                                        </button>
-                                      </div>
-
-                                      {/* CONFIRM PASSWORD */}
-                                      <div className="relative mt-3">
-                                        <input
-                                          type={showConfirmPassword ? "text" : "password"}
-                                          value={confirmPassword}
-                                          onChange={(e) => setConfirmPassword(e.target.value)}
-                                          placeholder="Confirm password"
-                                          className="w-full p-2 border rounded-lg text-green-900 pr-10"
-                                        />
-
-                                        <button
-                                          type="button"
-                                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                          className="absolute right-3 top-2.5 text-gray-500 hover:text-green-700"
-                                        >
-                                          {showConfirmPassword ? (
-                                            <EyeSlashIcon className="w-5 h-5" />
-                                          ) : (
-                                            <EyeIcon className="w-5 h-5" />
-                                          )}
-                                        </button>
-                                      </div>
-
-                                      {/* VALIDATIONS */}
-                                      {confirmPassword && password !== confirmPassword && (
-                                        <p className="text-xs mt-1 text-red-500 font-semibold">
-                                          Passwords do not match
-                                        </p>
-                                      )}
-
-                                      {confirmPassword && password === confirmPassword && password && (
-                                        <p className="text-xs mt-1 text-green-600 font-semibold">
-                                          Passwords match
-                                        </p>
-                                      )}
-
-                                      {password && (
-                                        <p className={`text-xs mt-2 font-semibold ${getPasswordStrength(password).color}`}>
-                                          {getPasswordStrength(password).label} password
-                                        </p>
-                                      )}
-
-                                      {password && !/[!@#$%^&*(),.?":{}|<>]/.test(password) && (
-                                        <p className="text-xs mt-1 text-red-500 font-semibold">
-                                          Must include a special character (!@#$ etc.)
-                                        </p>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <div className="mt-2">
-                                      <p className="text-lg md:text-xl font-bold text-green-900 tracking-widest break-all">
-                                        {password ? "•".repeat(Math.min(password.length, 12)) : "••••••••"}
-                                      </p>
-
-                                      {password && (
-                                        <p className={`text-xs mt-1 font-semibold ${getPasswordStrength(password).color}`}>
-                                          {getPasswordStrength(password).label} password
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    Password must include uppercase, numbers, and special characters
+                                    <option value="Basic Seaman Training Course">
+                                      Basic Seaman Training Course
+                                    </option>
+                                  </select>
+                                ) : (
+                                  <p className="text-lg md:text-xl font-bold text-green-900 truncate">
+                                    {selectedCourse || "No Course"}
                                   </p>
-                                </div>
+                                )}
+                              </div>
+                                 {/* STUDENT NUMBER */}
+                                      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200">
+                                        <p className="text-sm text-gray-500">Student Number</p>
 
-                                {/* ================= SAVE BUTTON ================= */}
-                                {isEditing && (
-                                  <div className="mt-6 flex justify-end">
-                                    <button
-                                      onClick={handleSaveChanges}
-                                      disabled={
-                                        password &&
-                                        password.trim() !== "" &&
-                                        password !== confirmPassword
-                                      }
-                                      className={`w-full md:w-auto px-5 py-2 rounded-full text-sm md:text-base text-white transition
-                                        ${
+                                        <p className="text-lg md:text-xl font-bold text-green-900 truncate">
+                                          {studentNumber || "No Student Number"}
+                                        </p>
+
+                                        {/* NOTE */}
+                                        <p className="text-xs text-gray-400 mt-2">
+                                          This is a unique identifier assigned to each student. It is used for official records, tracking academic data, and ensuring accurate identification within the system. This cannot be modified.
+                                        </p>
+                                      </div>
+                                      {/* PASSWORD */}
+                                      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border border-green-200">
+
+                                        <p className="text-sm text-gray-500">Password</p>
+
+                                        {isEditing ? (
+                                          <>
+                                            {/* PASSWORD INPUT */}
+                                            <div className="relative mt-2">
+                                              <input
+                                                type={showPassword ? "text" : "password"}
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder="Enter new password"
+                                                autoComplete="new-password"
+                                                className="w-full p-2 border rounded-lg text-green-900 pr-10"
+                                              />
+
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 top-2.5 text-gray-500 hover:text-green-700"
+                                              >
+                                                {showPassword ? (
+                                                  <EyeSlashIcon className="w-5 h-5" />
+                                                ) : (
+                                                  <EyeIcon className="w-5 h-5" />
+                                                )}
+                                              </button>
+                                            </div>
+
+                                            {/* CONFIRM PASSWORD */}
+                                            <div className="relative mt-3">
+                                              <input
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                placeholder="Confirm password"
+                                                className="w-full p-2 border rounded-lg text-green-900 pr-10"
+                                              />
+
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                className="absolute right-3 top-2.5 text-gray-500 hover:text-green-700"
+                                              >
+                                                {showConfirmPassword ? (
+                                                  <EyeSlashIcon className="w-5 h-5" />
+                                                ) : (
+                                                  <EyeIcon className="w-5 h-5" />
+                                                )}
+                                              </button>
+                                            </div>
+
+                                            {/* VALIDATIONS */}
+                                            {confirmPassword && password !== confirmPassword && (
+                                              <p className="text-xs mt-1 text-red-500 font-semibold">
+                                                Passwords do not match
+                                              </p>
+                                            )}
+
+                                            {confirmPassword && password === confirmPassword && password && (
+                                              <p className="text-xs mt-1 text-green-600 font-semibold">
+                                                Passwords match
+                                              </p>
+                                            )}
+
+                                            {password && (
+                                              <p className={`text-xs mt-2 font-semibold ${getPasswordStrength(password).color}`}>
+                                                {getPasswordStrength(password).label} password
+                                              </p>
+                                            )}
+
+                                            {password && !/[!@#$%^&*(),.?":{}|<>]/.test(password) && (
+                                              <p className="text-xs mt-1 text-red-500 font-semibold">
+                                                Must include a special character (!@#$ etc.)
+                                              </p>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <div className="mt-2">
+                                            <p className="text-lg md:text-xl font-bold text-green-900 tracking-widest break-all">
+                                              {password ? "•".repeat(Math.min(password.length, 12)) : "••••••••"}
+                                            </p>
+
+                                            {password && (
+                                              <p className={`text-xs mt-1 font-semibold ${getPasswordStrength(password).color}`}>
+                                                {getPasswordStrength(password).label} password
+                                              </p>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        <p className="text-xs text-gray-400 mt-1">
+                                          Password must include uppercase, numbers, and special characters
+                                        </p>
+                                      </div>
+
+                                  {/* ================= SAVE BUTTON ================= */}
+                                  {isEditing && (
+                                    <div className="mt-6 flex justify-end">
+                                      <button
+                                        onClick={handleSaveChanges}
+                                        disabled={
                                           password &&
                                           password.trim() !== "" &&
                                           password !== confirmPassword
-                                            ? "bg-gray-400 cursor-not-allowed"
-                                            : "bg-green-700 hover:bg-green-800"
-                                        }`}
-                                    >
-                                      Save Changes
-                                    </button>
-                                  </div>
-                                )}
+                                        }
+                                        className={`w-full md:w-auto px-5 py-2 rounded-full text-sm md:text-base text-white transition
+                                          ${
+                                            password &&
+                                            password.trim() !== "" &&
+                                            password !== confirmPassword
+                                              ? "bg-gray-400 cursor-not-allowed"
+                                              : "bg-green-700 hover:bg-green-800"
+                                          }`}
+                                      >
+                                        Save Changes
+                                      </button>
+                                    </div>
+                                  )}
 
+                          </div>
+                          </div>
                         </div>
-                        </div>
-                      </div>
-                    )}
+                      )}
                   {/* ======================== NOTIFICATIONS PAGE ========================= */}
                   {activePage === "Notifications" && (
                     <div className="w-full">
