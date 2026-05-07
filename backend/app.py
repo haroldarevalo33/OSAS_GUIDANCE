@@ -8,13 +8,20 @@ from extension import db
 import joblib
 from PIL import Image, ImageDraw
 from sklearn.metrics.pairwise import cosine_similarity
-
+from dotenv import load_dotenv
 from routes.violations import get_best_standard_text
 
+env = os.getenv("ENV", "development")
+
+if env == "production":
+    load_dotenv(".env.production", override=True)
+else:
+    load_dotenv(".env.development", override=True)
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object("config.Config")
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["DEBUG"] = True
 
     # ==========================
@@ -260,5 +267,6 @@ if __name__ == "__main__":
     print("\n=== REGISTERED ROUTES ===")
     print(app.url_map)
     print("========================\n")
+    print(os.getenv("DATABASE_URL"))
 
     app.run(debug=True)
