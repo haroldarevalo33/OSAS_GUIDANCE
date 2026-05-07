@@ -1840,13 +1840,13 @@ useEffect(() => {
                                   .map((word) => word[0])
                                   .join("")
                                   .toUpperCase()
-                                  .slice(0, 3);
+                                  .slice(0, 5);
                               };
 
                               const initials = getInitials(studentRecord?.student_name);
 
                               const displayPic =
-                                studentRecord?.profile_pic; // 🔥 FIX: REMOVE tempProfilePic
+                                studentRecord?.profile_pic; //  FIX: REMOVE tempProfilePic
 
                               return (
                                 <img
@@ -1855,7 +1855,7 @@ useEffect(() => {
                                       ? displayPic
                                       : `https://ui-avatars.com/api/?name=${encodeURIComponent(
                                           initials
-                                        )}&bold=true&length=3`
+                                        )}&bold=true&length=5`
                                   }
                                   alt="Profile"
                                   className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl transition duration-300"
