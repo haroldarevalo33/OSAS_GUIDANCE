@@ -3,6 +3,8 @@ import { EyeIcon, EyeSlashIcon, Squares2X2Icon, UserCircleIcon, ArrowRightOnRect
 import Swal from "sweetalert2";
 import { Trash2 } from "lucide-react";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function StudentHome() {
   // Page + data states
   const [activePage, setActivePage] = useState("Info");
@@ -83,7 +85,7 @@ export default function StudentHome() {
     const fetchNews = async () => {
       setNewsLoading(true);
       try {
-        const res = await fetch("http://localhost:5000/api/news");
+        const res = await fetch(`${API}/api/news`);
         const data = await res.json();
         if (data.status === "ok") setNewsArticles(data.articles || []);
         else setNewsArticles([]);
@@ -182,7 +184,7 @@ const handleSaveChanges = async () => {
       payload.password = password;
     }
 
-    const res = await fetch("http://127.0.0.1:5000/students/update", {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/update`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -287,10 +289,7 @@ useEffect(() => {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(
-        `http://127.0.0.1:5000/students/full/${studentNumber}`
-      );
-
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/students/full/${studentNumber}`);
       const data = await res.json();
 
       if (res.ok && data) {
@@ -370,10 +369,9 @@ const handleDeleteProfilePic = async () => {
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(
-        `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
-        { method: "DELETE" }
-      );
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`, {
+      method: "DELETE"
+    }); 
 
       const data = await res.json();
 
@@ -411,9 +409,7 @@ useEffect(() => {
 
   async function fetchSummary() {
     try {
-      const res = await fetch(
-        `http://localhost:5000/violations/summary/${studentNumber}`
-      );
+     const res = await fetch(`${import.meta.env.VITE_API_URL}/violations/summary/${studentNumber}`);
       const data = await res.json();
 
       if (!isMounted) return;
@@ -444,10 +440,7 @@ const refreshHistory = async () => {
   if (!studentNumber) return;
 
   try {
-    const res = await fetch(
-      `http://localhost:5000/violations/history/${studentNumber}`
-    );
-
+   const res = await fetch(`${import.meta.env.VITE_API_URL}/violations/history/${studentNumber}`);
     const data = await res.json();
 
     // IMPORTANT FIX: always normalize empty response
@@ -468,10 +461,7 @@ useEffect(() => {
 
   async function fetchHistory() {
     try {
-      const res = await fetch(
-        `http://localhost:5000/violations/history/${studentNumber}`
-      );
-
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/violations/history/${studentNumber}`);
       const data = await res.json();
 
       if (!isMounted) return;
@@ -516,9 +506,12 @@ function openHistoryModal() {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/students/${studentNumber}/profile-pic`,
-        { method: "POST", body: formData }
-      );
+        `${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`,
+            {
+              method: "POST",
+              body: formData
+            }
+          );
       const data = await res.json();
 
       if (res.ok) {
@@ -534,7 +527,7 @@ function openHistoryModal() {
         });
 
         const updatedProfilePic = data.profile_pic
-          ? `http://localhost:5000/uploads/${data.profile_pic}`
+          ? `${import.meta.env.VITE_API_URL}/uploads/${data.profile_pic}`
           : studentRecord?.profile_pic;
 
         setStudentRecord((prev) => ({ ...prev, profile_pic: updatedProfilePic }));
@@ -571,7 +564,7 @@ function openHistoryModal() {
     if (profilePreview) return profilePreview;
     if (studentRecord?.profile_pic) {
       if (studentRecord.profile_pic.startsWith("http")) return studentRecord.profile_pic;
-      return `http://localhost:5000/uploads/${studentRecord.profile_pic}`;
+      return `${import.meta.env.VITE_API_URL}/uploads/${studentRecord.profile_pic}`;
     }
     return null;
   };
@@ -581,13 +574,13 @@ function openHistoryModal() {
   useEffect(() => {
     async function fetchRules() {
       try {
-        const res = await fetch("http://localhost:5000/file/list");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
         const data = await res.json();
         const rulesFile = (data.files || []).find((f) => f.file_type === "rules");
         if (rulesFile) {
           setCurrentRules({
             name: rulesFile.original,
-            url: `http://localhost:5000/file/download/${rulesFile.stored}`,
+            url: `${import.meta.env.VITE_API_URL}/file/download/${rulesFile.stored}`
           });
         } else {
           setCurrentRules(null);
@@ -600,10 +593,7 @@ function openHistoryModal() {
     fetchRules();
   }, []);
 
-// -------------------------
-// Good Moral Functions
-// -------------------------
-const API_BASE = "http://localhost:5000"; // Flask backend URL
+  const API_BASE = import.meta.env.VITE_API_URL;
 
 // =========================
 // AUTO-FETCH LATEST GOOD MORAL
@@ -826,7 +816,7 @@ useEffect(() => {
 // =========================
 // Constants
 // =========================
-const POLL_INTERVAL = 5000;
+const POLL_INTERVAL = 2000;
 // =========================
 // Fetch unread notification count (backend-based)
 // =========================
@@ -1896,11 +1886,13 @@ useEffect(() => {
                                     formData.append("profile_pic", file);
 
                                     try {
-                                      const res = await fetch(
-                                        `http://127.0.0.1:5000/students/${studentNumber}/profile-pic`,
-                                        { method: "POST", body: formData }
-                                      );
-
+                                     const res = await fetch(
+                                          `${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`,
+                                          {
+                                            method: "POST",
+                                            body: formData
+                                          }
+                                        );
                                       const data = await res.json();
 
                                       if (res.ok) {

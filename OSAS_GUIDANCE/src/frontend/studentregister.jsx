@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 
+ const API = import.meta.env.VITE_API_URL;
+
 export default function StudentRegister() {
   const words = ["TRUTH", "EXCELLENCE", "SERVICE", "EQUALITY"];
   const [index, setIndex] = useState(0);
@@ -127,7 +129,7 @@ if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:5000/students/register", {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

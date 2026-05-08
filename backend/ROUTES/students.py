@@ -8,7 +8,9 @@ import traceback
 import os
 import uuid
 from sqlalchemy import func, and_
+from flask_cors import cross_origin
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # ===========================
 # Blueprint
@@ -56,7 +58,7 @@ def uploaded_file(filename):
 # REGISTER STUDENT
 # ===========================
 @student_bp.route("/register", methods=["POST", "OPTIONS"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def register_student():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -115,7 +117,7 @@ def register_student():
 # LOGIN
 # ===========================
 @student_bp.route("/login", methods=["POST", "OPTIONS"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def login_student():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -158,7 +160,7 @@ def login_student():
 # GET STUDENT BY ID OR NAME
 # ===========================
 @student_bp.route("/student", methods=["GET"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def get_student():
     try:
         query = request.args.get("query", "").strip()
@@ -192,7 +194,7 @@ def get_student():
 # GET ALL STUDENTS
 # ===========================
 @student_bp.route("/all", methods=["GET"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def get_all_students():
     try:
         students = Student.query.all()
@@ -217,7 +219,7 @@ def get_all_students():
 # DELETE STUDENT
 # ===========================
 @student_bp.route("/<int:id>", methods=["DELETE", "OPTIONS"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def delete_student(id):
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -240,7 +242,7 @@ def delete_student(id):
 # GET STUDENT BY NUMBER
 # ===========================
 @student_bp.route("/by-number/<student_number>", methods=["GET"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def get_student_by_number(student_number):
     try:
         student = Student.query.filter_by(student_number=student_number).first()
@@ -271,7 +273,7 @@ def get_student_by_number(student_number):
 # UPDATE PROFILE PIC
 # ===========================
 @student_bp.route("/<student_number>/profile-pic", methods=["POST"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def update_profile_pic(student_number):
     try:
         student = Student.query.filter_by(student_number=student_number).first()
@@ -315,7 +317,7 @@ def update_profile_pic(student_number):
 # DELETE PROFILE PICTURE
 # ===========================
 @student_bp.route("/<student_number>/profile-pic", methods=["DELETE", "OPTIONS"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def delete_profile_pic(student_number):
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -353,7 +355,7 @@ def delete_profile_pic(student_number):
 # UPDATE STUDENT INFO (MANAGE ACCOUNT)
 # ===========================
 @student_bp.route("/update", methods=["PUT", "OPTIONS"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def update_student():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -470,7 +472,7 @@ def get_full_student(student_number):
 # FORGOT / RESET PASSWORD (SHA256 VERSION FIXED)
 # ===========================
 @student_bp.route("/forgot-password", methods=["PUT", "OPTIONS"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def forgot_password():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -536,7 +538,7 @@ def forgot_password():
 # FILTERED STUDENT RECORDS
 # ===========================
 @student_bp.route("/records", methods=["GET"])
-@cross_origin(origin="http://localhost:5173", supports_credentials=True)
+@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
 def get_filtered_records():
     try:
         search = request.args.get("search", "").lower()

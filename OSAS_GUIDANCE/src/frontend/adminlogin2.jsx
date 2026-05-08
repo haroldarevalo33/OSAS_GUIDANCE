@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function AdminLogin2() {
   const words = ["TRUTH", "EXCELLENCE", "SERVICE", "EQUALITY"];
   const [index, setIndex] = useState(0);
@@ -38,7 +40,7 @@ export default function AdminLogin2() {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/admin/login", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

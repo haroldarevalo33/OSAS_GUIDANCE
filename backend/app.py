@@ -22,17 +22,20 @@ def create_app():
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
     app.config["DEBUG"] = True
+    
 
     # ==========================
     # CORS
     # ==========================
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
     CORS(
         app,
-        origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        origins=[FRONTEND_URL],
         supports_credentials=True
     )
-
     # ==========================
     # Upload folder
     # ==========================
@@ -268,5 +271,7 @@ if __name__ == "__main__":
     print(app.url_map)
     print("========================\n")
     print(os.getenv("DATABASE_URL"))
+    print(os.getenv("FRONTEND_URL"))
+    print(os.getenv("SECRET_KEY"))
 
     app.run(debug=True)

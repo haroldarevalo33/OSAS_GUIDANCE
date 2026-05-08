@@ -7,6 +7,8 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function AdminHome() {
   const [activePage, setActivePage] = useState("trends");
   const [query, setQuery] = useState("");
@@ -634,7 +636,7 @@ const uploadFile = async (file, fileType) => {
     formData.append("file_type", fileType);
 
     // Upload file to backend
-    const res = await fetch("http://localhost:5000/file/upload", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/file/upload`, {
       method: "POST",
       body: formData,
     });
@@ -654,7 +656,7 @@ const uploadFile = async (file, fileType) => {
       fileType: fileType,
       stored: data.stored,
       original: data.original,
-      url: `http://localhost:5000/file/download/${data.stored}`, // Backend URL for download
+      url: `${import.meta.env.VITE_API_URL}/file/download/${data.stored}` // Backend URL for download
     };
 
     console.log("UPLOAD SUCCESS:", displayFile);
@@ -685,7 +687,7 @@ const uploadFile = async (file, fileType) => {
 // Function to list all uploaded files
 const listFiles = async () => {
   try {
-    const res = await fetch("http://localhost:5000/file/list");
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
     if (!res.ok) {
       const text = await res.text();
       console.error("Error fetching file list:", res.status, text);
@@ -726,7 +728,7 @@ const displayFiles = (files) => {
 useEffect(() => {
   const fetchSavedFiles = async () => {
     try {
-      const res = await fetch("http://localhost:5000/file/list");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
       if (!res.ok) return;
 
       const data = await res.json();
@@ -739,14 +741,14 @@ useEffect(() => {
       if (goodMoralFile) {
         setCurrentGoodMoral({
           name: goodMoralFile.original,
-          url: `http://localhost:5000/file/download/${goodMoralFile.stored}`,
+          url: `${import.meta.env.VITE_API_URL}/file/download/${goodMoralFile.stored}`,
         });
       }
 
       if (rulesFile) {
         setCurrentRules({
           name: rulesFile.original,
-          url: `http://localhost:5000/file/download/${rulesFile.stored}`,
+          url: `${import.meta.env.VITE_API_URL}/file/download/${rulesFile.stored}`
         });
       }
     } catch (err) {
@@ -761,7 +763,7 @@ useEffect(() => {
 useEffect(() => {
   async function fetchUser() {
     try {
-      const res = await fetch("http://localhost:5000/admin/me?admin_id=1"); 
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/me?admin_id=1`);
       if (!res.ok) throw new Error("Failed to fetch user info");
       const data = await res.json();
 
@@ -802,9 +804,9 @@ useEffect(() => {
 
   try {
     const res = await fetch(
-      `http://localhost:5000/violations/resolve/${v.id}`,
-      { method: "PUT" }
-    );
+    `${import.meta.env.VITE_API_URL}/violations/resolve/${v.id}`,
+    { method: "PUT" }
+   );
 
     if (!res.ok) {
       const data = await res.json();
@@ -876,9 +878,9 @@ async function handleDeleteViolation(v) {
   }).then(async (result) => {
     if (result.isConfirmed) {
       try {
-        const res = await fetch(`http://localhost:5000/violations/${v.id}`, {
-          method: "DELETE",
-        });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/violations/${v.id}`, {
+        method: "DELETE",
+      });
 
         if (res.ok) {
           // Show success toast in top-right
@@ -951,7 +953,7 @@ const menuItems = [
   async function fetchRss() {
     setLoadingRss(true);
     try {
-      const res = await fetch("http://localhost:5000/api/news");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/news`);
       const data = await res.json();
       if (data.status === "ok") setRssItems(data.articles || []);
       else setRssItems([]);
@@ -970,7 +972,7 @@ useEffect(() => {
 
 async function fetchViolations() {
   try {
-    const res = await fetch("http://localhost:5000/violations");
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`);
 
     if (!res.ok) {
       throw new Error(`HTTP error! status: ${res.status}`);
@@ -1094,7 +1096,7 @@ async function handleSubmitViolation() {
     // ==========================
     // STEP 3: SUBMIT
     // ==========================
-    const res = await fetch("http://localhost:5000/violations", {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newViolation),
@@ -1165,7 +1167,7 @@ useEffect(() => {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/students/student?query=${encodeURIComponent(q)}`
+        `${import.meta.env.VITE_API_URL}/students/student?query=${encodeURIComponent(q)}`
       );
 
       const data = await res.json();
@@ -1270,7 +1272,7 @@ const handleConfirmDelete = async () => {
 
   try {
     // DELETE request sa backend
-    const res = await fetch(`http://localhost:5000/students/${deleteStudent.id}`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/${deleteStudent.id}`, {
       method: "DELETE",
     });
 
@@ -1313,7 +1315,7 @@ const handleViewStudent = (student) => {
 const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/students/all"); // adjust URL
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/students/all`); // adjust URL
       const data = await res.json();
       setStudents(data);
     } catch (err) {
@@ -1407,7 +1409,8 @@ const [currentAdminId] = useState(null);
 // ----------------- FETCH PENDING REQUESTS (AUTO-POLLING) -----------------
 const fetchPendingRequests = async () => {
   try {
-    const res = await fetch("http://localhost:5000/good-moral/admin/requests?status=Pending");
+    const res = await fetch(
+  `${import.meta.env.VITE_API_URL}/good-moral/admin/requests?status=Pending`);
     const data = await res.json();
 
     const formatted = data.map((req) => ({
@@ -1435,7 +1438,8 @@ useEffect(() => {
 
 const handleApprove = async (request) => {
   try {
-    const res = await fetch(`http://localhost:5000/good-moral/process/${request.request_id}`, {
+    const res = await fetch(
+     `${import.meta.env.VITE_API_URL}/good-moral/process/${request.request_id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Approved", admin_id: currentAdminId }),
@@ -1473,7 +1477,8 @@ const handleApprove = async (request) => {
 
 const handleReject = async (request) => {
   try {
-    const res = await fetch(`http://localhost:5000/good-moral/process/${request.request_id}`, {
+    const res = await fetch(
+   `${import.meta.env.VITE_API_URL}/good-moral/process/${request.request_id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Rejected", admin_id: currentAdminId }),
@@ -1504,7 +1509,8 @@ const handleReject = async (request) => {
 // Fetch all requests for a student
 const fetchStudentRequests = async (studentNumber) => {
   try {
-    const res = await fetch(`http://localhost:5000/good-moral/history?student_number=${studentNumber}`);
+    const res = await fetch(
+   `${import.meta.env.VITE_API_URL}/good-moral/history?student_number=${studentNumber}`);
     const data = await res.json();
     setStudentRequests(data);
   } catch (err) {
@@ -1536,7 +1542,8 @@ useEffect(() => {
         sort: sortOrder.toUpperCase(),
       });
 
-      const res = await fetch(`http://localhost:5000/students/records?${params}`);
+     const res = await fetch(
+     `${import.meta.env.VITE_API_URL}/students/records?${params}` );
       const data = await res.json();
 
       setStudents(data);
@@ -1564,7 +1571,7 @@ useEffect(() => {
       sort: sortOrder.toUpperCase(),
     });
 
-    const res = await fetch(`http://localhost:5000/students/records?${params}`);
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/records?${params}`);
     const data = await res.json();
 
     setStudents(data);
@@ -1668,7 +1675,7 @@ const fetchFilteredViolations = async () => {
     params.append("sort", sortOrder);
 
     const response = await fetch(
-      `http://localhost:5000/violations/search?${params.toString()}`
+      `${import.meta.env.VITE_API_URL}/violations/search?${params.toString()}`
     );
 
     const data = await response.json();
@@ -1689,40 +1696,41 @@ useEffect(() => {
 
       // TRENDS (Dashboard)
       if (activePage === "trends") {
-        await fetch("http://localhost:5000/violations");
+        await fetch(`${import.meta.env.VITE_API_URL}/violations`);
       }
 
       //  RECORDS
       else if (activePage === "records") {
-        const res = await fetch("http://localhost:5000/students/records");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/students/records`);
         const data = await res.json();
         setStudents(data);
       }
 
       //  SEARCH VIOLATIONS
       else if (activePage === "search") {
-        const res = await fetch("http://localhost:5000/violations");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`);
         const data = await res.json();
         setViolations(data);
       }
 
       //  ENCODE VIOLATION (optional, usually no fetch)
       else if (activePage === "violation") {
-          const res = await fetch("http://localhost:5000/violations");
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`);
           const data = await res.json();
           setViolations(data);
         }
 
       // FILE FORMAT / REQUESTS
       else if (activePage === "uploadFileFormat") {
-        const res = await fetch("http://localhost:5000/good-moral/admin/requests?status=Pending");
+        const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/good-moral/admin/requests?status=Pending`);
         const data = await res.json();
         setPendingRequests(data);
       }
 
       //  NEWS
       else if (activePage === "news") {
-        const res = await fetch("http://localhost:5000/api/news");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/news`);
         const data = await res.json();
         setRssItems(data.articles || []);
       }
@@ -1902,7 +1910,7 @@ return (
 
                       try {
                         const res = await fetch(
-                          "http://localhost:5000/admin/upload_profile",
+                          `${import.meta.env.VITE_API_URL}/admin/upload_profile`,
                           { method: "POST", body: formData }
                         );
 
@@ -3395,7 +3403,7 @@ return (
             setIsLoadingPredict(true);
 
             try {
-              const res = await fetch("http://127.0.0.1:5000/predict", {
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/predict`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text: violationText }),
