@@ -380,7 +380,7 @@ useEffect(() => {
 
   const fetchViolations = async () => {
     try {
-      const res = await fetch("/violations");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`);
       const data = await res.json();
 
       // ================= REMOVE DUPLICATES =================
