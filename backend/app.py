@@ -11,16 +11,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 from routes.violations import get_best_standard_text
 
-
 # ==========================
 # ENV LOADING (FIXED)
 # ==========================
 
 # Load base env first (optional fallback)
-load_dotenv()
-
-ENV = os.getenv("ENV", "production")
-
+load_dotenv(".env.production")
 
 # ==========================
 # AFTER ENV IS READY
