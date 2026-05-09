@@ -168,6 +168,8 @@ if (filteredSectionData.length > 0 && violationData && violationData.length > 0)
     `Overall, there are ${totalSectionCases} cases from all sections combined.`
   );
 }
+
+
 // ================= VIOLATION ANALYSIS (NOW LINKED TO SECTION) =================
 if (violationData && violationData.length > 0) {
 

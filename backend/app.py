@@ -34,11 +34,11 @@ def create_app():
     # ==========================
     # CORS
     # ==========================
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    FRONTEND_URL = os.getenv("FRONTEND_URL")
 
     CORS(
         app,
-        origins=[FRONTEND_URL],
+        resources={r"/*": {"origins": FRONTEND_URL if FRONTEND_URL else "*"}},
         supports_credentials=True
     )
     # ==========================
