@@ -161,6 +161,10 @@ def create_app():
     app.register_blueprint(upload_bp)
     app.register_blueprint(good_moral_bp, url_prefix="/good-moral")
 
+    @app.route("/")
+    def home():
+        return {"message": "Backend is running successfully"}
+
     # ==========================
     # ML ROUTE
     # ==========================
