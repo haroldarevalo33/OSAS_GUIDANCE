@@ -31,24 +31,16 @@ def create_app():
     app.config["DEBUG"] = True
     
 
-   # ==========================
+    # ==========================
     # CORS
     # ==========================
-    FRONTEND_URL = os.getenv("FRONTEND_URL")
-
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://osas-guidance.netlify.app")
     CORS(
         app,
-        resources={r"/*": {"origins": FRONTEND_URL}},
+        resources={r"/*": {"origins": [FRONTEND_URL]}},
         supports_credentials=True
     )
 
-    @app.after_request
-    def after_request(response):
-        response.headers.add("Access-Control-Allow-Origin", "https://osas-guidance.netlify.app")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
-        response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response
     
     # ==========================
     # Upload folder
