@@ -1568,7 +1568,7 @@ useEffect(() => {
             GOOD MORAL COMPONENT
         ========================= */}
         {activePage === "GoodMoral" && (
-          <div className="flex flex-col items-center w-full relative min-h-[400px]">
+          <div className="flex flex-col items-center w-full relative min-h-[400px] px-4">
 
             {/* Title */}
             <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
@@ -1585,7 +1585,7 @@ useEffect(() => {
             {/* Request Form / Status */}
             {!studentRecord?.lastGoodMoralRequest ||
             studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
-              <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md text-center">
+              <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md mx-4 sm:mx-auto text-center">
 
                 {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
                   <p className="text-red-700 font-medium mb-4">
@@ -1655,7 +1655,7 @@ useEffect(() => {
                         );
                       })()}
                     </p>
-                    <div className="w-full border rounded overflow-hidden h-64 mb-2">
+                    <div className="w-full border rounded overflow-hidden h-[300px] aspect-[4/3] sm:h-64 mb-2">
                       <iframe
                         src={currentGoodMoral?.url}
                         className="w-full h-full"
