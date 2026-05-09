@@ -11,6 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 from routes.violations import get_best_standard_text
 
+
 # ==========================
 # ENV LOADING (FIXED)
 # ==========================
@@ -18,13 +19,8 @@ from routes.violations import get_best_standard_text
 # Load base env first (optional fallback)
 load_dotenv()
 
-env = os.getenv("ENV", "development")
+ENV = os.getenv("ENV", "production")
 
-# Load specific env override (if needed)
-if env == "production":
-    load_dotenv(".env.production", override=True)
-elif env == "development":
-    load_dotenv(".env.development", override=True)
 
 # ==========================
 # AFTER ENV IS READY
