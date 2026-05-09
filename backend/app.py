@@ -11,12 +11,25 @@ from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 from routes.violations import get_best_standard_text
 
+# ==========================
+# ENV LOADING (FIXED)
+# ==========================
+
+# Load base env first (optional fallback)
+load_dotenv()
+
 env = os.getenv("ENV", "development")
 
+# Load specific env override (if needed)
 if env == "production":
     load_dotenv(".env.production", override=True)
-else:
+elif env == "development":
     load_dotenv(".env.development", override=True)
+
+# ==========================
+# AFTER ENV IS READY
+# ==========================
+import cloudinary_config
 
 def create_app():
     app = Flask(__name__)
@@ -273,5 +286,6 @@ if __name__ == "__main__":
     print(os.getenv("DATABASE_URL"))
     print(os.getenv("FRONTEND_URL"))
     print(os.getenv("SECRET_KEY"))
+    print("CLOUDINARY URL:", os.getenv("CLOUDINARY_URL"))
 
     app.run(debug=True)

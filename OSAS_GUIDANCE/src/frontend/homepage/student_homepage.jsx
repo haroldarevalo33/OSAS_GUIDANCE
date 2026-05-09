@@ -321,20 +321,16 @@ useEffect(() => {
 
   setLoading(true);
 
-  fetch(`http://127.0.0.1:5000/students/by-number/${studentNumber}`)
+  fetch(`${import.meta.env.VITE_API_URL}/students/by-number/${studentNumber}`)
     .then((res) => res.json())
     .then((data) => {
-      const fixedProfile =
-        data.profile_pic && !data.profile_pic.startsWith("http")
-          ? `http://127.0.0.1:5000/students/uploads/${data.profile_pic}`
-          : data.profile_pic;
+      const fixedProfile = data.profile_pic || null;
 
       setStudentRecord({
         ...data,
         profile_pic: fixedProfile,
       });
 
-  
       setStudentProfile(fixedProfile);
 
       setLoading(false);
@@ -354,8 +350,10 @@ useEffect(() => {
     });
 }, [activePage, studentNumber]);
 
-// delete profile picture
 
+// ==========================
+// DELETE PROFILE PICTURE
+// ==========================
 const handleDeleteProfilePic = async () => {
   Swal.fire({
     title: "Delete Profile Picture?",
@@ -369,24 +367,31 @@ const handleDeleteProfilePic = async () => {
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`, {
-      method: "DELETE"
-    }); 
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const data = await res.json();
 
       if (res.ok) {
         const updatedRes = await fetch(
-          `http://127.0.0.1:5000/students/by-number/${studentNumber}`
+          `${import.meta.env.VITE_API_URL}/students/by-number/${studentNumber}`
         );
 
         const updatedData = await updatedRes.json();
 
+        const fixedProfile = updatedData.profile_pic || null;
+
         setStudentRecord((prev) => ({
           ...prev,
-          ...updatedData, // safe merge
+          ...updatedData,
+          profile_pic: fixedProfile,
         }));
 
+        setStudentProfile(fixedProfile);
         setTempProfilePic(null);
 
         Swal.fire("Deleted!", data.message, "success");
@@ -580,7 +585,7 @@ function openHistoryModal() {
         if (rulesFile) {
           setCurrentRules({
             name: rulesFile.original,
-            url: `${import.meta.env.VITE_API_URL}/file/download/${rulesFile.stored}`
+            url: rulesFile.url,
           });
         } else {
           setCurrentRules(null);

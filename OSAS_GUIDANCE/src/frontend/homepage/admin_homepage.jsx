@@ -626,7 +626,9 @@ const openCourseSections = (courseItem) => {
 const [profilePicPreview, setProfilePicPreview] = useState(null);
 const [user, setUser] = useState({ name: "", email: "", profile_pic:"" });
 
-// Upload file to backend and return display info
+// =========================
+// UPLOAD FILE (CLOUDINARY)
+// =========================
 const uploadFile = async (file, fileType) => {
   if (!file) return null;
 
@@ -635,33 +637,30 @@ const uploadFile = async (file, fileType) => {
     formData.append("file", file);
     formData.append("file_type", fileType);
 
-    // Upload file to backend
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/file/upload`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/file/upload`, {
       method: "POST",
       body: formData,
     });
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("Server returned error:", res.status, text);
+      console.error("Upload error:", res.status, text);
       throw new Error(`Upload failed: ${res.status}`);
     }
 
     const data = await res.json();
 
-    // Prepare the file for display (immediate UI feedback)
     const displayFile = {
       id: data.file_id,
       name: file.name,
       fileType: fileType,
       stored: data.stored,
       original: data.original,
-      url: `${import.meta.env.VITE_API_URL}/file/download/${data.stored}` // Backend URL for download
+      url: data.url, // Cloudinary URL
     };
 
     console.log("UPLOAD SUCCESS:", displayFile);
 
-    // Show SweetAlert2 success toast
     Swal.fire({
       position: "top-end",
       icon: "success",
@@ -669,10 +668,8 @@ const uploadFile = async (file, fileType) => {
       showConfirmButton: false,
       timer: 2000,
       toast: true,
-      timerProgressBar: true,
     });
 
-    // Optionally refresh the file list after upload
     await listFiles();
 
     return displayFile;
@@ -684,71 +681,90 @@ const uploadFile = async (file, fileType) => {
 };
 
 
-// Function to list all uploaded files
+// =========================
+// LIST FILES
+// =========================
 const listFiles = async () => {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
+
     if (!res.ok) {
       const text = await res.text();
-      console.error("Error fetching file list:", res.status, text);
+      console.error("List error:", res.status, text);
       return;
     }
 
     const data = await res.json();
+
     if (data.status !== "success") {
       console.error("Backend error:", data.message);
       return;
     }
 
-    const files = data.files;
-    displayFiles(files); // Display the files in the UI
+    displayFiles(data.files);
   } catch (err) {
     console.error("Error fetching file list:", err);
   }
 };
 
-// Function to display the files
-const displayFiles = (files) => {
-  const fileListContainer = document.getElementById("file-list");
-  if (!fileListContainer) return;
 
-  fileListContainer.innerHTML = ""; // Clear the current list
+// =========================
+// DISPLAY FILES
+// =========================
+const displayFiles = (files) => {
+  const container = document.getElementById("file-list");
+  if (!container) return;
+
+  container.innerHTML = "";
 
   files.forEach((file) => {
-    const fileElement = document.createElement("div");
-    fileElement.classList.add("file-item");
-    fileElement.innerHTML = `
+    const div = document.createElement("div");
+    div.classList.add("file-item");
+
+    div.innerHTML = `
       <p><strong>${file.original}</strong> (${file.size_bytes} bytes)</p>
-      <a href="${file.path || file.url}" download>Download</a>
+      <a href="${file.url}" target="_blank" rel="noopener noreferrer">
+        View / Open
+      </a>
     `;
-    fileListContainer.appendChild(fileElement);
+
+    container.appendChild(div);
   });
 };
 
+
+// =========================
+// LOAD SAVED FILES (REACT)
+// =========================
 useEffect(() => {
   const fetchSavedFiles = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
+
       if (!res.ok) return;
 
       const data = await res.json();
       if (data.status !== "success") return;
 
-      // Assign previously uploaded files to state
-      const goodMoralFile = data.files.find(f => f.file_type === "good_moral");
-      const rulesFile = data.files.find(f => f.file_type === "rules");
+      const goodMoralFile = data.files.find(
+        (f) => f.file_type === "good_moral"
+      );
+
+      const rulesFile = data.files.find(
+        (f) => f.file_type === "rules"
+      );
 
       if (goodMoralFile) {
         setCurrentGoodMoral({
           name: goodMoralFile.original,
-          url: `${import.meta.env.VITE_API_URL}/file/download/${goodMoralFile.stored}`,
+          url: goodMoralFile.url,
         });
       }
 
       if (rulesFile) {
         setCurrentRules({
           name: rulesFile.original,
-          url: `${import.meta.env.VITE_API_URL}/file/download/${rulesFile.stored}`
+          url: rulesFile.url,
         });
       }
     } catch (err) {
@@ -758,7 +774,6 @@ useEffect(() => {
 
   fetchSavedFiles();
 }, []);
-
 //fetch user
 useEffect(() => {
   async function fetchUser() {
@@ -1042,7 +1057,8 @@ async function handleSubmitViolation() {
     // ==========================
     // STEP 1: PREDICT
     // ==========================
-    const predictRes = await fetch("http://127.0.0.1:5000/predict", {
+    const predictRes = await fetch(
+  `${import.meta.env.VITE_API_URL}/predict` , {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: violationText }),

@@ -20,6 +20,7 @@ export default function StudentRegister() {
   const [selectedCourse, setSelectedCourse] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // ================= Course List =================
   const courses = [
@@ -48,87 +49,88 @@ export default function StudentRegister() {
   // =========================
   // Handle registration
   // =========================
- const handleRegister = async () => {
-  // Check empty fields
-  if (
-    !studentNumber ||
-    !studentName ||
-    !email ||
-    !phone ||
-    !selectedCourse ||
-    !password ||
-    !confirmPassword
-  ) {
-    Swal.fire({
-      icon: "warning",
-      title: "Incomplete Form",
-      text: "Please fill out all fields",
-    });
-    return;
-  }
-
-  // STUDENT NAME (NO SPECIAL CHARS)
-if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.test(password)) {
-  Swal.fire({
-    icon: "error",
-    title: "Invalid Password",
-    text: "Password must contain letters, numbers, and at least 1 special character",
-  });
-  return;
-}
-
-  // PHONE (NUMBERS ONLY)
-  if (!/^[0-9]+$/.test(phone)) {
-    Swal.fire({
-      icon: "error",
-      title: "Invalid Phone Number",
-      text: "Numbers only",
-    });
-    return;
-  }
-
-  // Student Number Validation: must be exactly 9 digits
-  if (!/^\d{9}$/.test(studentNumber)) {
-    Swal.fire({
-      icon: "error",
-      title: "Invalid Student Number",
-      text: "Student number must be exactly 9 digits.",
-    });
-    return;
-  }
-
-  // CvSU Email Validation
-  const cvsuEmailRegex = /^([a-zA-Z]+(\.[a-zA-Z]+){1,3})@cvsu\.edu\.ph$/;
-  const normalizedEmail = email.toLowerCase();
-
-  if (!cvsuEmailRegex.test(normalizedEmail)) {
-    Swal.fire({
-      icon: "error",
-      title: "Invalid Email",
-      text: "Only CvSU Email Account (e.g., example@cvsu.edu.ph) are allowed.",
-    });
-    return;
-  }
-
-if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.test(password)) {
-  Swal.fire({
-    icon: "error",
-    title: "Weak Password",
-    text: "Password must contain letters, numbers, and at least 1 special character",
-  });
-  return;
-}
-  // Password Match
-  if (password !== confirmPassword) {
-    Swal.fire({
-      icon: "error",
-      title: "Password Mismatch",
-      text: "Password and Confirm Password do not match.",
-    });
-    return;
-  }
-
+const handleRegister = async () => {
+  // START LOADING
+  setLoading(true);
   try {
+    // Check empty fields
+    if (
+      !studentNumber ||
+      !studentName ||
+      !email ||
+      !phone ||
+      !selectedCourse ||
+      !password ||
+      !confirmPassword
+    ) {
+      Swal.fire({
+        icon: "warning",
+        title: "Incomplete Form",
+        text: "Please fill out all fields",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // PASSWORD VALIDATION
+    if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.test(password)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid Password",
+        text: "Password must contain letters, numbers, and at least 1 special character",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // PHONE
+    if (!/^[0-9]+$/.test(phone)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid Phone Number",
+        text: "Numbers only",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // STUDENT NUMBER
+    if (!/^\d{9}$/.test(studentNumber)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid Student Number",
+        text: "Student number must be exactly 9 digits.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // EMAIL
+    const cvsuEmailRegex = /^([a-zA-Z]+(\.[a-zA-Z]+){1,3})@cvsu\.edu\.ph$/;
+    const normalizedEmail = email.toLowerCase();
+
+    if (!cvsuEmailRegex.test(normalizedEmail)) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid Email",
+        text: "Only CvSU Email Account (e.g., example@cvsu.edu.ph) are allowed.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // PASSWORD MATCH
+    if (password !== confirmPassword) {
+      Swal.fire({
+        icon: "error",
+        title: "Password Mismatch",
+        text: "Password and Confirm Password do not match.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // API CALL
     const res = await fetch(`${import.meta.env.VITE_API_URL}/students/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -165,8 +167,11 @@ if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.
       title: "Server Error",
       text: "Could not connect to backend",
     });
+  } finally {
+    // ALWAYS STOP LOADING
+    setLoading(false);
   }
-}
+};
 
   return (
     <div className="w-screen h-screen bg-gray-900 flex overflow-hidden">
@@ -317,11 +322,38 @@ if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.
             </div>
           {/* BUTTON */}
           <button
-            onClick={handleRegister}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold"
-          >
-            Register
-          </button>
+              onClick={handleRegister}
+              disabled={loading}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold flex items-center justify-center disabled:opacity-60"
+            >
+              {loading ? (
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    d="M4 12a8 8 0 018-8"
+                  />
+                </svg>
+              ) : (
+                "Register"
+              )}
+            </button>
 
           <p className="text-center text-gray-600 mb-10">
             Already have an account?{" "}

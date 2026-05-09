@@ -1,22 +1,25 @@
 import os
 import uuid
 import io
+import requests
+
 from flask import Blueprint, request, jsonify, send_file, current_app
 from models import Student, GoodMoralRequest, UploadedFile, Violation, db
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+
 from pypdf import PdfReader, PdfWriter
+
 
 good_moral_bp = Blueprint("good_moral_bp", __name__, url_prefix="/good-moral")
 
-import io
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from PyPDF2 import PdfReader, PdfWriter
 
-
-
+# ==============================
+# GENERATE GOOD MORAL PDF
+# ==============================
 def generate_good_moral_pdf(template_path, student_name, student_number):
+
     overlay_buffer = io.BytesIO()
     c = canvas.Canvas(overlay_buffer, pagesize=A4)
     width, height = A4
@@ -58,7 +61,7 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
         first_middle = ""
 
     # ==============================
-    # POSITIONS (FIRST COPY)
+    # POSITIONS
     # ==============================
     name_y = height - 152
 
@@ -66,9 +69,6 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
     firstmid_x = 385
     middle_x = 510
 
-    # ==============================
-    # FUNCTION TO DRAW BLOCK
-    # ==============================
     def draw_block(offset_y=0, offset_x=0):
         y = name_y - offset_y
 
@@ -82,25 +82,39 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
 
         c.drawString(260 + offset_x, (height - 178) - offset_y, str(student_number))
 
-    # ==============================
-    # FIRST COPY (NORMAL POSITION)
-    # ==============================
+    # first copy
     draw_block(0, 0)
 
-    # ==============================
-    # SECOND COPY (SHIFTED POSITION)
-    # ==============================
-    draw_block(395, 0)  # ↓ moved down
-
-    # OPTIONAL: kung gusto mo din shift right
-    # draw_block(90, 20)
+    # second copy (duplicate print)
+    draw_block(395, 0)
 
     c.save()
     overlay_buffer.seek(0)
 
-    template_reader = PdfReader(template_path)
+    # ==============================
+    # LOAD TEMPLATE (CLOUDINARY SAFE)
+    # ==============================
+    try:
+        response = requests.get(template_path, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        raise Exception(f"Failed to fetch template from Cloudinary: {str(e)}")
+
+    template_file = io.BytesIO(response.content)
+
+    try:
+        template_reader = PdfReader(template_file)
+    except Exception as e:
+        raise Exception(f"Invalid PDF template: {str(e)}")
+
     overlay_reader = PdfReader(overlay_buffer)
 
+    if not template_reader.pages:
+        raise Exception("Template PDF has no pages")
+
+    # ==============================
+    # MERGE PDF
+    # ==============================
     writer = PdfWriter()
     page = template_reader.pages[0]
     page.merge_page(overlay_reader.pages[0])
@@ -469,15 +483,20 @@ def soft_delete_notification(request_id):
 # =========================
 # Download Good Moral PDF
 # =========================
+# =========================
+# Download Good Moral PDF (FIXED FOR CLOUDINARY)
+# =========================
 @good_moral_bp.get("/download/<int:request_id>")
 def download_certificate(request_id):
     gm_request = GoodMoralRequest.query.get(request_id)
     if not gm_request:
         return jsonify({"message": "Request not found"}), 404
 
+    # auto revoke check
     if auto_revoke_if_violations(gm_request.student_number):
         return jsonify({"message": "Your Good Moral certificate has been revoked due to violations."}), 403
 
+    # must be approved
     if gm_request.status != "Approved":
         return jsonify({"message": "Request not approved"}), 403
 
@@ -485,15 +504,23 @@ def download_certificate(request_id):
     if not student:
         return jsonify({"message": "Student not found"}), 404
 
+    # =========================
+    #  GET TEMPLATE FROM CLOUDINARY (NOT LOCAL FILE)
+    # =========================
     gm_template = UploadedFile.query.filter_by(
         file_type="good_moral"
     ).order_by(UploadedFile.uploaded_at.desc()).first()
 
-    if not gm_template or not os.path.exists(gm_template.path):
+    if not gm_template or not gm_template.path:
         return jsonify({"message": "No Good Moral template uploaded"}), 404
 
+    # =========================
+    # Cloudinary URL USED DIRECTLY
+    # =========================
+    template_path = gm_template.path
+
     pdf = generate_good_moral_pdf(
-        template_path=gm_template.path,
+        template_path=template_path,
         student_name=student.student_name,
         student_number=student.student_number
     )
@@ -506,7 +533,7 @@ def download_certificate(request_id):
     )
 
 # =========================
-# List approved Good Moral files
+# List approved Good Moral files (FIXED)
 # =========================
 @good_moral_bp.get("/student/files")
 def student_files():
@@ -519,13 +546,22 @@ def student_files():
         status="Approved"
     ).order_by(GoodMoralRequest.processed_at.desc()).all()
 
-    result = [dict(
-        request_id=r.request_id,
-        filename_original=r.filename_original,
-        filename_stored=r.filename_stored,
-        processed_at=r.processed_at,
-        remarks=r.remarks,
-        download_url=f"{request.host_url}good-moral/download/{r.request_id}" if r.filename_stored else None
-    ) for r in files]
+    result = []
+    for r in files:
+
+        # =========================
+        # download URL now ALWAYS points to backend route
+        # backend will handle Cloudinary template internally
+        # =========================
+        download_url = f"{request.host_url}good-moral/download/{r.request_id}"
+
+        result.append({
+            "request_id": r.request_id,
+            "filename_original": r.filename_original,
+            "filename_stored": r.filename_stored,
+            "processed_at": r.processed_at,
+            "remarks": r.remarks,
+            "download_url": download_url  # FIXED
+        })
 
     return jsonify(result)

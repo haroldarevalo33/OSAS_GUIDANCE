@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import Swal from "sweetalert2";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function StudentLogin() {
   const words = ["TRUTH", "EXCELLENCE", "SERVICE", "EQUALITY"];
   const [index, setIndex] = useState(0);
@@ -16,6 +18,7 @@ export default function StudentLogin() {
   // ==================
   const [studentNumber, setStudentNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // ==================
   // FORGOT PASSWORD STATES (FIXED)
@@ -54,8 +57,10 @@ export default function StudentLogin() {
       return;
     }
 
+    setLoading(true);
+
     try {
-      const res = await fetch("http://localhost:5000/students/login", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/students/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -96,8 +101,10 @@ export default function StudentLogin() {
         title: "Server Error",
         text: "Unable to connect to server",
       });
+    } finally {
+      setLoading(false); 
     }
-  };
+};
 // ==================
 // FORGOT PASSWORD (FINAL FIXED)
 // ==================
@@ -142,8 +149,7 @@ const handleForgotPassword = async () => {
   }
 
   try {
-    const res = await fetch(
-      "http://localhost:5000/students/forgot-password",
+     const res = await fetch(`${API}/students/forgot-password`,
       {
         method: "PUT",
         headers: {
@@ -384,13 +390,39 @@ return (
           >
             Forgot Password?
           </p>
-
-          <button
-            onClick={handleLogin}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold"
-          >
-            Login
-          </button>
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold flex items-center justify-center disabled:opacity-60"
+            >
+              {loading ? (
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    d="M4 12a8 8 0 018-8"
+                  />
+                </svg>
+              ) : (
+                "Login"
+              )}
+            </button>
 
           <p className="text-center text-gray-600 mt-2">
             Don't have an account?{" "}

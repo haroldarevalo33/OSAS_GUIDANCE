@@ -8,7 +8,11 @@ import traceback
 import os
 import uuid
 from sqlalchemy import func, and_
-from flask_cors import cross_origin
+import cloudinary.uploader
+
+import os
+import cloudinary.uploader
+from flask import Blueprint
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -17,16 +21,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # ===========================
 student_bp = Blueprint("students", __name__, url_prefix="/students")
 
-# ===========================
-# Config
-# ===========================
-UPLOAD_FOLDER = "static/uploads"
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
 def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg", "gif"}
 
 
 # ===========================
@@ -40,25 +36,18 @@ def verify_password(stored, provided):
     return stored == hashlib.sha256(provided.encode()).hexdigest()
 
 
-def profile_url(filename):
-    if not filename:
-        return None
-    return f"http://localhost:5000/students/uploads/{filename}?t={uuid.uuid4().hex}"
-
-
-# ===========================
-# Serve uploaded files
-# ===========================
-@student_bp.route("/uploads/<filename>")
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
+def profile_url(url):
+    """
+    Cloudinary already returns full secure_url.
+    This just ensures safe fallback handling.
+    """
+    return url if url else None
 
 # ===========================
 # REGISTER STUDENT
 # ===========================
 @student_bp.route("/register", methods=["POST", "OPTIONS"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def register_student():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -117,7 +106,7 @@ def register_student():
 # LOGIN
 # ===========================
 @student_bp.route("/login", methods=["POST", "OPTIONS"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def login_student():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -160,7 +149,7 @@ def login_student():
 # GET STUDENT BY ID OR NAME
 # ===========================
 @student_bp.route("/student", methods=["GET"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def get_student():
     try:
         query = request.args.get("query", "").strip()
@@ -194,7 +183,7 @@ def get_student():
 # GET ALL STUDENTS
 # ===========================
 @student_bp.route("/all", methods=["GET"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def get_all_students():
     try:
         students = Student.query.all()
@@ -219,7 +208,7 @@ def get_all_students():
 # DELETE STUDENT
 # ===========================
 @student_bp.route("/<int:id>", methods=["DELETE", "OPTIONS"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def delete_student(id):
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -242,7 +231,7 @@ def delete_student(id):
 # GET STUDENT BY NUMBER
 # ===========================
 @student_bp.route("/by-number/<student_number>", methods=["GET"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def get_student_by_number(student_number):
     try:
         student = Student.query.filter_by(student_number=student_number).first()
@@ -273,7 +262,7 @@ def get_student_by_number(student_number):
 # UPDATE PROFILE PIC
 # ===========================
 @student_bp.route("/<student_number>/profile-pic", methods=["POST"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def update_profile_pic(student_number):
     try:
         student = Student.query.filter_by(student_number=student_number).first()
@@ -288,24 +277,26 @@ def update_profile_pic(student_number):
         if not file.filename:
             return jsonify({"message": "No file selected"}), 400
 
-        if not allowed_file(file.filename):
-            return jsonify({"message": "Invalid file type"}), 400
+        # ☁️ UPLOAD TO CLOUDINARY
+        upload_result = cloudinary.uploader.upload(
+            file,
+            folder="student_profiles"
+        )
 
+        # OPTIONAL: delete old image
         if student.profile_pic:
-            old_file = os.path.join(UPLOAD_FOLDER, student.profile_pic)
-            if os.path.exists(old_file):
-                os.remove(old_file)
+            try:
+                public_id = student.profile_pic.split("/")[-1].split(".")[0]
+                cloudinary.uploader.destroy(f"student_profiles/{public_id}")
+            except:
+                pass
 
-        ext = os.path.splitext(file.filename)[1].lower()
-        filename = f"{uuid.uuid4().hex}{ext}"
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-
-        student.profile_pic = filename
+        student.profile_pic = upload_result["secure_url"]
         db.session.commit()
 
         return jsonify({
             "message": "Profile picture updated successfully",
-            "profile_pic": profile_url(filename)
+            "profile_pic": student.profile_pic
         }), 200
 
     except Exception:
@@ -313,11 +304,11 @@ def update_profile_pic(student_number):
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500
     
-    # ===========================
+# ===========================
 # DELETE PROFILE PICTURE
 # ===========================
 @student_bp.route("/<student_number>/profile-pic", methods=["DELETE", "OPTIONS"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def delete_profile_pic(student_number):
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -328,34 +319,29 @@ def delete_profile_pic(student_number):
         if not student:
             return jsonify({"message": "Student not found"}), 404
 
-        # delete file from server if exists
+        # delete from cloudinary
         if student.profile_pic:
-            file_path = os.path.join(UPLOAD_FOLDER, student.profile_pic)
+            try:
+                public_id = student.profile_pic.split("/")[-1].split(".")[0]
+                cloudinary.uploader.destroy(f"student_profiles/{public_id}")
+            except:
+                pass
 
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-        # remove from database
         student.profile_pic = None
         db.session.commit()
 
-        return jsonify({
-            "message": "Profile picture deleted successfully"
-        }), 200
+        return jsonify({"message": "Profile picture deleted successfully"}), 200
 
     except Exception as e:
         db.session.rollback()
         traceback.print_exc()
-        return jsonify({
-            "message": "Internal Server Error",
-            "error": str(e)
-        }), 500
+        return jsonify({"message": "Internal Server Error"}), 500
     
 # ===========================
 # UPDATE STUDENT INFO (MANAGE ACCOUNT)
 # ===========================
 @student_bp.route("/update", methods=["PUT", "OPTIONS"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def update_student():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -414,7 +400,6 @@ def update_student():
 
             new_password_hash = hashlib.sha256(new_password.encode()).hexdigest()
 
-            # PREVENT SAME PASSWORD
             if new_password_hash == student.password:
                 return jsonify({
                     "message": "New password must be different from current password"
@@ -432,7 +417,7 @@ def update_student():
                 "email": student.email,
                 "phone": student.phone,
                 "course": student.course,
-                "profile_pic": profile_url(student.profile_pic)
+                "profile_pic": student.profile_pic  #  CLOUDINARY DIRECT
             }
         }), 200
 
@@ -461,7 +446,7 @@ def get_full_student(student_number):
             "phone": student.phone,
             "course": student.course,
             "password_hash": student.password,
-            "profile_pic": profile_url(student.profile_pic)
+            "profile_pic": student.profile_pic  
         }), 200
 
     except Exception:
@@ -472,7 +457,7 @@ def get_full_student(student_number):
 # FORGOT / RESET PASSWORD (SHA256 VERSION FIXED)
 # ===========================
 @student_bp.route("/forgot-password", methods=["PUT", "OPTIONS"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def forgot_password():
     if request.method == "OPTIONS":
         return jsonify({"msg": "CORS OK"}), 200
@@ -538,7 +523,7 @@ def forgot_password():
 # FILTERED STUDENT RECORDS
 # ===========================
 @student_bp.route("/records", methods=["GET"])
-@cross_origin(origin="FRONTEND_URL", supports_credentials=True)
+@cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def get_filtered_records():
     try:
         search = request.args.get("search", "").lower()
