@@ -2344,7 +2344,7 @@ return (
                 <h3 className="text-xl font-semibold text-green-800 mb-4 text-center">
                   Total Behavioral Cases:{" "}
                   {lineData
-                    .filter((d) => d.year === school)
+                    .filter((d) => d.year === selectedYear)
                     .reduce((sum, item) => sum + item.cases, 0)}
                 </h3>
 
