@@ -47,66 +47,69 @@ export default function StudentLogin() {
   // ==================
   // LOGIN
   // ==================
-  const handleLogin = async () => {
-    if (!studentNumber || !password) {
+ const handleLogin = async () => {
+  if (!studentNumber || !password) {
+    Swal.fire({
+      icon: "warning",
+      title: "Incomplete Form",
+      text: "Please enter both student number and password",
+    });
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        student_number: studentNumber,
+        password: password,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      localStorage.setItem(
+        "student",
+        JSON.stringify({
+          student_number: data.student.student_number,
+          student_name: data.student.student_name,
+        })
+      );
+
       Swal.fire({
-        icon: "warning",
-        title: "Incomplete Form",
-        text: "Please enter both student number and password",
+        icon: "success",
+        title: "Login Successful",
+        text: data.message,
+        confirmButtonColor: "#22c55e",
+      }).then(() => {
+        navigate("/student_homepage");
       });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/students/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          student_number: studentNumber,
-          password: password,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        localStorage.setItem(
-          "student",
-          JSON.stringify({
-            student_number: data.student.student_number,
-            student_name: data.student.student_name,
-          })
-        );
-
-        Swal.fire({
-          icon: "success",
-          title: "Login Successful",
-          text: data.message,
-          confirmButtonColor: "#22c55e",
-        }).then(() => {
-          navigate("/student_homepage");
-        });
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: data.message || "Invalid credentials",
-        });
-      }
-    } catch (err) {
+    } else {
       Swal.fire({
         icon: "error",
-        title: "Server Error",
-        text: "Unable to connect to server",
+        title: "Error",
+        text: data.message || "Invalid credentials",
       });
-    } finally {
-      setLoading(false); 
     }
+  } catch (err) {
+    Swal.fire({
+      icon: "error",
+      title: "Server Error",
+      text: "Unable to connect to server",
+    });
+  } finally {
+    setLoading(false);
+  }
 };
+
+
+
 // ==================
-// FORGOT PASSWORD (FINAL FIXED)
+// FORGOT PASSWORD
 // ==================
 const handleForgotPassword = async () => {
   if (!studentNumber || !newPass || !confirmPass) {
@@ -127,7 +130,6 @@ const handleForgotPassword = async () => {
     return;
   }
 
-  // REQUIRE at least 1 special character
   const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
 
   if (!specialCharRegex.test(newPass)) {
@@ -148,19 +150,19 @@ const handleForgotPassword = async () => {
     return;
   }
 
+  setLoading(true);
+
   try {
-     const res = await fetch(`${API}/students/forgot-password`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          student_number: studentNumber,
-          new_password: newPass,
-        }),
-      }
-    );
+    const res = await fetch(`${API}/students/forgot-password`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        student_number: studentNumber,
+        new_password: newPass,
+      }),
+    });
 
     const data = await res.json().catch(() => ({}));
 
@@ -189,9 +191,10 @@ const handleForgotPassword = async () => {
       title: "Server Error",
       text: "Cannot connect to backend",
     });
+  } finally {
+    setLoading(false);
   }
 };
-
 return (
 <div className="w-screen h-screen bg-gray-900 flex overflow-visible">
   {showForgotModal && (

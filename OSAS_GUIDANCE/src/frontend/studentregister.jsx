@@ -50,8 +50,10 @@ export default function StudentRegister() {
   // Handle registration
   // =========================
 const handleRegister = async () => {
-  // START LOADING
   setLoading(true);
+
+  const stopLoading = () => setLoading(false);
+
   try {
     // Check empty fields
     if (
@@ -68,7 +70,7 @@ const handleRegister = async () => {
         title: "Incomplete Form",
         text: "Please fill out all fields",
       });
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -79,7 +81,7 @@ const handleRegister = async () => {
         title: "Invalid Password",
         text: "Password must contain letters, numbers, and at least 1 special character",
       });
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -90,7 +92,7 @@ const handleRegister = async () => {
         title: "Invalid Phone Number",
         text: "Numbers only",
       });
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -101,7 +103,7 @@ const handleRegister = async () => {
         title: "Invalid Student Number",
         text: "Student number must be exactly 9 digits.",
       });
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -115,7 +117,7 @@ const handleRegister = async () => {
         title: "Invalid Email",
         text: "Only CvSU Email Account (e.g., example@cvsu.edu.ph) are allowed.",
       });
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -126,7 +128,7 @@ const handleRegister = async () => {
         title: "Password Mismatch",
         text: "Password and Confirm Password do not match.",
       });
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -160,6 +162,7 @@ const handleRegister = async () => {
         text: data.message || "Something went wrong",
       });
     }
+
   } catch (err) {
     console.error(err);
     Swal.fire({
@@ -168,8 +171,7 @@ const handleRegister = async () => {
       text: "Could not connect to backend",
     });
   } finally {
-    // ALWAYS STOP LOADING
-    setLoading(false);
+    stopLoading(); // ALWAYS STOP, success or error
   }
 };
 
@@ -322,11 +324,12 @@ const handleRegister = async () => {
             </div>
           {/* BUTTON */}
           <button
-              onClick={handleRegister}
-              disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold flex items-center justify-center disabled:opacity-60"
-            >
-              {loading ? (
+            onClick={handleRegister}
+            disabled={loading}
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {loading ? (
+              <>
                 <svg
                   className="animate-spin h-5 w-5 text-white"
                   xmlns="http://www.w3.org/2000/svg"
@@ -339,21 +342,21 @@ const handleRegister = async () => {
                     cy="12"
                     r="10"
                     stroke="currentColor"
-                    strokeWidth="2"
+                    strokeWidth="4"
                   />
                   <path
                     className="opacity-75"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    d="M4 12a8 8 0 018-8"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                   />
                 </svg>
-              ) : (
-                "Register"
-              )}
-            </button>
+
+                <span>Registering...</span>
+              </>
+            ) : (
+              "Register"
+            )}
+          </button>
 
           <p className="text-center text-gray-600 mb-10">
             Already have an account?{" "}

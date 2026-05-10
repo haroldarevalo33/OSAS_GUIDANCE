@@ -32,58 +32,69 @@ export default function AdminLogin2() {
   // Handle login
   const handleLogin = async () => {
   setLoading(true);
-    if (!email || !password) {
+
+  if (!email || !password) {
+    setLoading(false);
+    Swal.fire({
+      icon: "warning",
+      title: "Incomplete Form",
+      text: "Please enter both email and password",
+    });
+    return;
+  }
+
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
       Swal.fire({
-        icon: "warning",
-        title: "Incomplete Form",
-        text: "Please enter both email and password",
+        icon: "success",
+        title: "Login Successful",
+        text: data.message,
+        confirmButtonColor: "#22c55e",
+      }).then(() => {
+        setLoading(false);
+        navigate("/admin_homepage");
       });
       return;
     }
 
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email,
-          password: password,
-        }),
-      });
+    setLoading(false);
 
-      const data = await res.json();
-
-      if (res.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Login Successful",
-          text: data.message,
-          confirmButtonColor: "#22c55e",
-        }).then(() => {
-          navigate("/admin_homepage"); // redirect to admin dashboard/home
-        });
-      } else if (res.status === 401) {
-        Swal.fire({
-          icon: "error",
-          title: "Login Failed",
-          text: "Incorrect email or password",
-        });
-      } else {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: data.message || "Something went wrong",
-        });
-      }
-    } catch (err) {
-      console.error(err);
+    if (res.status === 401) {
       Swal.fire({
         icon: "error",
-        title: "Server Error",
-        text: "Could not connect to backend",
+        title: "Login Failed",
+        text: "Incorrect email or password",
+      });
+    } else {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: data.message || "Something went wrong",
       });
     }
-  };
+  } catch (err) {
+    console.error(err);
+
+    setLoading(false);
+
+    Swal.fire({
+      icon: "error",
+      title: "Server Error",
+      text: "Could not connect to backend",
+    });
+  }
+};
 
   return (
     <div className="w-screen h-screen bg-gray-900 flex overflow-hidden">

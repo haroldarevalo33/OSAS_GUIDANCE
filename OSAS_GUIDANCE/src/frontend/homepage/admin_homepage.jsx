@@ -1854,7 +1854,7 @@ return (
   </aside>
 
   {/* ================= MAIN CONTENT ================= */}
-  <main className="bg-gray-200 flex-1 flex flex-col lg:ml-0 ml-0">
+  <main className="bg-gray-200 flex-1 flex flex-col lg:ml-0 ml-0 overflow-auto">
 
     {/* HEADER */}
     <header className="w-full h-16 bg-[#1f2937] text-white shadow-md flex items-center justify-between px-6 relative">
@@ -1978,47 +1978,49 @@ return (
           )}
       
       {/* Trends */}
-        {activePage === "trends" && (
-          <div className="space-y-8">
-            {/* ================= YEAR + SEMESTER DROPDOWN ================= */}
-           <div className="flex items-center justify-end space-x-4">
-                {/* School Year */}
-                <div className="flex items-center space-x-2">
-                  <label className="font-sans font-medium text-gray-700">
-                    School Year:
-                  </label>
+       {activePage === "trends" && (
+        <div className="space-y-8">
 
-                  <select
-                    className="border rounded px-2 py-1 font-sans"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  >
-                    {years.map((y) => (
-                      <option key={y} value={y}>
-                        {y}-{y + 1}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* ================= YEAR + SEMESTER DROPDOWN ================= */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 sm:gap-4 w-full">
 
-                {/* Semester Dropdown */}
-                <div className="flex items-center space-x-2">
-                  <label className="font-sans font-medium text-gray-700">
-                    Semester:
-                  </label>
+            {/* School Year */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
+              <label className="font-sans font-medium text-gray-700 text-sm sm:text-base whitespace-nowrap">
+                School Year:
+              </label>
 
-                  <select
-                    className="border rounded px-2 py-1 font-sans"
-                    value={selectedSemester}
-                    onChange={(e) => setSelectedSemester(e.target.value)}
-                  >
-                    <option value="">All</option>
-                    <option value="1st Semester">1st Semester</option>
-                    <option value="2nd Semester">2nd Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
-                </div>
-              </div>
+              <select
+                className="border rounded px-3 py-2 font-sans w-full sm:w-auto text-sm sm:text-base"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}-{y + 1}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Semester Dropdown */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
+              <label className="font-sans font-medium text-gray-700 text-sm sm:text-base whitespace-nowrap">
+                Semester:
+              </label>
+
+              <select
+                className="border rounded px-3 py-2 font-sans w-full sm:w-auto text-sm sm:text-base"
+                value={selectedSemester}
+                onChange={(e) => setSelectedSemester(e.target.value)}
+              >
+                <option value="">All</option>
+                <option value="1st Semester">1st Semester</option>
+                <option value="2nd Semester">2nd Semester</option>
+                <option value="Summer">Summer</option>
+              </select>
+            </div>
+          </div>
             {/* ================= SUMMARY CARDS ================= */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Total Behavioral Cases */}
@@ -2775,7 +2777,7 @@ return (
                       </select>
 
                         {/* Date Range */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
 
                           <div className="flex items-center gap-2">
                             <label className="text-blue-700 text-sm font-medium">
@@ -2846,7 +2848,7 @@ return (
                     </div>
 
                     {/* TABLE */}
-                    <div className="bg-white shadow-xl rounded-lg overflow-visible border border-blue-300">
+                    <div className="bg-white shadow-xl rounded-lg overflow-x-auto border border-blue-300">
                       <table className="w-full text-left">
                         <thead className="bg-blue-600 text-white">
                           <tr>
@@ -3634,335 +3636,335 @@ return (
   </div>
 )}
 
-    {/* ===== Upload File Section ===== */}
-        {activePage === "uploadFileFormat" && (
-          <div className="flex flex-col items-center mt-9 space-y-6">
+        {/* ===== Upload File Section ===== */}
+      {activePage === "uploadFileFormat" && (
+        <div className="flex flex-col items-center mt-9 space-y-6">
 
-            {/* SIDE-BY-SIDE WRAPPER (EQUAL HEIGHT FIXED) */}
-            <div className="w-full flex justify-center gap-10 items-stretch">
+          {/* SIDE-BY-SIDE WRAPPER (ONLY RESPONSIVE FIX HERE) */}
+          <div className="w-full flex flex-col lg:flex-row justify-center gap-10 items-stretch">
 
-              {/* ================== GOOD MORAL CERTIFICATE UI ================== */}
-              <div className="bg-white shadow-lg rounded-lg p-6 w-[550px] flex flex-col gap-4 h-full ">
+            {/* ================== GOOD MORAL CERTIFICATE UI ================== */}
+            <div className="bg-white shadow-lg rounded-lg p-6 w-full lg:w-[550px] flex flex-col gap-4 h-full">
 
-                <h3 className="text-lg font-semibold text-center">
-                  Good Moral Certificate
-                </h3>
+              <h3 className="text-lg font-semibold text-center">
+                Good Moral Certificate
+              </h3>
 
-                {/* View Request List Button */}
-                <button
-                  className="relative bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 self-end cursor-pointer"
-                  onClick={() => setShowRequestList(true)}
-                >
-                  View Request List
-                  {pendingRequests.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">
-                      {pendingRequests.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* CONTENT AREA */}
-                {currentGoodMoral ? (
-                  <div className="flex flex-col gap-4 w-full flex-1">
-                    {/* FILE BOX */}
-                    <div className="border border-gray-300 flex flex-col gap-1 rounded flex-1">
-
-                      <div className="flex items-center gap-3">
-                        <span className="text-red-600 text-5xl">📄</span>
-
-                        <span
-                          className="truncate font-medium cursor-pointer hover:underline"
-                          onClick={() => setPreviewFile(currentGoodMoral)}
-                        >
-                          Certificate of Good Moral.pdf
-                        </span>
-                      </div>
-
-                      <div className="mt-2 rounded-lg flex-1 overflow-auto flex items-center justify-center p-2 w-full">
-                        <embed
-                          src={currentGoodMoral.url}
-                          type="application/pdf"
-                          className="w-full h-full min-h-[320px]"
-                        />
-                      </div>
-
-                    </div>
-
-                    {/* FIXED CHANGE FILE ALIGNMENT */}
-                    <div className="flex justify-start items-center h-[44px]">
-
-                      <label className="bg-yellow-500 text-white mb-6 px-3 py-1 rounded hover:bg-yellow-600 cursor-pointer">
-                        Change File
-
-                        <input
-                          type="file"
-                          accept="application/pdf"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files[0];
-                            if (!file) return;
-
-                            setCurrentGoodMoral({ name: file.name, file });
-
-                            const uploaded = await uploadFile(file, "good_moral");
-                            if (uploaded?.url) {
-                              setCurrentGoodMoral((prev) => ({
-                                ...prev,
-                                url: uploaded.url,
-                              }));
-                            }
-                          }}
-                        />
-                      </label>
-
-                    </div>
-
-                  </div>
-                ) : (
-                <label className="w-full flex flex-col items-center justify-center rounded-lg p-6 cursor-pointer text-center flex-1 hover:bg-gray-50 transition-colors">
-                    <span className="text-6xl mb-2">📁</span>
-                    <span className="text-gray-500 mb-2">Click here to upload PDF</span>
-
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-
-                        setCurrentGoodMoral({ name: file.name, file });
-
-                        const uploaded = await uploadFile(file, "good_moral");
-                        if (uploaded?.url) {
-                          setCurrentGoodMoral((prev) => ({
-                            ...prev,
-                            url: uploaded.url,
-                          }));
-                        }
-                      }}
-                    />
-
-                    <span className="text-sm text-gray-400">PDF only</span>
-                  </label>
+              {/* View Request List Button */}
+              <button
+                className="relative bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 self-end cursor-pointer"
+                onClick={() => setShowRequestList(true)}
+              >
+                View Request List
+                {pendingRequests.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">
+                    {pendingRequests.length}
+                  </span>
                 )}
-              </div>
+              </button>
 
-              {/* ================== FULLSCREEN FILE PREVIEW ================== */}
-              {previewFile && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                  <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white flex flex-col">
+              {/* CONTENT AREA */}
+              {currentGoodMoral ? (
+                <div className="flex flex-col gap-4 w-full flex-1">
 
-                    <button
-                      onClick={() => setPreviewFile(null)}
-                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white"
-                    >
-                      ✕
-                    </button>
+                  {/* FILE BOX */}
+                  <div className="border border-gray-300 flex flex-col gap-1 rounded flex-1">
 
-                    <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                    <div className="flex items-center gap-3">
+                      <span className="text-red-600 text-5xl">📄</span>
+
+                      <span
+                        className="truncate font-medium cursor-pointer hover:underline"
+                        onClick={() => setPreviewFile(currentGoodMoral)}
+                      >
+                        Certificate of Good Moral.pdf
+                      </span>
+                    </div>
+
+                    <div className="mt-2 rounded-lg flex-1 overflow-auto flex items-center justify-center p-2 w-full">
                       <embed
-                        src={previewFile.url}
+                        src={currentGoodMoral.url}
                         type="application/pdf"
-                        className="w-full min-h-[500px] md:min-h-[600px]"
+                        className="w-full h-full min-h-[320px]"
                       />
                     </div>
 
                   </div>
-                </div>
-              )}
 
-              {/* ================== REQUEST LIST MODAL ================== */}
-              {showRequestList && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                  <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
+                  {/* FIXED CHANGE FILE ALIGNMENT */}
+                  <div className="flex justify-start items-center h-[44px]">
 
-                    <button
-                      onClick={() => setShowRequestList(false)}
-                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white cursor-pointer"
-                    >
-                      ✕
-                    </button>
+                    <label className="bg-yellow-500 text-white mb-6 px-3 py-1 rounded hover:bg-yellow-600 cursor-pointer">
+                      Change File
 
-                    <h3 className="text-xl font-semibold text-center mt-4">
-                      Pending Requests
-                    </h3>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
 
-                    <div className="flex-1 overflow-auto p-4 space-y-2">
-                      {pendingRequests.length === 0 ? (
-                        <p className="text-center text-gray-500">
-                          No pending requests
-                        </p>
-                      ) : (
-                        pendingRequests.map((req, idx) => (
-                          <button
-                            key={idx}
-                            className="w-full text-left border p-2 rounded hover:bg-gray-100"
-                            onClick={() => {
-                              setSelectedRequest(req);
-                              setShowRequestDetails(true);
-                            }}
-                          >
-                            {req.student_name} ({req.student_number}) -{" "}
-                            {req.course || "N/A"}
-                          </button>
-                        ))
-                      )}
-                    </div>
+                          setCurrentGoodMoral({ name: file.name, file });
+
+                          const uploaded = await uploadFile(file, "good_moral");
+                          if (uploaded?.url) {
+                            setCurrentGoodMoral((prev) => ({
+                              ...prev,
+                              url: uploaded.url,
+                            }));
+                          }
+                        }}
+                      />
+                    </label>
 
                   </div>
+
                 </div>
+              ) : (
+                <label className="w-full flex flex-col items-center justify-center rounded-lg p-6 cursor-pointer text-center flex-1 hover:bg-gray-50 transition-colors">
+
+                  <span className="text-6xl mb-2">📁</span>
+                  <span className="text-gray-500 mb-2">Click here to upload PDF</span>
+
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+
+                      setCurrentGoodMoral({ name: file.name, file });
+
+                      const uploaded = await uploadFile(file, "good_moral");
+                      if (uploaded?.url) {
+                        setCurrentGoodMoral((prev) => ({
+                          ...prev,
+                          url: uploaded.url,
+                        }));
+                      }
+                    }}
+                  />
+
+                  <span className="text-sm text-gray-400">PDF only</span>
+                </label>
               )}
+            </div>
 
-              {/* ================== REQUEST DETAILS MODAL ================== */}
-              {showRequestDetails && selectedRequest && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                  <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
+            {/* ================== FULLSCREEN FILE PREVIEW ================== */}
+            {previewFile && (
+              <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="relative w-full max-w-5xl max-h-[90vh] rounded shadow-lg bg-white flex flex-col">
 
-                    <button
-                      onClick={() => setShowRequestDetails(false)}
-                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white cursor-pointer"
-                    >
-                      ✕
-                    </button>
+                  <button
+                    onClick={() => setPreviewFile(null)}
+                    className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white"
+                  >
+                    ✕
+                  </button>
 
-                    <h3 className="text-lg font-semibold mb-4">Request Details</h3>
-
-                    <div className="space-y-2">
-                      <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
-                      <p><strong>Name:</strong> {selectedRequest.student_name}</p>
-                      <p><strong>Course:</strong> {selectedRequest.course || ""}</p>
-                      <p><strong>Status:</strong> {selectedRequest.status}</p>
-
-                      {selectedRequest.status === "Pending" && (
-                        <div className="flex gap-2 mt-4">
-                          <button
-                            className="bg-green-500 text-white px-3 py-1 rounded cursor-pointer"
-                            onClick={() => handleApprove(selectedRequest)}
-                          >
-                            Approve
-                          </button>
-
-                          <button
-                            className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer"
-                            onClick={() => handleReject(selectedRequest)}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
+                  <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+                    <embed
+                      src={previewFile.url}
+                      type="application/pdf"
+                      className="w-full min-h-[500px] md:min-h-[600px]"
+                    />
                   </div>
+
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* ================== REQUEST LIST MODAL ================== */}
+            {showRequestList && (
+              <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="relative w-full max-w-3xl max-h-[80vh] rounded shadow-lg bg-white flex flex-col">
+
+                  <button
+                    onClick={() => setShowRequestList(false)}
+                    className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white cursor-pointer"
+                  >
+                    ✕
+                  </button>
+
+                  <h3 className="text-xl font-semibold text-center mt-4">
+                    Pending Requests
+                  </h3>
+
+                  <div className="flex-1 overflow-auto p-4 space-y-2">
+                    {pendingRequests.length === 0 ? (
+                      <p className="text-center text-gray-500">
+                        No pending requests
+                      </p>
+                    ) : (
+                      pendingRequests.map((req, idx) => (
+                        <button
+                          key={idx}
+                          className="w-full text-left border p-2 rounded hover:bg-gray-100"
+                          onClick={() => {
+                            setSelectedRequest(req);
+                            setShowRequestDetails(true);
+                          }}
+                        >
+                          {req.student_name} ({req.student_number}) -{" "}
+                          {req.course || "N/A"}
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* ================== REQUEST DETAILS MODAL ================== */}
+            {showRequestDetails && selectedRequest && (
+              <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="relative w-full max-w-2xl max-h-[70vh] rounded shadow-lg bg-white flex flex-col p-4">
+
+                  <button
+                    onClick={() => setShowRequestDetails(false)}
+                    className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 text-white cursor-pointer"
+                  >
+                    ✕
+                  </button>
+
+                  <h3 className="text-lg font-semibold mb-4">Request Details</h3>
+
+                  <div className="space-y-2">
+                    <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
+                    <p><strong>Name:</strong> {selectedRequest.student_name}</p>
+                    <p><strong>Course:</strong> {selectedRequest.course || ""}</p>
+                    <p><strong>Status:</strong> {selectedRequest.status}</p>
+
+                    {selectedRequest.status === "Pending" && (
+                      <div className="flex gap-2 mt-4">
+                        <button
+                          className="bg-green-500 text-white px-3 py-1 rounded cursor-pointer"
+                          onClick={() => handleApprove(selectedRequest)}
+                        >
+                          Approve
+                        </button>
+
+                        <button
+                          className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer"
+                          onClick={() => handleReject(selectedRequest)}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
 
             {/* ================== CVSU RULES (PDF ONLY) ================== */}
-              <div className="bg-white shadow-lg rounded mb-20 p-6 w-[550px] flex flex-col gap-4 h-[600px] border border-gray-200">
+            <div className="flex bg-white shadow-lg rounded mb-20 p-6 w-full lg:w-[550px] flex flex-col gap-4 h-full border border-gray-200">
 
-                <h3 className="text-lg font-semibold text-center">
-                  CVSU Rules and Regulations
-                </h3>
+              <h3 className="text-lg font-semibold text-center">
+                CVSU Rules and Regulations
+              </h3>
 
-                {currentRules ? (
-                  <div className="flex flex-col gap-4 w-full flex-1">
+              {currentRules ? (
+                <div className="flex flex-col gap-4 w-full flex-1">
 
-                    {/* FILE PREVIEW BOX */}
-                    <div className="flex flex-col gap-2 border border-gray-300 p-3 rounded flex-1">
+                  {/* FILE PREVIEW BOX */}
+                  <div className="flex flex-col gap-2 border border-gray-300 p-3 rounded flex-1">
 
-                      {/* ICON + NAME */}
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3">
 
-                        <span className="text-red-600 text-4xl">📄</span>
+                      <span className="text-red-600 text-4xl">📄</span>
 
-                        <span
-                          className="truncate font-medium cursor-pointer hover:underline"
-                          onClick={() => setPreviewFile(currentRules)}
-                        >
-                          CVSU Rules and Regulations.pdf
-                        </span>
-
-                      </div>
-
-                      {/* PDF VIEWER */}
-                      <div className="mt-2 border border-gray-300 rounded-lg flex-1 overflow-hidden flex items-center justify-center p-2 w-full bg-gray-50">
-
-                        <embed
-                          src={currentRules.url}
-                          type="application/pdf"
-                          className="w-full h-full min-h-[320px]"
-                        />
-
-                      </div>
+                      <span
+                        className="truncate font-medium cursor-pointer hover:underline"
+                        onClick={() => setPreviewFile(currentRules)}
+                      >
+                        CVSU Rules and Regulations.pdf
+                      </span>
 
                     </div>
 
-                    {/* CHANGE FILE SECTION (PANTAY NA HEIGHT + CENTERED) */}
-                    <div className="flex items-center h-[70px] border-t border-gray-200 pt-3">
+                    <div className="mt-2 border border-gray-300 rounded-lg flex-1 overflow-hidden flex items-center justify-center p-2 w-full bg-gray-50">
 
-                          <label className="bg-yellow-500 mb-4 text-white px-3 py-1 rounded hover:bg-yellow-600 cursor-pointer">
-                        Change File
-
-                        <input
-                          type="file"
-                          accept="application/pdf"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files[0];
-                            if (!file) return;
-
-                            setCurrentRules({ name: file.name, file });
-
-                            const uploaded = await uploadFile(file, "rules");
-                            if (uploaded?.url) {
-                              setCurrentRules((prev) => ({
-                                ...prev,
-                                url: uploaded.url,
-                              }));
-                            }
-                          }}
-                        />
-                      </label>
+                      <embed
+                        src={currentRules.url}
+                        type="application/pdf"
+                        className="w-full h-full min-h-[320px]"
+                      />
 
                     </div>
 
                   </div>
-                ) : (
-                  <label className="w-full flex flex-col tp items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 text-center flex-1">
 
-                    <span className="text-6xl mb-2">📁</span>
-                    <span className="text-gray-500 mb-2">Click here to upload PDF</span>
+                  {/* CHANGE FILE SECTION */}
+                  <div className="flex items-center h-[70px] border-t border-gray-200 pt-3">
 
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
+                    <label className="bg-yellow-500 mb-4 text-white px-3 py-1 rounded hover:bg-yellow-600 cursor-pointer">
+                      Change File
 
-                        setCurrentRules({ name: file.name, file });
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
 
-                        const uploaded = await uploadFile(file, "rules");
-                        if (uploaded?.url) {
-                          setCurrentRules((prev) => ({
-                            ...prev,
-                            url: uploaded.url,
-                          }));
-                        }
-                      }}
-                    />
+                          setCurrentRules({ name: file.name, file });
 
-                    <span className="text-sm text-gray-400">PDF only</span>
+                          const uploaded = await uploadFile(file, "rules");
+                          if (uploaded?.url) {
+                            setCurrentRules((prev) => ({
+                              ...prev,
+                              url: uploaded.url,
+                            }));
+                          }
+                        }}
+                      />
+                    </label>
 
-                  </label>
-                )}
+                  </div>
 
-              </div>
+                </div>
+              ) : (
+                <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 text-center flex-1">
+
+                  <span className="text-6xl mb-2">📁</span>
+                  <span className="text-gray-500 mb-2">Click here to upload PDF</span>
+
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+
+                      setCurrentRules({ name: file.name, file });
+
+                      const uploaded = await uploadFile(file, "rules");
+                      if (uploaded?.url) {
+                        setCurrentRules((prev) => ({
+                          ...prev,
+                          url: uploaded.url,
+                        }));
+                      }
+                    }}
+                  />
+
+                  <span className="text-sm text-gray-400">PDF only</span>
+
+                </label>
+              )}
 
             </div>
+
           </div>
-        )}
+        </div>
+      )}
             {/*STUDENT RECORDS*/}
                 {activePage === "records" && (
               <div className="bg-[#e8f5e9] p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
