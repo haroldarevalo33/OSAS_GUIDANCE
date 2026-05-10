@@ -16,7 +16,7 @@ from routes.violations import get_best_standard_text
 # ==========================
 
 # Load base env first (optional fallback)
-load_dotenv(".env.development")
+load_dotenv(".env.production")
 
 # ==========================
 # AFTER ENV IS READY
@@ -32,16 +32,12 @@ def create_app():
     
 
     # ==========================
-    #==========================
     # CORS
     # ==========================
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    FRONTEND_URL = os.getenv("FRONTEND_URL")
-
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://osasguidance.pages.dev")
     CORS(
         app,
-        origins=[FRONTEND_URL],
-        resources={r"/*": {"origins": FRONTEND_URL}},
+        resources={r"/*": {"origins": [FRONTEND_URL]}},
         supports_credentials=True
     )
 
