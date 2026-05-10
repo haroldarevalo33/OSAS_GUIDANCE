@@ -16,7 +16,7 @@ from routes.violations import get_best_standard_text
 # ==========================
 
 # Load base env first (optional fallback)
-load_dotenv(".env.prodution")
+load_dotenv(".env.production")
 
 # ==========================
 # AFTER ENV IS READY
