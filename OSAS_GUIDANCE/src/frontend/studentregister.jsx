@@ -223,7 +223,7 @@ const handleRegister = async () => {
 
           <label className="text-gray-700 font-medium">Student Number</label>
           <input
-            type="text"
+            type="number"
             value={studentNumber}
             onChange={(e) => setStudentNumber(e.target.value)}
             placeholder="Enter your Student Number"
@@ -250,7 +250,7 @@ const handleRegister = async () => {
 
           <label className="text-gray-700 font-medium">Phone Number</label>
           <input
-            type="text"
+            type="number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Enter phone number"
