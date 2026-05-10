@@ -34,7 +34,7 @@ def create_app():
     # ==========================
     # CORS
     # ==========================
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://osas-guidance.netlify.app")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://osasguidance.pages.dev/")
     CORS(
         app,
         resources={r"/*": {"origins": [FRONTEND_URL]}},
