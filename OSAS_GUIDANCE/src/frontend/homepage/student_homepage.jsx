@@ -1214,54 +1214,54 @@ useEffect(() => {
           </button>
         </nav><br></br>
 
-    {/* DESKTOP LOGOUT BUTTON */}
-    <div className="px-4 pb-6 mt-auto">
-      <button
-        onClick={() => {
-      Swal.fire({
-        title: "Logout",
-        text: "Are you sure you want to log out?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Logout",
-        cancelButtonText: "Cancel",
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-      }).then((result) => {
-        if (result.isConfirmed) {
-
-          
+        {/* DESKTOP LOGOUT BUTTON */}
+        <div className="px-4 pb-6 mt-auto">
+          <button
+            onClick={() => {
           Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "success",
-            title: "Logged out successfully",
-            showConfirmButton: false,
-            timer: 500,
-            timerProgressBar: true,
-          });
+            title: "Logout",
+            text: "Are you sure you want to log out?",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Logout",
+            cancelButtonText: "Cancel",
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+          }).then((result) => {
+            if (result.isConfirmed) {
 
-          // DELAY REDIRECT
-          setTimeout(() => {
-            localStorage.removeItem("student");
-            window.location.href = "/";
-          }, 500);
-        }
-      });
-    }}
-    className="
-      flex items-center justify-center gap-3 
-      w-full py-3
-      bg-red-600 text-white 
-      rounded-lg shadow-md 
-      hover:bg-red-700 
-      transition-all select-none
-    "
-  >
-    <ArrowRightOnRectangleIcon className="w-6 h-6" />
-    <span className="text-base font-semibold">Logout</span>
-  </button>
-</div>
+              
+              Swal.fire({
+                toast: true,
+                position: "top-end",
+                icon: "success",
+                title: "Logged out successfully",
+                showConfirmButton: false,
+                timer: 500,
+                timerProgressBar: true,
+              });
+
+              // DELAY REDIRECT
+              setTimeout(() => {
+                localStorage.removeItem("student");
+                window.location.href = "/";
+              }, 500);
+            }
+          });
+        }}
+        className="
+          flex items-center justify-center gap-3 
+          w-full py-3
+          bg-red-600 text-white 
+          rounded-lg shadow-md 
+          hover:bg-red-700 
+          transition-all select-none
+        "
+      >
+        <ArrowRightOnRectangleIcon className="w-6 h-6" />
+        <span className="text-base font-semibold">Logout</span>
+      </button>
+    </div>
      </aside>
 
       {/* Sidebar drawer for mobile */}
@@ -1408,72 +1408,103 @@ useEffect(() => {
               {/* placeholder so header spacing matches desktop */}
             </div>
           </div>
-    {/* Right: user avatar */}
-    <div className="relative">
-      <div
-        onClick={() => setAccountModal(!accountModal)}
-        className="cursor-pointer flex items-center gap-2 p-2 rounded-full hover:bg-gray-700/40"
-      >
-        {studentRecord?.profile_pic ? (
-          <img
-            src={studentRecord.profile_pic}
-            alt="user"
-            className="w-10 h-10 rounded-full object-cover border border-gray-400"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
-            {studentRecord?.student_name
-              ? studentRecord.student_name
-                  .trim()
-                  .split(" ")
-                  .map((word) => word[0])
-                  .join("")
-                  .toUpperCase()
-              : "S"}
-          </div>
-        )}
-      </div>
+        {/* Right: user avatar */}
+        <div className="relative flex items-center">
 
-      {accountModal && (
-        <div className="absolute right-0 mt-2 w-72 bg-[#1f2937] text-white rounded-xl shadow-xl p-5 z-50 border border-gray-700">
-          <div className="flex flex-col items-center">
-
-            <div className="relative">
-              {studentRecord?.profile_pic ? (
-                <img
-                  src={studentRecord.profile_pic}
-                  alt="user"
-                  className="w-10 h-10 rounded-full object-cover border border-gray-400"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
-                  {studentRecord?.student_name
-                    ? studentRecord.student_name
-                        .trim()
-                        .split(" ")
-                        .map((word) => word[0])
-                        .join("")
-                        .toUpperCase()
-                    : "S"}
-                </div>
-              )}
-            </div>
-                  <p className="mt-3 text-lg text-white">
-                    Hi, <span className="font-bold">{studentRecord?.student_name || "—"}</span>
-                  </p>
-
-                  <p className="text-sm text-gray-300 mb-1">
-                    {studentRecord?.student_number}
-                  </p>
-
-                  <p className="text-sm text-gray-300 mb-1">
-                    {studentRecord?.course || "—"}
-                  </p>
-
-                </div>
+          {/* Avatar Button */}
+          <div
+            onClick={() => setAccountModal(!accountModal)}
+            className="cursor-pointer flex items-center justify-center
+                      p-1 sm:p-2 rounded-full hover:bg-gray-700/40
+                      transition"
+          >
+            {studentRecord?.profile_pic ? (
+              <img
+                src={studentRecord.profile_pic}
+                alt="user"
+                className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11
+                          rounded-full object-cover border border-gray-400"
+              />
+            ) : (
+              <div
+                className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11
+                          rounded-full bg-green-600 text-white
+                          flex items-center justify-center font-bold
+                          text-sm sm:text-base"
+              >
+                {studentRecord?.student_name
+                  ? studentRecord.student_name
+                      .trim()
+                      .split(" ")
+                      .map((word) => word[0])
+                      .join("")
+                      .toUpperCase()
+                  : "S"}
               </div>
             )}
           </div>
+
+          {/* Dropdown Modal */}
+          {accountModal && (
+            <div
+              className="absolute right-0 top-full mt-2
+                        w-[260px] sm:w-72
+                        bg-[#1f2937] text-white
+                        rounded-xl shadow-xl p-4 sm:p-5
+                        z-50 border border-gray-700"
+            >
+
+              <div className="flex flex-col items-center text-center">
+
+                {/* Avatar inside modal */}
+                <div className="mb-2">
+                  {studentRecord?.profile_pic ? (
+                    <img
+                      src={studentRecord.profile_pic}
+                      alt="user"
+                      className="w-12 h-12 sm:w-14 sm:h-14
+                                rounded-full object-cover border border-gray-400"
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 sm:w-14 sm:h-14
+                                rounded-full bg-green-600 text-white
+                                flex items-center justify-center font-bold"
+                    >
+                      {studentRecord?.student_name
+                        ? studentRecord.student_name
+                            .trim()
+                            .split(" ")
+                            .map((word) => word[0])
+                            .join("")
+                            .toUpperCase()
+                        : "S"}
+                    </div>
+                  )}
+                </div>
+
+                {/* Name */}
+                <p className="mt-2 text-base sm:text-lg text-white break-words">
+                  Hi,{" "}
+                  <span className="font-bold">
+                    {studentRecord?.student_name || "—"}
+                  </span>
+                </p>
+
+                {/* Student Number */}
+                <p className="text-xs sm:text-sm text-gray-300 break-words">
+                  {studentRecord?.student_number}
+                </p>
+
+                {/* Course */}
+                <p className="text-xs sm:text-sm text-gray-300 break-words">
+                  {studentRecord?.course || "—"}
+                </p>
+
+              </div>
+            </div>
+          )}
+        </div>
         </header>
 
         {/*Dashboard*/}
@@ -1637,85 +1668,113 @@ useEffect(() => {
                   )}
                 </div>
 
-              {/* Approved Good Moral File Preview */}
-                {currentGoodMoral && !isRevoked && (
-                  <div className="border rounded-lg p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4">
-                    <p className="text-gray-800 font-semibold truncate">
-                      {(() => {
-                        const name = currentGoodMoral.name || "Good Moral Certificate";
-                        const parts = name.split(".");
-                        if (parts.length === 1) return name; // no extension
-                        const extension = parts.pop(); // remove last item
-                        const baseName = parts.join("."); // join rest safely
-                        return (
-                          <>
-                            {baseName}
-                            {extension && <span className="font-bold">.{extension}</span>}
-                          </>
-                        );
-                      })()}
-                    </p>
-                    <div className="w-full border rounded overflow-hidden h-[300px] aspect-[4/3] sm:h-64 mb-2">
-                      <iframe
-                        src={currentGoodMoral?.url}
-                        className="w-full h-full"
-                        title={currentGoodMoral?.name || "Good Moral Certificate Preview"}
-                      />
-                    </div>
+             {/* Approved Good Moral File Preview */}
+              {currentGoodMoral && !isRevoked && (
+                <div className="border rounded-lg p-3 sm:p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4 w-full">
 
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => window.open(currentGoodMoral?.url, "_blank")}
-                        className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
-                      >
-                        View File
-                      </button>
-                    </div>
+                  {/* FILE NAME */}
+                  <p className="text-gray-800 font-semibold break-words text-sm sm:text-base">
+                    {(() => {
+                      const name = currentGoodMoral.name || "Good Moral Certificate";
+                      const parts = name.split(".");
+                      if (parts.length === 1) return name;
+
+                      const extension = parts.pop();
+                      const baseName = parts.join(".");
+
+                      return (
+                        <>
+                          {baseName}
+                          {extension && <span className="font-bold">.{extension}</span>}
+                        </>
+                      );
+                    })()}
+                  </p>
+
+                  {/* PDF PREVIEW */}
+                  <div className="w-full border rounded overflow-hidden 
+                                  h-[220px] sm:h-[280px] md:h-[300px] 
+                                  aspect-auto sm:aspect-[4/3]">
+
+                    <iframe
+                      src={currentGoodMoral?.url}
+                      className="w-full h-full"
+                      title={currentGoodMoral?.name || "Good Moral Certificate Preview"}
+                    />
                   </div>
-                )}
 
-                {/* Cancel Pending Request */}
-                {studentRecord?.lastGoodMoralRequest?.status === "Pending" && !isRevoked && (
-                  <button
-                    onClick={() => {
-                      Swal.fire({
-                        title: "Are you sure?",
-                        text: "Do you want to cancel your Good Moral request?",
-                        icon: "warning",
-                        showCancelButton: true,
-                        confirmButtonColor: "#3085d6",
-                        cancelButtonColor: "#d33",
-                        confirmButtonText: "Yes, cancel it!",
-                      }).then((result) => {
-                        if (result.isConfirmed) {
-                          fetch(`${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`, { method: "DELETE" })
-                            .then(res => {
-                              if (res.ok) {
-                                Swal.fire({
-                                  toast: true,
-                                  position: "top-end",
-                                  icon: "success",
-                                  title: "Request cancelled!",
-                                  showConfirmButton: false,
-                                  timer: 500,
-                                });
-                                setTimeout(() => window.location.reload(), 500);
-                              } else {
-                                Swal.fire({ toast: true, position: "top-end", icon: "error", title: "Failed to cancel request", showConfirmButton: false, timer: 1500 });
-                              }
-                            })
-                            .catch(() => {
-                              Swal.fire({ toast: true, position: "top-end", icon: "error", title: "Failed to cancel request", showConfirmButton: false, timer: 1500 });
+                  {/* BUTTON */}
+                  <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+
+                    <button
+                      onClick={() => window.open(currentGoodMoral?.url, "_blank")}
+                      className="w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
+                    >
+                      View File
+                    </button>
+
+                  </div>
+                </div>
+              )}
+
+              {/* CANCEL REQUEST */}
+              {studentRecord?.lastGoodMoralRequest?.status === "Pending" && !isRevoked && (
+                <button
+                  onClick={() => {
+                    Swal.fire({
+                      title: "Are you sure?",
+                      text: "Do you want to cancel your Good Moral request?",
+                      icon: "warning",
+                      showCancelButton: true,
+                      confirmButtonColor: "#3085d6",
+                      cancelButtonColor: "#d33",
+                      confirmButtonText: "Yes, cancel it!",
+                    }).then((result) => {
+                      if (result.isConfirmed) {
+                        fetch(
+                          `${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`,
+                          { method: "DELETE" }
+                        )
+                          .then(res => {
+                            if (res.ok) {
+                              Swal.fire({
+                                toast: true,
+                                position: "top-end",
+                                icon: "success",
+                                title: "Request cancelled!",
+                                showConfirmButton: false,
+                                timer: 800,
+                              });
+                              setTimeout(() => window.location.reload(), 800);
+                            } else {
+                              Swal.fire({
+                                toast: true,
+                                position: "top-end",
+                                icon: "error",
+                                title: "Failed to cancel request",
+                                showConfirmButton: false,
+                                timer: 1500
+                              });
+                            }
+                          })
+                          .catch(() => {
+                            Swal.fire({
+                              toast: true,
+                              position: "top-end",
+                              icon: "error",
+                              title: "Failed to cancel request",
+                              showConfirmButton: false,
+                              timer: 1500
                             });
-                        }
-                      });
-                    }}
-                    className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
-                  >
-                    Cancel Request
-                  </button>
-                )}
-
+                          });
+                      }
+                    });
+                  }}
+                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 text-sm sm:text-base"
+                >
+                  Cancel Request
+                </button>
+              )}
               </div>
             )}
           </div>
