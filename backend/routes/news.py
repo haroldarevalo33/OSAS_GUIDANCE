@@ -33,7 +33,13 @@ def get_news():
             "source": entry.get("source", {}).get("title", "Unknown")
         })
 
-    CACHE["data"] = articles
-    CACHE["timestamp"] = now
+    #  IMPORTANT FIX: only update cache if NOT empty
+    if articles:
+        CACHE["data"] = articles
+        CACHE["timestamp"] = now
+
+    #  fallback: if RSS failed, return old cache
+    if not articles and CACHE["data"]:
+        return jsonify({"status": "ok", "articles": CACHE["data"]})
 
     return jsonify({"status": "ok", "articles": articles})
