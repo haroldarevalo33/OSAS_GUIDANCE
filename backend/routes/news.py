@@ -1,19 +1,39 @@
 from flask import Blueprint, jsonify
 import feedparser
+import time
 
 news_bp = Blueprint("news", __name__, url_prefix="/api")
+
+CACHE = {
+    "data": [],
+    "timestamp": 0
+}
+
+CACHE_TIME = 300  # 5 minutes
 
 
 @news_bp.get("/news")
 def get_news():
-    feed = feedparser.parse("https://news.google.com/rss?hl=en-PH&gl=PH&ceid=PH:en")
+    now = time.time()
+
+    # return cached data if still valid
+    if CACHE["data"] and now - CACHE["timestamp"] < CACHE_TIME:
+        return jsonify({"status": "ok", "articles": CACHE["data"]})
+
+    feed = feedparser.parse(
+        "https://news.google.com/rss?hl=en-PH&gl=PH&ceid=PH:en"
+    )
+
     articles = []
 
     for entry in feed.entries[:10]:
         articles.append({
-            "title": entry.title,
-            "link": entry.link,
+            "title": getattr(entry, "title", "No title"),
+            "link": getattr(entry, "link", "#"),
             "source": entry.get("source", {}).get("title", "Unknown")
         })
+
+    CACHE["data"] = articles
+    CACHE["timestamp"] = now
 
     return jsonify({"status": "ok", "articles": articles})
