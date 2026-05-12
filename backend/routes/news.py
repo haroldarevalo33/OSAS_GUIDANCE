@@ -6,14 +6,27 @@ news_bp = Blueprint("news", __name__, url_prefix="/api")
 
 @news_bp.get("/news")
 def get_news():
-    feed = feedparser.parse("https://news.google.com/rss?hl=en-PH&gl=PH&ceid=PH:en")
+    feeds = [
+        ("https://data.gmanetwork.com/gno/rss/news/feed.xml", "GMA News"),
+        ("https://news.abs-cbn.com/rss/latest-news", "ABS-CBN News"),
+        ("https://www.inquirer.net/feed", "Philippine Daily Inquirer"),
+        ("https://www.philstar.com/rss/headlines", "Philstar"),
+        ("https://www.manilatimes.net/feed", "Manila Times")
+    ]
+
     articles = []
 
-    for entry in feed.entries[:10]:
-        articles.append({
-            "title": entry.title,
-            "link": entry.link,
-            "source": entry.get("source", {}).get("title", "Unknown")
-        })
+    for url, source_name in feeds:
+        feed = feedparser.parse(url)
 
-    return jsonify({"status": "ok", "articles": articles})
+        for entry in feed.entries[:5]:
+            articles.append({
+                "title": entry.get("title", ""),
+                "link": entry.get("link", ""),
+                "source": source_name
+            })
+
+    return jsonify({
+        "status": "ok",
+        "articles": articles
+    })
