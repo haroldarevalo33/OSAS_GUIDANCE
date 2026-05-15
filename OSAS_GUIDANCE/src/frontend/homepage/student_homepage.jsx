@@ -46,6 +46,8 @@ export default function StudentHome() {
   const [hasShownRevokeAlert, setHasShownRevokeAlert] = useState(false);
   const [violationsCount, setViolationsCount] = useState(0);
   const [canSubmit,setCanSubmit] = useState(false);
+  const [loadingGoodMoral, setLoadingGoodMoral] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   // notifications
   const [currentGoodMoral, setCurrentGoodMoral] = useState(null);
@@ -58,6 +60,10 @@ export default function StudentHome() {
   const [currentRules, setCurrentRules] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
 
+  // Update Info
+  const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
+  const [deletingProfilePic, setDeletingProfilePic] = useState(false);
+  const [savingChanges, setSavingChanges] = useState(false);
   // Responsive sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -108,6 +114,9 @@ const isPasswordValid = password && confirmPassword && isPasswordMatch;
 // GET All Student Manage Account
 const handleSaveChanges = async () => {
   try {
+    // START LOADING
+    setSavingChanges(true);
+
     if (!studentNumber) {
       Swal.fire({
         toast: true,
@@ -118,9 +127,11 @@ const handleSaveChanges = async () => {
         timer: 1500,
         timerProgressBar: true,
       });
+
+      setSavingChanges(false); // FIX: stop loading
       return;
     }
-
+    
     const isPasswordMatch = password === confirmPassword;
 
     if (password && password.trim() !== "") {
@@ -137,6 +148,8 @@ const handleSaveChanges = async () => {
           showConfirmButton: false,
           timer: 2000,
         });
+
+        setSavingChanges(false); // FIX
         return;
       }
 
@@ -150,6 +163,8 @@ const handleSaveChanges = async () => {
           showConfirmButton: false,
           timer: 2000,
         });
+
+        setSavingChanges(false); // FIX
         return;
       }
 
@@ -163,12 +178,10 @@ const handleSaveChanges = async () => {
           showConfirmButton: false,
           timer: 2000,
         });
+
+        setSavingChanges(false); // FIX
         return;
       }
-
-      // ================= SAME PASSWORD CHECK =================
-      //  REMOVED FRONTEND HASH CHECK (WRONG APPROACH)
-      // Backend na ang magva-validate nito (correct & secure)
     }
 
     // ================= PAYLOAD =================
@@ -201,6 +214,8 @@ const handleSaveChanges = async () => {
         showConfirmButton: false,
         timer: 1500,
       });
+
+      setSavingChanges(false); // FIX
       return;
     }
 
@@ -250,6 +265,10 @@ const handleSaveChanges = async () => {
       showConfirmButton: false,
       timer: 1500,
     });
+
+  } finally {
+    // SAFETY NET (IMPORTANT)
+    setSavingChanges(false);
   }
 };
 // =========================
@@ -351,9 +370,6 @@ useEffect(() => {
 }, [activePage, studentNumber]);
 
 
-// ==========================
-// DELETE PROFILE PICTURE
-// ==========================
 const handleDeleteProfilePic = async () => {
   Swal.fire({
     title: "Delete Profile Picture?",
@@ -367,6 +383,8 @@ const handleDeleteProfilePic = async () => {
     if (!result.isConfirmed) return;
 
     try {
+      setDeletingProfilePic(true);
+
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`,
         {
@@ -401,6 +419,8 @@ const handleDeleteProfilePic = async () => {
     } catch (err) {
       console.error(err);
       Swal.fire("Error", "Server error", "error");
+    } finally {
+      setDeletingProfilePic(false);
     }
   });
 };
@@ -739,17 +759,31 @@ const fetchLatestGoodMoral = async () => {
 // =========================
 // SUBMIT GOOD MORAL REQUEST
 // =========================
+
+
 const submitGoodMoralRequest = async (file) => {
   if (!studentNumber) {
-    Swal.fire({ icon: "error", title: "Error", text: "Student number is missing" });
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Student number is missing",
+    });
     return;
   }
+
   if (!file) {
-    Swal.fire({ icon: "error", title: "Error", text: "Please select a file to upload" });
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Please select a file to upload",
+    });
     return;
   }
 
   try {
+    // START LOADING
+    setLoadingGoodMoral(true);
+
     const formData = new FormData();
     formData.append("student_number", studentNumber);
     formData.append("certificate_file", file);
@@ -769,9 +803,14 @@ const submitGoodMoralRequest = async (file) => {
           text: data.message || "You have reached 3 violations.",
           confirmButtonText: "OK",
         });
+
         setActivePage("Info");
+
+        // STOP LOADING
+        setLoadingGoodMoral(false);
         return;
       }
+
       throw new Error(data.message || "Failed to submit request");
     }
 
@@ -788,11 +827,16 @@ const submitGoodMoralRequest = async (file) => {
 
   } catch (err) {
     console.error(err);
+
     Swal.fire({
       icon: "error",
       title: "Error",
       text: err.message || "Something went wrong",
     });
+
+  } finally {
+    // END LOADING
+    setLoadingGoodMoral(false);
   }
 };
 
@@ -1595,46 +1639,52 @@ useEffect(() => {
               )}
             </>
           )}
-        {/* =========================
-            GOOD MORAL COMPONENT
-        ========================= */}
-        {activePage === "GoodMoral" && (
-          <div className="flex flex-col items-center w-full relative min-h-[400px] px-4">
+      {/* =========================
+           GOOD MORAL COMPONENT
+      ========================= */}
+      {activePage === "GoodMoral" && (
+        <div className="flex flex-col items-center w-full relative min-h-[400px] px-4">
 
-            {/* Title */}
-            <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
+          {/* Title */}
+          <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
             Good Moral Certificate
-            </h2>
+          </h2>
 
-            {/* Revoke Banner */}
-            {isRevoked && (
-              <div className="w-full max-w-lg bg-red-100 border border-red-600 text-red-800 p-4 rounded-xl mb-6 text-center font-semibold">
-                Your Good Moral Certificate has been revoked due to multiple violations.
-              </div>
-            )}
+          {/* Revoke Banner */}
+          {isRevoked && (
+            <div className="w-full max-w-lg bg-red-100 border border-red-600 text-red-800 p-4 rounded-xl mb-6 text-center font-semibold">
+              Your Good Moral Certificate has been revoked due to multiple violations.
+            </div>
+          )}
 
-            {/* Request Form / Status */}
-            {!studentRecord?.lastGoodMoralRequest ||
-            studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
-              <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md mx-4 sm:mx-auto text-center">
+          {/* Request Form / Status */}
+          {!studentRecord?.lastGoodMoralRequest ||
+          studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
+            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md mx-4 sm:mx-auto text-center">
 
-                {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
-                  <p className="text-red-700 font-medium mb-4">
-                    Remarks: {studentRecord?.lastGoodMoralRequest?.remarks || "Your previous request was rejected."}
-                  </p>
-                )}
-
-                <p className="text-gray-700 mb-4">
-                  Request your Good Moral Certificate here.
+              {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
+                <p className="text-red-700 font-medium mb-4">
+                  Remarks:{" "}
+                  {studentRecord?.lastGoodMoralRequest?.remarks ||
+                    "Your previous request was rejected."}
                 </p>
+              )}
 
-                {/* Submit Button */}
-                <div className="text-center mt-4">
+              <p className="text-gray-700 mb-4">
+                Request your Good Moral Certificate here.
+              </p>
+
+              {/* Submit Button */}
+              <div className="text-center mt-4">
                 <button
                   onClick={submitGoodMoralRequest}
-                  disabled={isRevoked && violationsCount >= 3} // only block if revoked **and** >=3 violations
-                  className={`bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-all duration-200 ${
-                    isRevoked && violationsCount >= 3 ? "opacity-50 cursor-not-allowed hover:bg-green-600" : ""
+                  disabled={
+                    (isRevoked && violationsCount >= 3) || loadingGoodMoral
+                  }
+                  className={`flex items-center justify-center gap-2 w-full sm:w-auto mx-auto bg-green-600 text-white px-6 py-3 rounded-lg transition-all duration-200 ${
+                    (isRevoked && violationsCount >= 3) || loadingGoodMoral
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-green-700"
                   }`}
                   title={
                     isRevoked && violationsCount >= 3
@@ -1642,31 +1692,52 @@ useEffect(() => {
                       : ""
                   }
                 >
-                  {studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? "Submit Again" : "Request Good Moral"}
+                  {loadingGoodMoral ? (
+                    <>
+                      {/* Spinner */}
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      {studentRecord?.lastGoodMoralRequest?.status === "Rejected"
+                        ? "Submit Again"
+                        : "Request Good Moral"}
+                    </>
+                  )}
                 </button>
-                </div>
               </div>
-            ) : (
-              <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600">
+            </div>
+          ) : (
+            <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600">
 
-                {/* Status & Remarks */}
-                <div className="mb-4">
-                  <p className="text-green-600 font-semibold">
-                    Status: {isRevoked ? "Rejected" : studentRecord?.lastGoodMoralRequest?.status || "Pending"}
-                  </p>
+              {/* Status & Remarks */}
+              <div className="mb-4">
+                <p className="text-green-600 font-semibold">
+                  Status:{" "}
+                  {isRevoked
+                    ? "Rejected"
+                    : studentRecord?.lastGoodMoralRequest?.status || "Pending"}
+                </p>
 
-                  {studentRecord?.lastGoodMoralRequest?.status === "Pending" && !isRevoked && (
+                {studentRecord?.lastGoodMoralRequest?.status === "Pending" &&
+                  !isRevoked && (
                     <p className="text-yellow-700 font-medium">
                       Waiting for admin approval...
                     </p>
                   )}
 
-                  {(studentRecord?.lastGoodMoralRequest?.status === "Rejected" || isRevoked) && (
-                    <p className="text-red-700 font-medium">
-                      Remarks: {studentRecord?.lastGoodMoralRequest?.remarks || (isRevoked ? "Auto-revoked due to multiple violations." : "Your request was rejected.")}
-                    </p>
-                  )}
-                </div>
+                {(studentRecord?.lastGoodMoralRequest?.status === "Rejected" ||
+                  isRevoked) && (
+                  <p className="text-red-700 font-medium">
+                    Remarks:{" "}
+                    {studentRecord?.lastGoodMoralRequest?.remarks ||
+                      (isRevoked
+                        ? "Auto-revoked due to multiple violations."
+                        : "Your request was rejected.")}
+                  </p>
+                )}
+              </div>
 
              {/* Approved Good Moral File Preview */}
               {currentGoodMoral && !isRevoked && (
@@ -1717,63 +1788,91 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* CANCEL REQUEST */}
-              {studentRecord?.lastGoodMoralRequest?.status === "Pending" && !isRevoked && (
-                <button
-                  onClick={() => {
-                    Swal.fire({
-                      title: "Are you sure?",
-                      text: "Do you want to cancel your Good Moral request?",
-                      icon: "warning",
-                      showCancelButton: true,
-                      confirmButtonColor: "#3085d6",
-                      cancelButtonColor: "#d33",
-                      confirmButtonText: "Yes, cancel it!",
-                    }).then((result) => {
-                      if (result.isConfirmed) {
-                        fetch(
-                          `${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`,
-                          { method: "DELETE" }
-                        )
-                          .then(res => {
-                            if (res.ok) {
-                              Swal.fire({
-                                toast: true,
-                                position: "top-end",
-                                icon: "success",
-                                title: "Request cancelled!",
-                                showConfirmButton: false,
-                                timer: 800,
-                              });
-                              setTimeout(() => window.location.reload(), 800);
-                            } else {
+             {/* CANCEL REQUEST */}
+              {studentRecord?.lastGoodMoralRequest?.status === "Pending" &&
+                !isRevoked && (
+                  <button
+                    onClick={() => {
+                      Swal.fire({
+                        title: "Are you sure?",
+                        text: "Do you want to cancel your Good Moral request?",
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#3085d6",
+                        cancelButtonColor: "#d33",
+                        confirmButtonText: "Yes, cancel it!",
+                      }).then((result) => {
+                        if (result.isConfirmed) {
+
+                          // START LOADING
+                          setCancelLoading(true);
+
+                          fetch(
+                            `${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`,
+                            { method: "DELETE" }
+                          )
+                            .then((res) => {
+                              if (res.ok) {
+                                Swal.fire({
+                                  toast: true,
+                                  position: "top-end",
+                                  icon: "success",
+                                  title: "Request cancelled!",
+                                  showConfirmButton: false,
+                                  timer: 800,
+                                });
+
+                                setTimeout(() => {
+                                  window.location.reload();
+                                }, 800);
+
+                              } else {
+                                Swal.fire({
+                                  toast: true,
+                                  position: "top-end",
+                                  icon: "error",
+                                  title: "Failed to cancel request",
+                                  showConfirmButton: false,
+                                  timer: 1500,
+                                });
+
+                                // STOP LOADING
+                                setCancelLoading(false);
+                              }
+                            })
+                            .catch(() => {
                               Swal.fire({
                                 toast: true,
                                 position: "top-end",
                                 icon: "error",
                                 title: "Failed to cancel request",
                                 showConfirmButton: false,
-                                timer: 1500
+                                timer: 1500,
                               });
-                            }
-                          })
-                          .catch(() => {
-                            Swal.fire({
-                              toast: true,
-                              position: "top-end",
-                              icon: "error",
-                              title: "Failed to cancel request",
-                              showConfirmButton: false,
-                              timer: 1500
+
+                              // STOP LOADING
+                              setCancelLoading(false);
                             });
-                          });
-                      }
-                    });
-                  }}
-                  className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 text-sm sm:text-base"
-                >
-                  Cancel Request
-                </button>
+                        }
+                      });
+                    }}
+                    disabled={cancelLoading}
+                    className={`mt-4 w-full text-white py-2 rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-200 ${
+                      cancelLoading
+                        ? "bg-red-400 cursor-not-allowed"
+                        : "bg-red-600 hover:bg-red-700"
+                    }`}
+                  >
+                    {cancelLoading ? (
+                      <>
+                        {/* Spinner */}
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Cancelling...</span>
+                      </>
+                    ) : (
+                      "Cancel Request"
+                    )}
+                  </button>
               )}
               </div>
             )}
@@ -1877,117 +1976,147 @@ useEffect(() => {
                           </div>
 
                         </div>
+            {/* ================= CONTENT CARD ================= */}
+              <div className="bg-green-50 p-4 md:p-6 rounded-2xl shadow-inner">
 
-                        {/* ================= CONTENT CARD ================= */}
-                        <div className="bg-green-50 p-4 md:p-6 rounded-2xl shadow-inner">
-                        {/* PROFILE PIC */}
-                        <div className="flex flex-col items-center mb-8">
-                          <div className="relative group">
+                {/* PROFILE PIC */}
+                <div className="flex flex-col items-center mb-8">
+                  <div className="relative group">
 
-                            {(() => {
-                              const getInitials = (name) => {
-                                if (!name) return "S";
+                    {(() => {
+                      const getInitials = (name) => {
+                        if (!name) return "S";
 
-                                return name
-                                  .trim()
-                                  .split(/\s+/)
-                                  .map((word) => word[0])
-                                  .join("")
-                                  .toUpperCase()
-                                  .slice(0, 5);
-                              };
+                        return name
+                          .trim()
+                          .split(/\s+/)
+                          .map((word) => word[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 5);
+                      };
 
-                              const initials = getInitials(studentRecord?.student_name);
+                      const initials = getInitials(studentRecord?.student_name);
+                      const displayPic = studentRecord?.profile_pic;
 
-                              const displayPic =
-                                studentRecord?.profile_pic; //  FIX: REMOVE tempProfilePic
+                      return (
+                        <>
+                          {/* PROFILE IMAGE */}
+                          <img
+                            src={
+                              displayPic
+                                ? displayPic
+                                : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                    initials
+                                  )}&bold=true&length=5`
+                            }
+                            alt="Profile"
+                            className={`w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl transition duration-300 ${
+                              uploadingProfilePic ? "opacity-60" : ""
+                            }`}
+                          />
 
-                              return (
-                                <img
-                                  src={
-                                    displayPic
-                                      ? displayPic
-                                      : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                          initials
-                                        )}&bold=true&length=5`
-                                  }
-                                  alt="Profile"
-                                  className="w-28 h-28 md:w-44 md:h-44 rounded-full object-cover border-4 border-green-300 shadow-xl transition duration-300"
-                                />
-                              );
-                            })()}
+                          {/* LOADING OVERLAY ON AVATAR */}
+                          {uploadingProfilePic && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30">
+                              <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
-                            {/* DARK HOVER OVERLAY */}
-                            {isEditing && (
-                              <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition duration-300"></div>
-                            )}
+                    {/* DARK HOVER OVERLAY */}
+                    {isEditing && !uploadingProfilePic && (
+                      <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition duration-300"></div>
+                    )}
 
-                            {/* TRASH ICON */}
-                            {isEditing && (
-                              <div
-                                onClick={handleDeleteProfilePic}
-                                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer z-20"
-                              >
-                                <div className="bg-black/60 rounded-full p-4 backdrop-blur-sm hover:scale-110 transition">
-                                  <Trash2 className="text-white w-8 h-8" />
-                                </div>
-                              </div>
-                            )}
+                  {/* TRASH ICON */}
+                    {isEditing && (
+                      <div
+                        onClick={!deletingProfilePic ? handleDeleteProfilePic : undefined}
+                        className={`absolute inset-0 flex items-center justify-center transition z-20 ${
+                          deletingProfilePic
+                            ? "cursor-not-allowed opacity-100"
+                            : "opacity-0 group-hover:opacity-100 cursor-pointer"
+                        }`}
+                      >
+                        <div className="bg-black/60 rounded-full p-4 backdrop-blur-sm hover:scale-110 transition">
 
-                            {/* UPLOAD BUTTON */}
-                            {isEditing && (
-                              <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg z-30">
-                                +
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept="image/*"
-                                  onChange={async (e) => {
-                                    const file = e.target.files[0];
-                                    if (!file) return;
+                          {deletingProfilePic ? (
+                            // SPINNER
+                            <div className="w-7 h-7 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            // TRASH ICON
+                            <Trash2 className="text-white w-8 h-8" />
+                          )}
 
-                                    const formData = new FormData();
-                                    formData.append("profile_pic", file);
-
-                                    try {
-                                     const res = await fetch(
-                                          `${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`,
-                                          {
-                                            method: "POST",
-                                            body: formData
-                                          }
-                                        );
-                                      const data = await res.json();
-
-                                      if (res.ok) {
-                          
-                                        setStudentRecord((prev) => ({
-                                          ...prev,
-                                          profile_pic: data.profile_pic,
-                                        }));
-
-                                        // optional cleanup
-                                        setTempProfilePic(null);
-
-                                        Swal.fire("Success", "Profile updated", "success");
-                                      } else {
-                                        Swal.fire("Error", data.message || "Upload failed", "error");
-                                      }
-                                    } catch (err) {
-                                      console.error(err);
-                                      Swal.fire("Error", "Server error", "error");
-                                    }
-                                  }}
-                                />
-                              </label>
-                            )}
-
-                          </div>
-
-                          <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
-                            {isEditing ? "Hover image to delete or click + to change" : "Profile Picture"}
-                          </p>
                         </div>
+                      </div>
+                    )}
+                    {/* UPLOAD BUTTON */}
+                    {isEditing && (
+                      <label className="text-2xl absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white rounded-full cursor-pointer shadow-lg z-30">
+
+                        +
+
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          disabled={uploadingProfilePic}
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+
+                            const formData = new FormData();
+                            formData.append("profile_pic", file);
+
+                            try {
+                              setUploadingProfilePic(true);
+
+                              const res = await fetch(
+                                `${import.meta.env.VITE_API_URL}/students/${studentNumber}/profile-pic`,
+                                {
+                                  method: "POST",
+                                  body: formData,
+                                }
+                              );
+
+                              const data = await res.json();
+
+                              if (res.ok) {
+                                setStudentRecord((prev) => ({
+                                  ...prev,
+                                  profile_pic: data.profile_pic,
+                                }));
+
+                                setTempProfilePic(null);
+
+                                Swal.fire("Success", "Profile updated", "success");
+                              } else {
+                                Swal.fire("Error", data.message || "Upload failed", "error");
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              Swal.fire("Error", "Server error", "error");
+                            } finally {
+                              setUploadingProfilePic(false);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+
+                  </div>
+
+                  <p className="text-xs md:text-sm text-gray-500 mt-3 text-center">
+                    {isEditing
+                      ? "Hover image to delete or click + to change"
+                      : "Profile Picture"}
+                  </p>
+                </div>
+
                           {/* ================= FIELDS ================= */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
 
@@ -2204,29 +2333,39 @@ useEffect(() => {
                                         </p>
                                       </div>
 
-                                  {/* ================= SAVE BUTTON ================= */}
-                                  {isEditing && (
-                                    <div className="mt-6 flex justify-end">
-                                      <button
-                                        onClick={handleSaveChanges}
-                                        disabled={
-                                          password &&
+                               {/* ================= SAVE BUTTON ================= */}
+                                {isEditing && (
+                                  <div className="mt-6 flex justify-end">
+                                    <button
+                                      onClick={handleSaveChanges}
+                                      disabled={
+                                        savingChanges ||
+                                        (password &&
                                           password.trim() !== "" &&
-                                          password !== confirmPassword
-                                        }
-                                        className={`w-full md:w-auto px-5 py-2 rounded-full text-sm md:text-base text-white transition
-                                          ${
-                                            password &&
+                                          password !== confirmPassword)
+                                      }
+                                      className={`w-full md:w-auto px-5 py-2 rounded-full text-sm md:text-base text-white transition flex items-center justify-center gap-2
+                                        ${
+                                          savingChanges ||
+                                          (password &&
                                             password.trim() !== "" &&
-                                            password !== confirmPassword
-                                              ? "bg-gray-400 cursor-not-allowed"
-                                              : "bg-green-700 hover:bg-green-800"
-                                          }`}
-                                      >
-                                        Save Changes
-                                      </button>
-                                    </div>
-                                  )}
+                                            password !== confirmPassword)
+                                            ? "bg-gray-400 cursor-not-allowed"
+                                            : "bg-green-700 hover:bg-green-800"
+                                        }`}
+                                    >
+                                      {savingChanges ? (
+                                        <>
+                                          {/* SPINNER */}
+                                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                          <span>Saving...</span>
+                                        </>
+                                      ) : (
+                                        "Save Changes"
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
 
                           </div>
                           </div>

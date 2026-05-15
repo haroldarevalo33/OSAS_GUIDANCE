@@ -47,6 +47,7 @@ export default function AdminHome() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [semester, setSemester] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
+  const [submitViolationLoading, setSubmitViolationLoading] = useState(false);
   
 
   // auto-filled student info fetched from /student?query=
@@ -71,6 +72,8 @@ export default function AdminHome() {
    //request view list
   const [showRequestList, setShowRequestList] = useState(false);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
+  const [approvedAction, setApprovedAction] = useState(false);
+  const [rejectAction, setRejectAction] = useState(false);
   const [pendingRequests, setPendingRequests] = useState([
   // Dummy data for now
   { student_number: "202210221", section: "Section 8", violation: "Late Submission", status: "Pending" },
@@ -1038,33 +1041,39 @@ function handleLogout() {
 
 // ------------------ Submit Violation ------------------
 async function handleSubmitViolation() {
-  if (
-    !studentName ||
-    !studentId ||
-    !courseYearSection ||
-    !gender ||
-    !violationText ||
-    !violationDate ||
-    !semester
-  ) {
-    Swal.fire({
-      icon: "warning",
-      title: "Missing Fields",
-      text: "Please fill out all fields before submitting.",
-    });
-    return;
-  }
+  setSubmitViolationLoading(true); // START LOADING
 
   try {
+    // ================= VALIDATION =================
+    if (
+      !studentName ||
+      !studentId ||
+      !courseYearSection ||
+      !gender ||
+      !violationText ||
+      !violationDate ||
+      !semester
+    ) {
+      Swal.fire({
+        icon: "warning",
+        title: "Missing Fields",
+        text: "Please fill out all fields before submitting.",
+      });
+
+      return;
+    }
+
     // ==========================
     // STEP 1: PREDICT
     // ==========================
     const predictRes = await fetch(
-  `${import.meta.env.VITE_API_URL}/predict` , {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: violationText }),
-    });
+      `${import.meta.env.VITE_API_URL}/predict`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: violationText }),
+      }
+    );
 
     const predictData = await predictRes.json();
 
@@ -1092,7 +1101,7 @@ async function handleSubmitViolation() {
     }
 
     // ==========================
-    // STEP 2: PREPARE DATA (FIXED)
+    // STEP 2: PREPARE DATA
     // ==========================
     const newViolation = {
       student_name: studentName,
@@ -1114,53 +1123,57 @@ async function handleSubmitViolation() {
     // ==========================
     // STEP 3: SUBMIT
     // ==========================
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newViolation),
-    });
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/violations`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newViolation),
+      }
+    );
 
     const data = await res.json();
 
-    if (res.ok) {
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Violation submitted successfully",
-        showConfirmButton: false,
-        timer: 1500,
-      });
-
-      setShowViolationModal(false);
-
-      setStudentName("");
-      setStudentId("");
-      setCourseYearSection("");
-      setGender("");
-      setViolationText("");
-      setViolationDate("");
-      setSemester("");
-
-      setStudentInfo(null);
-
-      await fetchViolations();
-    } else {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text:
-          data?.message ||
-          "Submission failed: Invalid input detected. Please enter a meaningful sentence.",
-      });
+    if (!res.ok) {
+      throw new Error(data?.message || "Submission failed");
     }
+
+    // ================= SUCCESS =================
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "Violation submitted successfully",
+      showConfirmButton: false,
+      timer: 1500,
+    });
+
+    setShowViolationModal(false);
+
+    setStudentName("");
+    setStudentId("");
+    setCourseYearSection("");
+    setGender("");
+    setViolationText("");
+    setViolationDate("");
+    setSemester("");
+
+    setStudentInfo(null);
+
+    await fetchViolations();
+
   } catch (err) {
     console.error(err);
+
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: "Invalid or Wrong Student Number.",
+      text: err.message || "Invalid or Wrong Student Number.",
     });
+
+  } finally {
+    // ================= ALWAYS STOP LOADING =================
+    setSubmitViolationLoading(false);
   }
 }
 // ------------------ View Student Info ------------------
@@ -1455,20 +1468,28 @@ useEffect(() => {
 }, []);
 
 const handleApprove = async (request) => {
+  setApprovedAction(true); // START SPINNER
+
   try {
     const res = await fetch(
-     `${import.meta.env.VITE_API_URL}/good-moral/process/${request.request_id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "Approved", admin_id: currentAdminId }),
-    });
+      `${import.meta.env.VITE_API_URL}/good-moral/process/${request.request_id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Approved",
+          admin_id: currentAdminId,
+        }),
+      }
+    );
+
     const data = await res.json();
 
     console.log("Approve response:", data);
 
     setSelectedRequest((prev) => ({ ...prev, status: "Approved" }));
 
-    fetchPendingRequests();
+    await fetchPendingRequests(); // optional await para sync update
 
     if (data?.request?.filename_url) {
       setCurrentGoodMoral({
@@ -1490,24 +1511,48 @@ const handleApprove = async (request) => {
 
   } catch (err) {
     console.error("Failed to approve request:", err);
+
+    Swal.fire({
+      title: "Error",
+      icon: "error",
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+
+  } finally {
+    setApprovedAction(false); // STOP SPINNER ALWAYS (SUCCESS OR ERROR)
   }
 };
 
 const handleReject = async (request) => {
+  setRejectAction(true); // START SPINNER
+
   try {
     const res = await fetch(
-   `${import.meta.env.VITE_API_URL}/good-moral/process/${request.request_id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "Rejected", admin_id: currentAdminId }),
-    });
+      `${import.meta.env.VITE_API_URL}/good-moral/process/${request.request_id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Rejected",
+          admin_id: currentAdminId,
+        }),
+      }
+    );
+
     const data = await res.json();
 
     console.log("Reject response:", data);
 
-    setSelectedRequest((prev) => ({ ...prev, status: "Rejected" }));
+    setSelectedRequest((prev) => ({
+      ...prev,
+      status: "Rejected",
+    }));
 
-    fetchPendingRequests();
+    await fetchPendingRequests(); // wait update
+
     setShowRequestDetails(false);
 
     Swal.fire({
@@ -1521,6 +1566,18 @@ const handleReject = async (request) => {
 
   } catch (err) {
     console.error("Failed to reject request:", err);
+
+    Swal.fire({
+      title: "Error",
+      icon: "error",
+      toast: true,
+      position: "top-end",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+
+  } finally {
+    setRejectAction(false); // STOP SPINNER ALWAYS
   }
 };
 
@@ -3483,12 +3540,24 @@ return (
           >
             Regenerate
           </button>
-
+     {/* Submit Violation */}
           <button
-            onClick={handleSubmitViolation}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-800 cursor-pointer"
+            onClick={async () => {
+              setSubmitViolationLoading(true);
+              await handleSubmitViolation();
+              setSubmitViolationLoading(false);
+            }}
+            disabled={submitViolationLoading}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-800 cursor-pointer flex items-center justify-center gap-2 transition-colors duration-200 disabled:opacity-70"
           >
-            Submit Violation
+            {submitViolationLoading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Submitting...
+              </>
+            ) : (
+              "Submit"
+            )}
           </button>
         </>
       )}
@@ -3856,21 +3925,40 @@ return (
                     <p><strong>Status:</strong> {selectedRequest.status}</p>
 
                     {selectedRequest.status === "Pending" && (
-                      <div className="flex gap-2 mt-4">
-                        <button
-                          className="bg-green-500 text-white px-3 py-1 rounded cursor-pointer"
-                          onClick={() => handleApprove(selectedRequest)}
-                        >
-                          Approve
-                        </button>
-
-                        <button
-                          className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer"
-                          onClick={() => handleReject(selectedRequest)}
-                        >
-                          Reject
-                        </button>
-                      </div>
+                   <div className="flex gap-2 mt-4">
+                      {/* APPROVE */}
+                      <button
+                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded cursor-pointer flex items-center justify-center w-24 h-9"
+                        onClick={async () => {
+                          setApprovedAction(true);
+                          await handleApprove(selectedRequest);
+                          setLoadingAction(false);
+                        }}
+                        disabled={approvedAction}
+                      >
+                        {approvedAction ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          "Approve"
+                        )}
+                      </button>
+                   {/* REJECT */}
+                    <button
+                      className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer flex items-center justify-center w-24 h-9"
+                      onClick={async () => {
+                        setRejectAction(true);
+                        await handleReject(selectedRequest);
+                        setRejectAction(false);
+                      }}
+                      disabled={rejectAction}
+                    >
+                      {rejectAction ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        "Reject"
+                      )}
+                    </button>
+                  </div>
                     )}
                   </div>
 
@@ -3982,7 +4070,7 @@ return (
           </div>
         </div>
       )}
-    {/* STUDENT RECORDS */}
+      {/* STUDENT RECORDS */}
       {activePage === "records" && (
         <div className="bg-[#e8f5e9] p-3 sm:p-4 md:p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
 
@@ -4046,13 +4134,14 @@ return (
                 />
               </div>
 
-              {/* SORT */}
+              {/* SORT (UPDATED) */}
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
                 className="w-full md:w-auto px-3 py-2 border border-green-300 rounded-lg bg-white 
                 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
+                <option value="latest">Latest Registered</option>
                 <option value="asc">Sort A → Z</option>
                 <option value="desc">Sort Z → A</option>
               </select>
@@ -4064,7 +4153,7 @@ return (
                   setCourseFilter("all");
                   setDateFrom("");
                   setDateTo("");
-                  setSortOrder("asc");
+                  setSortOrder("latest"); // FIX DEFAULT RESET
                 }}
                 className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
               >
@@ -4074,88 +4163,109 @@ return (
             </div>
 
           </div>
-             {/* ================= TABLE ================= */}
-              <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
-                <table className="min-w-full table-fixed text-left">
-                  <thead className="bg-green-600 text-white">
-                    <tr>
-                      <th className="px-4 py-3">ID</th>
-                      <th className="px-4 py-3">Student Name</th>
-                      <th className="px-4 py-3">Student Number</th>
-                      <th className="px-4 py-3">Email</th>
-                      <th className="px-4 py-3">Phone</th>
-                      <th className="px-4 py-3">Course</th>
-                      <th className="px-4 py-3">Date Registered</th>
-                      <th className="px-4 py-3 text-center">Actions</th>
-                    </tr>
-                  </thead>
 
-                  <tbody>
-                    {filteredStudents.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="text-center py-6 text-green-700">
-                          No students found.
+          {/* ================= TABLE ================= */}
+          <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
+            <table className="min-w-full table-fixed text-left">
+              <thead className="bg-green-600 text-white">
+                <tr>
+                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3">Student Name</th>
+                  <th className="px-4 py-3">Student Number</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Phone</th>
+                  <th className="px-4 py-3">Course</th>
+                  <th className="px-4 py-3">Date Registered</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-6 text-green-700">
+                      No students found.
+                    </td>
+                  </tr>
+                ) : (
+                  [...filteredStudents]
+                    .sort((a, b) => {
+                      // ================= DEFAULT: LATEST FIRST =================
+                      if (!sortOrder || sortOrder === "latest") {
+                        return new Date(b.created_at) - new Date(a.created_at);
+                      }
+
+                      // ================= A → Z =================
+                      if (sortOrder === "asc") {
+                        return (a.student_name || "").localeCompare(
+                          b.student_name || ""
+                        );
+                      }
+
+                      // ================= Z → A =================
+                      if (sortOrder === "desc") {
+                        return (b.student_name || "").localeCompare(
+                          a.student_name || ""
+                        );
+                      }
+
+                      return 0;
+                    })
+                    .map((s) => (
+                      <tr
+                        key={s.id}
+                        className="border-b border-green-200 hover:bg-green-100 transition-colors"
+                      >
+                        <td className="py-3 px-4">{s.id}</td>
+
+                        <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_name}>
+                          {s.student_name}
+                        </td>
+
+                        <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_number}>
+                          {s.student_number}
+                        </td>
+
+                        <td className="py-3 px-4 truncate max-w-[180px]" title={s.email}>
+                          {s.email}
+                        </td>
+
+                        <td className="py-3 px-4 truncate max-w-[120px]" title={s.phone}>
+                          {s.phone}
+                        </td>
+
+                        <td className="py-3 px-4 truncate max-w-[140px]" title={s.course}>
+                          {s.course}
+                        </td>
+
+                        <td className="py-3 px-4">
+                          {s.created_at ? s.created_at.slice(0, 10) : "—"}
+                        </td>
+
+                        <td className="py-3 px-4 flex gap-2 justify-center">
+                          <button
+                            className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            onClick={() => setViewStudent(s)}
+                          >
+                            View
+                          </button>
+
+                          <button
+                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            onClick={() => setDeleteStudent(s)}
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
-                    ) : (
-                      filteredStudents.map((s) => (
-                        <tr
-                          key={s.id}
-                          className="border-b border-green-200 hover:bg-green-100 transition-colors"
-                        >
-                          <td className="py-3 px-4">{s.id}</td>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                          {/* NAME (TRUNCATED) */}
-                          <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_name}>
-                            {s.student_name}
-                          </td>
-
-                          {/* STUDENT NUMBER */}
-                          <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_number}>
-                            {s.student_number}
-                          </td>
-
-                          {/* EMAIL */}
-                          <td className="py-3 px-4 truncate max-w-[180px]" title={s.email}>
-                            {s.email}
-                          </td>
-
-                          {/* PHONE */}
-                          <td className="py-3 px-4 truncate max-w-[120px]" title={s.phone}>
-                            {s.phone}
-                          </td>
-
-                          <td className="py-3 px-4 truncate max-w-[140px]" title={s.course}>
-                            {s.course}
-                          </td>
-
-                          <td className="py-3 px-4">
-                            {s.created_at ? s.created_at.slice(0, 10) : "—"}
-                          </td>
-
-                          <td className="py-3 px-4 flex gap-2 justify-center">
-                            <button
-                              className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                              onClick={() => setViewStudent(s)}
-                            >
-                              View
-                            </button>
-
-                            <button
-                              className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                              onClick={() => setDeleteStudent(s)}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              </div>
-            )}
+        </div>
+      )}
 
          </section>
         </main>
