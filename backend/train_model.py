@@ -79,7 +79,7 @@ vectorizer = FeatureUnion([
     ("word", TfidfVectorizer(
         ngram_range=(1, 3),
         min_df=2,
-        max_df=0.90,
+        max_df=0.95,
         sublinear_tf=True,
         strip_accents='unicode',
         stop_words='english',
