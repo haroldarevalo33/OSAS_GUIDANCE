@@ -3,25 +3,36 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import FeatureUnion
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import (accuracy_score, classification_report, confusion_matrix)
 from sklearn.metrics.pairwise import cosine_similarity
+
+import time
 import pandas as pd
 import numpy as np
 import joblib
-import string
 import re
 
 # ==========================
 # LOAD DATASET
 # ==========================
-df = pd.read_excel(r"C:\Users\Harold Arevalo\Downloads\cvsu_violation_balanced.xlsx")
+df = pd.read_excel(
+    r"C:\Users\Harold Arevalo\Downloads\cvsu_violation_balanced.xlsx"
+)
 
 df = df.dropna(subset=['violation', 'text'])
-df['violation'] = df['violation'].astype(str).str.strip().str.lower()
+
+df['violation'] = (
+    df['violation']
+    .astype(str)
+    .str.strip()
+    .str.lower()
+)
+
 df['text'] = df['text'].astype(str)
 
 print("Dataset preview:")
-print(df.head(5))
+print(df.head(15))
+
 print(f"\nTotal rows: {df.shape[0]}")
 print(f"Unique texts: {df['text'].nunique()}")
 
@@ -29,7 +40,7 @@ print("\nViolation distribution:")
 print(df['violation'].value_counts())
 
 # ==========================
-# FIX: REMOVE CLASSES WITH <2 SAMPLES (IMPORTANT FOR cv=2)
+# REMOVE CLASSES WITH <2 SAMPLES
 # ==========================
 counts = df['violation'].value_counts()
 df = df[df['violation'].isin(counts[counts >= 2].index)]
@@ -43,17 +54,16 @@ print(df['violation'].value_counts())
 def preprocess(text):
     if not isinstance(text, str):
         return ""
-
     text = text.lower()
     text = re.sub(r"[^a-z\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
-
     return text
+
 
 def clean_input(text):
     text = preprocess(text)
-    words = text.split()
-    return " ".join(words[:80])
+    return " ".join(text.split()[:80])
+
 
 texts = df['text'].apply(preprocess)
 labels = df['violation']
@@ -85,7 +95,6 @@ vectorizer = FeatureUnion([
         stop_words='english',
         token_pattern=r"(?u)\b[a-zA-Z]+\b"
     )),
-
     ("char", TfidfVectorizer(
         analyzer='char_wb',
         ngram_range=(3, 6),
@@ -99,16 +108,31 @@ X_test_tfidf = vectorizer.transform(X_test)
 print(f"\nTotal features: {X_train_tfidf.shape[1]}")
 
 # ==========================
-# MODEL (FIXED CV ISSUE)
+# MODEL (FIXED — NO DOUBLE FIT BUG)
 # ==========================
-base_model = LinearSVC(class_weight='balanced', max_iter=3000)
+base_model = LinearSVC(
+    class_weight='balanced',
+    max_iter=3000
+)
 
-# TRAIN FIRST (IMPORTANT)
+start_train = time.perf_counter()
 base_model.fit(X_train_tfidf, y_train)
+end_train = time.perf_counter()
 
-# CALIBRATION SAFE MODE
-model = CalibratedClassifierCV(base_model, cv="prefit", method='sigmoid')
+print(f"\n[TRAIN TIME] {end_train - start_train:.6f} sec")
+
+# CALIBRATED MODEL (CORRECT WAY)
+model = CalibratedClassifierCV(
+    estimator=base_model,
+    method='sigmoid',
+    cv=2
+)
+
+start_calib = time.perf_counter()
 model.fit(X_train_tfidf, y_train)
+end_calib = time.perf_counter()
+
+print(f"[CALIBRATION TIME] {end_calib - start_calib:.6f} sec")
 
 # ==========================
 # EVALUATION
@@ -116,6 +140,7 @@ model.fit(X_train_tfidf, y_train)
 y_pred = model.predict(X_test_tfidf)
 
 print(f"\nAccuracy: {accuracy_score(y_test, y_pred):.2f}")
+
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 
@@ -134,54 +159,120 @@ print("\nSaved: model, vectorizer, dataset")
 # ==========================
 # SECTION MAPPING
 # ==========================
-violation_to_section = df.groupby('violation')['section'].agg(
-    lambda x: x.mode()[0] if not x.mode().empty else "Unknown"
-).to_dict()
+violation_to_section = (
+    df.groupby('violation')['section']
+    .agg(lambda x: x.mode()[0] if not x.mode().empty else "Unknown")
+    .to_dict()
+)
 
 joblib.dump(violation_to_section, "violation_to_section.pkl")
 
 print("Saved: violation_to_section")
 
 # ==========================
-# WEIRD PHRASES (FULL + EXPANDED)
+# WEIRD PHRASES
 # ==========================
 weird_phrases = [
-    "bawal unan","bawal upuan","bawal mesa","bawal bag","bawal pagkain",
-    "illegal pillows","illegal pillow","illegal bags","illegal table",
-    "illegal slippers","illegal phone case","illegal banana","illegal bananas",
-    "illegal fruits","illegal burger","illegal rice","illegal candy",
-    "illegal chocolate","illegal juice","illegal water","illegal blue",
-    "illegal soft","illegal cute","illegal waters","illegal vehicles",
-    "illegal game","illegal toy","illegal basketball","illegal mobile legends",
-    "illegal random","illegal test","illegal haha","illegal chair","illegal desk",
+    "bawal unan",
+    "bawal upuan",
+    "bawal mesa",
+    "bawal bag",
+    "bawal pagkain",
 
-    "drugs in classroom discussion","drug attendance issue",
-    "cheating with drugs in paper","weapon during attendance",
-    "bringing weapon for assignment","weapon in classroom discussion",
-    "cheating the teacher behavior","cheating in school property",
-    "cheating during physical fight","physical fight in exam paper",
-    "assault in school project","absent with weapon possession",
-    "late due to cheating activity","attendance using drugs system",
-    "disrespecting property physically","verbal abuse of attendance",
-    "insubordination in exam paper","vandalism in attendance record",
-    "damage during drug possession","writing on weapon surface",
+    "illegal pillows",
+    "illegal pillow",
+    "illegal bags",
+    "illegal table",
 
-    # SPAM / GIBBERISH PATTERNS
-    "asdf asdf asdf","qwe qwe qwe","zxc zxc zxc",
-    "sdf sdf sdf","dfg dfg dfg","ghj ghj ghj",
-    "aaaaa aaaaa","bbbb bbbb","cccc cccc",
-    "xyz xyz xyz","lorem ipsum random text",
-    "asdasdasdasdasd","sdfsdfsdfsdfsdf","qweqweqweqwe",
-    "asdasd asdasd asdasd","random random random"
+    "illegal slippers",
+    "illegal phone case",
+    "illegal banana",
+    "illegal bananas",
+
+    "illegal fruits",
+    "illegal burger",
+    "illegal rice",
+    "illegal candy",
+
+    "illegal chocolate",
+    "illegal juice",
+    "illegal water",
+    "illegal blue",
+
+    "illegal soft",
+    "illegal cute",
+    "illegal waters",
+    "illegal vehicles",
+
+    "illegal game",
+    "illegal toy",
+    "illegal basketball",
+    "illegal mobile legends",
+
+    "illegal random",
+    "illegal test",
+    "illegal haha",
+    "illegal chair",
+    "illegal desk",
+
+    "drugs in classroom discussion",
+    "drug attendance issue",
+
+    "cheating with drugs in paper",
+    "weapon during attendance",
+
+    "bringing weapon for assignment",
+    "weapon in classroom discussion",
+
+    "cheating the teacher behavior",
+    "cheating in school property",
+
+    "cheating during physical fight",
+    "physical fight in exam paper",
+
+    "assault in school project",
+    "absent with weapon possession",
+
+    "late due to cheating activity",
+    "attendance using drugs system",
+
+    "disrespecting property physically",
+    "verbal abuse of attendance",
+
+    "insubordination in exam paper",
+    "vandalism in attendance record",
+
+    "damage during drug possession",
+    "writing on weapon surface",
+
+    # GIBBERISH
+    "asdf asdf asdf",
+    "qwe qwe qwe",
+    "zxc zxc zxc",
+
+    "sdf sdf sdf",
+    "dfg dfg dfg",
+    "ghj ghj ghj",
+
+    "aaaaa aaaaa",
+    "bbbb bbbb",
+    "cccc cccc",
+
+    "xyz xyz xyz",
+    "lorem ipsum random text",
+
+    "asdasdasdasdasd",
+    "sdfsdfsdfsdfsdf",
+    "qweqweqweqwe",
+
+    "asdasd asdasd asdasd",
+    "random random random"
 ]
+
 
 weird_clean = [preprocess(x) for x in weird_phrases]
 
-weird_vectorizer = TfidfVectorizer(
-    ngram_range=(1, 2),
-    min_df=1
-)
-
+weird_vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
 weird_matrix = weird_vectorizer.fit_transform(weird_clean)
 
 joblib.dump(weird_vectorizer, "weird_vectorizer.pkl")
@@ -190,10 +281,11 @@ joblib.dump(weird_matrix, "weird_matrix.pkl")
 def is_weird_phrase(text, threshold=0.72):
     text = preprocess(text)
     vec = weird_vectorizer.transform([text])
-    return cosine_similarity(vec, weird_matrix).max() >= threshold
+    similarity = cosine_similarity(vec, weird_matrix).max()
+    return similarity >= threshold
 
 # ==========================
-# STRONG GIBBERISH DETECTOR (NEW FIX)
+# GIBBERISH DETECTOR
 # ==========================
 def is_gibberish(text):
     text = preprocess(text)
@@ -206,43 +298,23 @@ def is_gibberish(text):
     if len(words) == 0:
         return True
 
-    # ==========================
-    # 1. PURE NON-ALPHABETIC (!!!! / 123123)
-    # ==========================
     if not re.search(r"[a-zA-Z]", text):
         return True
 
-    # ==========================
-    # 2. EXTREME RANDOM CHAR STRINGS
-    # (asdfasdfasdf, sdfdsfsdfsd, qweqweqwe)
-    # ==========================
     if len(words) == 1:
         w = words[0]
-
-        # too repetitive pattern like "sdsdsdsdsd"
         if len(set(w)) <= 3 and len(w) > 6:
             return True
-
-        # no vowel + very long random string
         if not re.search(r"[aeiou]", w) and len(w) > 6:
             return True
 
-    # ==========================
-    # 3. REPETITION SPAM (word spam)
-    # ==========================
     if len(set(words)) <= max(2, int(len(words) * 0.3)):
         return True
 
-    # ==========================
-    # 4. TOO MANY SHORT WORDS (noise typing)
-    # ==========================
     avg_len = np.mean([len(w) for w in words])
     if avg_len < 3:
         return True
 
-    # ==========================
-    # 5. KEYBOARD SMASH PATTERN (sdf sdf sdf sdf)
-    # ==========================
     pattern_score = sum(1 for w in words if len(set(w)) <= 3)
     if pattern_score / len(words) > 0.6:
         return True
@@ -250,9 +322,10 @@ def is_gibberish(text):
     return False
 
 # ==========================
-# STANDARD TEXT MATCH
+# STANDARD MATCH
 # ==========================
 def get_best_standard_text(pred_label, input_text):
+
     subset = df[df['violation'] == pred_label]
 
     if subset.empty:
@@ -272,9 +345,11 @@ def get_best_standard_text(pred_label, input_text):
     return subset.iloc[best_idx]['text']
 
 # ==========================
-# FINAL PREDICT FUNCTION
+# PREDICTION FUNCTION
 # ==========================
 def predict_violation(sentence, top_n=3):
+
+    start = time.perf_counter()
 
     sentence_proc = clean_input(sentence)
 
@@ -285,7 +360,7 @@ def predict_violation(sentence, top_n=3):
             "predicted_section": "Unknown",
             "confidence": 0.0,
             "top_predictions": "unknown",
-            "standard_text": "invalid input (gibberish detected)"
+            "standard_text": "invalid input"
         }
 
     if len(sentence_proc.split()) < 3:
@@ -298,12 +373,11 @@ def predict_violation(sentence, top_n=3):
             "standard_text": "invalid input"
         }
 
-    vectorized = vectorizer.transform([sentence_proc])
-
-    probs = model.predict_proba(vectorized)[0]
+    vec = vectorizer.transform([sentence_proc])
+    probs = model.predict_proba(vec)[0]
     classes = model.classes_
 
-    top_indices = np.argsort(probs)[::-1][:top_n]
+    top_idx = np.argsort(probs)[::-1][:top_n]
 
     confidence = float(max(probs))
     pred = classes[np.argmax(probs)]
@@ -312,14 +386,17 @@ def predict_violation(sentence, top_n=3):
         pred = "uncertain"
         top_preds = "unknown"
         section = "Unknown"
-        standard = "No dataset match found"
+        standard = "No dataset match"
     else:
         top_preds = ", ".join(
-            [f"{classes[i]} ({probs[i]*100:.1f}%)" for i in top_indices]
+            f"{classes[i]} ({probs[i]*100:.1f}%)"
+            for i in top_idx
         )
 
         section = violation_to_section.get(pred, "Unknown")
         standard = get_best_standard_text(pred, sentence_proc)
+
+    print(f"[PREDICT TIME] {time.perf_counter()-start:.6f} sec")
 
     return {
         "input": sentence,
@@ -336,13 +413,48 @@ def predict_violation(sentence, top_n=3):
 print("\n--- TEST ---")
 
 tests = [
-    "STUDENT USED PHONE DURING EXAM WITHOUT PERMISSION",
-    "COPYING ANSWERS FROM CLASSMATE DURING QUIZ",
-    "random nonsense xyz abc",
-    "sdfdsfs sdfsdfss fsdfds",
-    "asdasdasdasdasd asdasdasd asdasd",
-    "aaaa bbbb cccc",
-]
 
+    # CELL PHONE
+    "STUDENT USED PHONE DURING EXAM WITHOUT PERMISSION",
+    "USING MOBILE PHONE INSIDE CLASSROOM",
+    "TAKING PICTURES OF EXAM USING CELLPHONE",
+
+    # CHEATING
+    "COPYING ANSWERS FROM CLASSMATE DURING QUIZ",
+    "CHEATING DURING FINAL EXAM",
+    "LOOKING AT ANOTHER STUDENT ANSWERS",
+
+    # DISRESPECT
+    "STUDENT SHOUTED AT THE TEACHER",
+    "DISRESPECTFUL BEHAVIOR TOWARDS FACULTY",
+    "ARGUING RUDELY WITH THE PROFESSOR",
+
+    # FIGHTING
+    "PHYSICAL FIGHT INSIDE THE CAMPUS",
+    "STUDENT ASSAULTED ANOTHER STUDENT",
+    "STARTING A FIGHT DURING CLASS",
+
+    # VANDALISM
+    "WRITING ON SCHOOL WALLS",
+    "DAMAGING SCHOOL PROPERTY",
+    "DESTROYING CLASSROOM CHAIRS",
+
+    # ATTENDANCE
+    "LEAVING CLASS WITHOUT PERMISSION",
+    "EXCESSIVE ABSENCES WITHOUT VALID REASON",
+    "COMING LATE TO CLASS REPEATEDLY",
+
+    # WEAPONS
+    "BRINGING A KNIFE TO SCHOOL",
+    "POSSESSION OF DANGEROUS WEAPON INSIDE CAMPUS",
+
+]
 for t in tests:
-    print(predict_violation(t))
+
+    result_start = time.perf_counter()
+
+    print("\n", predict_violation(t))
+
+    result_end = time.perf_counter()
+
+    print(f"[TOTAL LOOP TIME] {result_end - result_start:.6f} sec")
