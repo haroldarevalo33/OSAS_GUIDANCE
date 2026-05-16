@@ -5,7 +5,6 @@ from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import (accuracy_score, classification_report, confusion_matrix)
 from sklearn.metrics.pairwise import cosine_similarity
-
 import time
 import pandas as pd
 import numpy as np
@@ -108,31 +107,25 @@ X_test_tfidf = vectorizer.transform(X_test)
 print(f"\nTotal features: {X_train_tfidf.shape[1]}")
 
 # ==========================
-# MODEL (FIXED — NO DOUBLE FIT BUG)
+# MODEL (FIXED — NO DOUBLE FIT)
 # ==========================
 base_model = LinearSVC(
     class_weight='balanced',
     max_iter=3000
 )
 
-start_train = time.perf_counter()
-base_model.fit(X_train_tfidf, y_train)
-end_train = time.perf_counter()
-
-print(f"\n[TRAIN TIME] {end_train - start_train:.6f} sec")
-
-# CALIBRATED MODEL (CORRECT WAY)
+# CALIBRATED MODEL (ONLY ONCE TRAIN)
 model = CalibratedClassifierCV(
     estimator=base_model,
     method='sigmoid',
     cv=2
 )
 
-start_calib = time.perf_counter()
+start_train = time.perf_counter()
 model.fit(X_train_tfidf, y_train)
-end_calib = time.perf_counter()
+end_train = time.perf_counter()
 
-print(f"[CALIBRATION TIME] {end_calib - start_calib:.6f} sec")
+print(f"\n[TRAIN + CALIBRATION TIME] {end_train - start_train:.6f} sec")
 
 # ==========================
 # EVALUATION
@@ -268,7 +261,6 @@ weird_phrases = [
     "asdasd asdasd asdasd",
     "random random random"
 ]
-
 
 weird_clean = [preprocess(x) for x in weird_phrases]
 
@@ -406,6 +398,58 @@ def predict_violation(sentence, top_n=3):
         "top_predictions": top_preds,
         "standard_text": standard
     }
+
+# ==========================
+# TEST
+# ==========================
+print("\n--- TEST ---")
+
+tests = [
+
+    # CELL PHONE
+    "STUDENT USED PHONE DURING EXAM WITHOUT PERMISSION",
+    "USING MOBILE PHONE INSIDE CLASSROOM",
+    "TAKING PICTURES OF EXAM USING CELLPHONE",
+
+    # CHEATING
+    "COPYING ANSWERS FROM CLASSMATE DURING QUIZ",
+    "CHEATING DURING FINAL EXAM",
+    "LOOKING AT ANOTHER STUDENT ANSWERS",
+
+    # DISRESPECT
+    "STUDENT SHOUTED AT THE TEACHER",
+    "DISRESPECTFUL BEHAVIOR TOWARDS FACULTY",
+    "ARGUING RUDELY WITH THE PROFESSOR",
+
+    # FIGHTING
+    "PHYSICAL FIGHT INSIDE THE CAMPUS",
+    "STUDENT ASSAULTED ANOTHER STUDENT",
+    "STARTING A FIGHT DURING CLASS",
+
+    # VANDALISM
+    "WRITING ON SCHOOL WALLS",
+    "DAMAGING SCHOOL PROPERTY",
+    "DESTROYING CLASSROOM CHAIRS",
+
+    # ATTENDANCE
+    "LEAVING CLASS WITHOUT PERMISSION",
+    "EXCESSIVE ABSENCES WITHOUT VALID REASON",
+    "COMING LATE TO CLASS REPEATEDLY",
+
+    # WEAPONS
+    "BRINGING A KNIFE TO SCHOOL",
+    "POSSESSION OF DANGEROUS WEAPON INSIDE CAMPUS",
+
+]
+for t in tests:
+
+    result_start = time.perf_counter()
+
+    print("\n", predict_violation(t))
+
+    result_end = time.perf_counter()
+
+    print(f"[TOTAL LOOP TIME] {result_end - result_start:.6f} sec")
 
 # ==========================
 # TEST
