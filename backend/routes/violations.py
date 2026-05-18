@@ -248,11 +248,6 @@ def add_violation():
 
     vectorized = vectorizer.transform([text_proc])
 
-    if is_gibberish(text_proc) or is_weird_phrase(text_proc):
-        return jsonify({
-            "message": "Invalid input detected",
-            "error_type": "invalid_text"
-        }), 400
 
     probs = model.predict_proba(vectorized)[0]
     classes = model.classes_
