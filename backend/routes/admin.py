@@ -6,6 +6,10 @@ import cloudinary.uploader
 
 admin_bp = Blueprint("admin_bp", __name__, url_prefix="/admin")
 
+
+# -------------------------
+# Admin login
+# -------------------------
 # SIMPLE IN-MEMORY TOKEN STORE (demo only)
 active_tokens = {}
 
@@ -48,63 +52,16 @@ def admin_login():
             "profile_pic": admin.profile_pic
         }
     }), 200
-
-
 # -------------------------
-# GET ADMIN PROFILE (PROTECTED)
-# -------------------------
-@admin_bp.get("/me")
-def get_admin_profile():
-
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header:
-        return jsonify({"message": "Missing token"}), 401
-
-    token = auth_header.replace("Bearer ", "")
-
-    admin_id = active_tokens.get(token)
-
-    if not admin_id:
-        return jsonify({"message": "Invalid or expired token"}), 401
-
-    admin = Admin.query.get(admin_id)
-
-    if not admin:
-        return jsonify({"message": "Admin not found"}), 404
-
-    return jsonify({
-        "admin": {
-            "admin_id": admin.admin_id,
-            "email": admin.email,
-            "name": getattr(admin, "name", "Admin"),
-            "profile_pic": admin.profile_pic
-        }
-    }), 200
-
-
-# -------------------------
-# UPLOAD PROFILE PICTURE (PROTECTED)
+# Upload profile picture
 # -------------------------
 @admin_bp.post("/upload_profile")
 def upload_profile_pic():
-
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header:
-        return jsonify({"message": "Missing token"}), 401
-
-    token = auth_header.replace("Bearer ", "")
-
-    admin_id = active_tokens.get(token)
-
-    if not admin_id:
-        return jsonify({"message": "Invalid token"}), 401
-
+    admin_id = request.form.get("admin_id")
     file = request.files.get("profile_pic")
 
-    if not file:
-        return jsonify({"message": "Missing profile_pic"}), 400
+    if not admin_id or not file:
+        return jsonify({"message": "Missing admin_id or profile_pic"}), 400
 
     admin = Admin.query.get(admin_id)
 
@@ -123,6 +80,7 @@ def upload_profile_pic():
         )
 
         admin.profile_pic = result["secure_url"]
+
         db.session.commit()
 
         return jsonify({
@@ -137,23 +95,25 @@ def upload_profile_pic():
             "error": str(e)
         }), 500
 
+
 # -------------------------
-# ADMIN LOGOUT
+# Get admin info
 # -------------------------
-@admin_bp.post("/logout")
-def logout_admin():
+@admin_bp.get("/me")
+def get_admin_info():
+    admin_id = request.args.get("admin_id")
 
-    auth_header = request.headers.get("Authorization")
+    if not admin_id:
+        return jsonify({"message": "admin_id missing"}), 400
 
-    if not auth_header:
-        return jsonify({"message": "Missing token"}), 401
+    admin = Admin.query.get(admin_id)
 
-    token = auth_header.replace("Bearer ", "")
-
-    if token in active_tokens:
-        del active_tokens[token]
+    if not admin:
+        return jsonify({"message": "Admin not found"}), 404
 
     return jsonify({
-        "success": True,
-        "message": "Logged out successfully"
+        "admin_id": admin.admin_id,
+        "email": admin.email,
+        "name": getattr(admin, "name", "Admin"),
+        "profile_pic": admin.profile_pic
     }), 200

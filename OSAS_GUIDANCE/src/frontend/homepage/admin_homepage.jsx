@@ -780,59 +780,32 @@ useEffect(() => {
 
   fetchSavedFiles();
 }, []);
-// =========================
-// FETCH USER (FIXED)
-// =========================
+//fetch user
 useEffect(() => {
-
   async function fetchUser() {
     try {
-
-      const token = localStorage.getItem("token");
-
-      if (!token) return;
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/admin/me`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/me?admin_id=1`);
       if (!res.ok) throw new Error("Failed to fetch user info");
-
       const data = await res.json();
 
       setUser({
-        id: data.admin.admin_id,
-        name: data.admin.name || "Admin",
-        email: data.admin.email || "",
-        profile_pic: data.admin.profile_pic,
+        id: data.admin_id,           // fixed key
+        name: data.name || "Admin",
+        email: data.email || "",
+        profile_pic: data.profile_pic,  // backend already returns full URL
       });
-
     } catch (err) {
       console.error(err);
     }
   }
 
   fetchUser();
-
 }, []);
 
+  if (!user) return <p>Loading...</p>;
 
-// =========================
-// LOADING STATE CHECK
-// =========================
-if (!user) return <p>Loading...</p>;
-
-
-// =========================
-// RESOLVE VIOLATION
-// =========================
-async function handleResolveViolation(v) {
-
+  //Resolve
+  async function handleResolveViolation(v) {
   // PREVENT DOUBLE RESOLVE
   if (v.is_resolved === "Resolved") return;
 
@@ -851,28 +824,18 @@ async function handleResolveViolation(v) {
   if (!result.isConfirmed) return;
 
   try {
-
-    const token = localStorage.getItem("token");
-
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/violations/resolve/${v.id}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    `${import.meta.env.VITE_API_URL}/violations/resolve/${v.id}`,
+    { method: "PUT" }
+   );
 
     if (!res.ok) {
       const data = await res.json();
-
       Swal.fire({
         icon: "error",
         title: "Error",
         text: data?.message || "Resolve failed",
       });
-
       return;
     }
 
@@ -887,7 +850,7 @@ async function handleResolveViolation(v) {
       timerProgressBar: true,
     });
 
-    // UPDATE UI
+    // SMOOTH UI UPDATE
     setViolations((prev) =>
       prev.map((item) =>
         item.id === v.id
@@ -913,7 +876,6 @@ async function handleResolveViolation(v) {
 
   } catch (err) {
     console.error(err);
-
     Swal.fire({
       icon: "error",
       title: "Error",
@@ -921,7 +883,6 @@ async function handleResolveViolation(v) {
     });
   }
 }
-
 // Delete Violations
 async function handleDeleteViolation(v) {
   // Confirmation modal (center)
@@ -1083,7 +1044,7 @@ function handleLogout() {
   });
 }
 
-  const navigate = useNavigate(); 
+  const navigate = useNavigate(); // ✔ OK NA DITO
 
   useEffect(() => {
     const token = localStorage.getItem("token");
