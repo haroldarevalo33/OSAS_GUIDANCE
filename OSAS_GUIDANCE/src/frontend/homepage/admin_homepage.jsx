@@ -1029,9 +1029,10 @@ function handleLogout() {
       localStorage.removeItem("admin");
 
       Swal.fire({
-        title: "Logged out",
+        title: "Successfully Logged Out",
+        text: "You have been logged out successfully.",
         icon: "success",
-        timer: 800,
+        timer: 1000,
         showConfirmButton: false,
       }).then(() => {
         // IMPORTANT: use react navigation only
@@ -2341,7 +2342,14 @@ return (
                 barCategoryGap="30%"
               >
                 <CartesianGrid stroke="#fee2e2" />
-                <XAxis dataKey="violation" />
+                <XAxis
+                dataKey="violation"
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                height={80}
+                tick={{ fontSize: 13}}
+              />
                 <YAxis />
                 <Tooltip />
 
@@ -2358,16 +2366,7 @@ return (
                             key={entry.violation}
                             className="flex items-center gap-1"
                           >
-                            <span
-                              className="w-3 h-3 block rounded"
-                              style={{
-                                backgroundColor:
-                                  chartColors[index % chartColors.length],
-                              }}
-                            ></span>
-                            <span className="text-gray-700">
-                              {entry.violation}
-                            </span>
+                       
                           </div>
                         ))}
                     </div>

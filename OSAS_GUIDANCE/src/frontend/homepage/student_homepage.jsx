@@ -1171,6 +1171,44 @@ useEffect(() => {
 }, [studentNumber]);
 
 const navigate = useNavigate();
+
+// LOGOUT FUNCTION
+const handleLogout = () => {
+  Swal.fire({
+    title: "Logout",
+    text: "Are you sure you want to log out?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Logout",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+  }).then((result) => {
+    if (result.isConfirmed) {
+
+      // clear auth data
+      localStorage.removeItem("student");
+      localStorage.removeItem("token");
+
+      // optional: clear session history issue fix
+      window.history.replaceState(null, "", "/");
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Logged out successfully",
+        showConfirmButton: false,
+        timer: 800,
+        timerProgressBar: true,
+      });
+
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 400);
+    }
+  });
+};
   // ---------------------------
   // Render
   return (
@@ -1260,45 +1298,10 @@ const navigate = useNavigate();
             <span className="font-medium">Account Settings</span>
           </button>
         </nav><br></br>
-        
-        {/* DESKTOP LOGOUT BUTTON */}
-        
+       {/* DESKTOP LOGOUT BUTTON */}
         <div className="px-4 pb-6 mt-auto">
-         <button
-            onClick={() => {
-              Swal.fire({
-                title: "Logout",
-                text: "Are you sure you want to log out?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "Logout",
-                cancelButtonText: "Cancel",
-                confirmButtonColor: "#d33",
-                cancelButtonColor: "#3085d6",
-              }).then((result) => {
-                if (result.isConfirmed) {
-
-                
-                  localStorage.removeItem("student");
-                  localStorage.removeItem("token");
-
-                
-                  Swal.fire({
-                    toast: true,
-                    position: "top-end",
-                    icon: "success",
-                    title: "Logged out successfully",
-                    showConfirmButton: false,
-                    timer: 800,
-                    timerProgressBar: true,
-                  });
-
-                  setTimeout(() => {
-                    navigate("/", { replace: true });
-                  }, 400);
-                }
-              });
-            }}
+          <button
+            onClick={handleLogout}
             className="
               flex items-center justify-center gap-3 
               w-full py-3
@@ -1388,59 +1391,23 @@ const navigate = useNavigate();
             </button>
           </nav><br></br>
 
-      {/* MOBILE LOGOUT BUTTON */}
+       {/* MOBILE LOGOUT BUTTON */}
         <div className="px-4 pb-6 mt-auto">
           <button
-            onClick={() => {
-              Swal.fire({
-                title: "Logout",
-                text: "Are you sure you want to log out?",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "Logout",
-                cancelButtonText: "Cancel",
-                confirmButtonColor: "#d33",
-                cancelButtonColor: "#3085d6",
-              }).then((result) => {
-                if (result.isConfirmed) {
-
-                  Swal.fire({
-                    toast: true,
-                    position: "top-end",
-                    icon: "success",
-                    title: "Logged out successfully",
-                    showConfirmButton: false,
-                    timer: 1500,
-                    timerProgressBar: true,
-                  });
-
-                  setTimeout(() => {
-                    localStorage.removeItem("student");
-                    localStorage.removeItem("token");
-
-                    // optional safety cleanup
-                    localStorage.removeItem("user");
-
-                    window.location.href = "/student_login";
-                  }, 1500);
-                }
-                });
-              }}
-
-              className="
-                flex items-center justify-center gap-3 
-                w-full py-3
-                bg-red-600 text-white 
-                rounded-lg shadow-md 
-                hover:bg-red-700 
-                transition-all select-none
-              "
-            >
-              <ArrowRightOnRectangleIcon className="w-6 h-6" />
-              <span className="text-base font-semibold">Logout</span>
-            </button>
-          </div>
-
+            onClick={handleLogout}
+            className="
+              flex items-center justify-center gap-3 
+              w-full py-3
+              bg-red-600 text-white 
+              rounded-lg shadow-md 
+              hover:bg-red-700 
+              transition-all select-none
+            "
+          >
+            <ArrowRightOnRectangleIcon className="w-6 h-6" />
+            <span className="text-base font-semibold">Logout</span>
+          </button>
+        </div>
         </div>
       </div>
 
