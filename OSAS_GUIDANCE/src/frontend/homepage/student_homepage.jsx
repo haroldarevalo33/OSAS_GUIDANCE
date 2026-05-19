@@ -1388,42 +1388,43 @@ const navigate = useNavigate();
             </button>
           </nav><br></br>
 
-        {/* MOBILE LOGOUT BUTTON */}
-          <div className="px-4 pb-6 mt-auto">
-            <button
-              onClick={() => {
-                Swal.fire({
-                  title: "Logout",
-                  text: "Are you sure you want to log out?",
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonText: "Logout",
-                  cancelButtonText: "Cancel",
-                  confirmButtonColor: "#d33",
-                  cancelButtonColor: "#3085d6",
-                }).then((result) => {
-                  if (result.isConfirmed) {
+      {/* MOBILE LOGOUT BUTTON */}
+        <div className="px-4 pb-6 mt-auto">
+          <button
+            onClick={() => {
+              Swal.fire({
+                title: "Logout",
+                text: "Are you sure you want to log out?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Logout",
+                cancelButtonText: "Cancel",
+                confirmButtonColor: "#d33",
+                cancelButtonColor: "#3085d6",
+              }).then((result) => {
+                if (result.isConfirmed) {
 
-                    // 1. CLEAR ALL AUTH DATA (IMPORTANT FIX)
+                  Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "Logged out successfully",
+                    showConfirmButton: false,
+                    timer: 1500,
+                    timerProgressBar: true,
+                  });
+
+                  setTimeout(() => {
+            
                     localStorage.removeItem("student");
                     localStorage.removeItem("token");
 
-                    // 2. SUCCESS TOAST
-                    Swal.fire({
-                      toast: true,
-                      position: "top-end",
-                      icon: "success",
-                      title: "Logged out successfully",
-                      showConfirmButton: false,
-                      timer: 1000,
-                      timerProgressBar: true,
-                    });
+                    // optional safety cleanup
+                    localStorage.removeItem("user");
 
-                    // 3. SAFE REDIRECT (NO window.location)
-                    setTimeout(() => {
-                      navigate("/", { replace: true });
-                    }, 800);
-                  }
+                    window.location.href = "/student_login";
+                  }, 1500);
+                }
                 });
               }}
 
