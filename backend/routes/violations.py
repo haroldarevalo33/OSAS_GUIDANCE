@@ -502,7 +502,8 @@ def search_violations():
             "predicted_violation": r.predicted_violation,
             "predicted_section": r.predicted_section,
             "predictive_text": r.predictive_text,
-            "standard_text": r.standard_text  
+            "standard_text": r.standard_text,
+              "is_resolved": r.is_resolved or ""
         }
         for r in results
     ]), 200

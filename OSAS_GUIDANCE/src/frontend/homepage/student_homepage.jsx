@@ -1415,7 +1415,6 @@ const navigate = useNavigate();
                   });
 
                   setTimeout(() => {
-            
                     localStorage.removeItem("student");
                     localStorage.removeItem("token");
 

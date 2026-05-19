@@ -852,17 +852,12 @@ useEffect(() => {
 
     // SMOOTH UI UPDATE
     setViolations((prev) =>
-      prev.map((item) =>
-        item.id === v.id
-          ? {
-              ...item,
-              is_resolved: "Resolved",
-              _anim: true,
-            }
-          : item
-      )
-    );
-
+    prev.map((item) =>
+      item.id === v.id
+        ? { ...item, is_resolved: "Resolved" }
+        : item
+    )
+  );
     // REMOVE ANIMATION FLAG
     setTimeout(() => {
       setViolations((prev) =>
@@ -1182,11 +1177,11 @@ async function handleSubmitViolation() {
   } catch (err) {
     console.error(err);
 
-    Swal.fire({
-      icon: "error",
-      title: "Error",
-      text: err.message || "Invalid or Wrong Student Number.",
-    });
+ Swal.fire({
+  icon: "error",
+  title: "Student Not Found",
+  text: "Please check the student number and try again.",
+});
 
   } finally {
     // ================= ALWAYS STOP LOADING =================
@@ -3031,124 +3026,131 @@ return (
                                 return `${mm}/${dd}/${yy}`;
                               };
 
-                              return filtered.map((v, idx) => (
-                                <tr
-                                  key={idx}
-                                  className="border-b border-blue-200 last:border-b-0 hover:bg-blue-100 transition"
-                                >
+                            return filtered.map((v, idx) => {
+                                const isResolved =
+                                  String(v.is_resolved).toLowerCase() === "resolved" ||
+                                  v.is_resolved === true ||
+                                  v.is_resolved === 1;
 
-                                  {/* ID */}
-                                  {(filterCategory === "all" || filterCategory === "id") && (
-                                    <td className="py-3 px-4 truncate max-w-[120px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                      {v.student_id}
-                                    </td>
-                                  )}
+                                return (
+                                  <tr
+                                   key={v.id || v.violation_id}
+                                    className="border-b border-blue-200 last:border-b-0 hover:bg-blue-100 transition"
+                                  >
 
-                                  {/* NAME */}
-                                  {(filterCategory === "all" || filterCategory === "name") && (
-                                    <td className="py-3 px-4 truncate max-w-[150px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                      {v.student_name}
-                                    </td>
-                                  )}
+                                    {/* ID */}
+                                    {(filterCategory === "all" || filterCategory === "id") && (
+                                      <td className="py-3 px-4 truncate max-w-[120px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {v.student_id}
+                                      </td>
+                                    )}
 
-                                  {/* GENDER */}
-                                  {(filterCategory === "all" || filterCategory === "gender") && (
-                                    <td className="py-3 px-4 truncate max-w-[100px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                      {v.gender}
-                                    </td>
-                                  )}
+                                    {/* NAME */}
+                                    {(filterCategory === "all" || filterCategory === "name") && (
+                                      <td className="py-3 px-4 truncate max-w-[150px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {v.student_name}
+                                      </td>
+                                    )}
 
-                                  {/* COURSE */}
-                                  {(filterCategory === "all" || filterCategory === "course") && (
-                                    <td className="py-3 px-4 truncate max-w-[180px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                      {v.course_year_section}
-                                    </td>
-                                  )}
+                                    {/* GENDER */}
+                                    {(filterCategory === "all" || filterCategory === "gender") && (
+                                      <td className="py-3 px-4 truncate max-w-[100px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {v.gender}
+                                      </td>
+                                    )}
 
-                                  {/* DATE */}
-                                  {(filterCategory === "all" || filterCategory === "date") && (
-                                    <td className="py-3 px-4 whitespace-nowrap">
-                                      {formatDate(v.violation_date)}
-                                    </td>
-                                  )}
+                                    {/* COURSE */}
+                                    {(filterCategory === "all" || filterCategory === "course") && (
+                                      <td className="py-3 px-4 truncate max-w-[180px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {v.course_year_section}
+                                      </td>
+                                    )}
 
-                                  {/* VIOLATION */}
-                                  {(filterCategory === "all" || filterCategory === "violation") && (
-                                    <td className="py-3 px-4 max-w-[220px]">
-                                      <div
-                                        className="truncate whitespace-nowrap overflow-hidden text-ellipsis"
-                                        title={v.violation_text}
-                                      >
-                                        {v.violation_text}
-                                      </div>
-                                    </td>
-                                  )}
+                                    {/* DATE */}
+                                    {(filterCategory === "all" || filterCategory === "date") && (
+                                      <td className="py-3 px-4 whitespace-nowrap">
+                                        {formatDate(v.violation_date)}
+                                      </td>
+                                    )}
 
-                                  {/* ACTIONS */}
-                                  <td className="py-3 px-4">
-                                    <div className="flex items-center gap-2 justify-center">
-
-                                      <button
-                                        onClick={() => {
-                                          setCurrentViolation(v);
-                                          setShowViolationDetailsModal(true);
-                                        }}
-                                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
-                                      >
-                                        View
-                                      </button>
-
-                                      <button
-                                        onClick={() => handleResolveViolation(v)}
-                                        disabled={v.is_resolved === "Resolved"}
-                                        className={`px-3 py-1 rounded text-white transition ${
-                                          v.is_resolved === "Resolved"
-                                            ? "bg-gray-400 cursor-not-allowed"
-                                            : "bg-green-600 hover:bg-green-700"
-                                        }`}
-                                      >
-                                        {v.is_resolved === "Resolved" ? "Resolved" : "Resolve"}
-                                      </button>
-
-                                      <div className="relative">
-                                        <button
-                                          onClick={() =>
-                                            setOpenMenuId(openMenuId === idx ? null : idx)
-                                          }
-                                          className="px-2 py-1 text-gray-700 hover:bg-gray-300 rounded-lg"
+                                    {/* VIOLATION */}
+                                    {(filterCategory === "all" || filterCategory === "violation") && (
+                                      <td className="py-3 px-4 max-w-[220px]">
+                                        <div
+                                          className="truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                          title={v.violation_text}
                                         >
-                                          ⋮
+                                          {v.violation_text}
+                                        </div>
+                                      </td>
+                                    )}
+
+                                    {/* ACTIONS */}
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center gap-2 justify-center">
+
+                                        <button
+                                          onClick={() => {
+                                            setCurrentViolation(v);
+                                            setShowViolationDetailsModal(true);
+                                          }}
+                                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+                                        >
+                                          View
                                         </button>
 
-                                        {openMenuId === idx && (
-                                          <div className="absolute right-0 mt-2 w-32 bg-white border rounded-lg shadow-lg z-50">
-                                            <button
-                                              onClick={() => {
-                                                handleDeleteViolation(v);
-                                                setOpenMenuId(null);
-                                              }}
-                                              className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-100"
-                                            >
-                                              Delete
-                                            </button>
-                                          </div>
-                                        )}
+                                        <button
+                                          onClick={() => handleResolveViolation(v)}
+                                          disabled={isResolved}
+                                          className={`px-3 py-1 rounded text-white transition ${
+                                            isResolved
+                                              ? "bg-gray-400 cursor-not-allowed"
+                                              : "bg-green-600 hover:bg-green-700"
+                                          }`}
+                                        >
+                                          {isResolved ? "Resolved" : "Resolve"}
+                                        </button>
+
+                                        <div className="relative">
+                                          <button
+                                            onClick={() =>
+                                              setOpenMenuId(openMenuId === idx ? null : idx)
+                                            }
+                                            className="px-2 py-1 text-gray-700 hover:bg-gray-300 rounded-lg"
+                                          >
+                                            ⋮
+                                          </button>
+
+                                          {openMenuId === idx && (
+                                            <div className="absolute right-0 mt-2 w-32 bg-white border rounded-lg shadow-lg z-50">
+                                              <button
+                                                onClick={() => {
+                                                  handleDeleteViolation(v);
+                                                  setOpenMenuId(null);
+                                                }}
+                                                className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-100"
+                                              >
+                                                Delete
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+
                                       </div>
+                                    </td>
 
-                                    </div>
-                                  </td>
-
-                                </tr>
-                              ));
+                                  </tr>
+                                );
+                              });
                             })()}
                           </tbody>
                         </table>
                       </div>
                     </div>
                     </div>
-                                    )}
-                                    {showViolationDetailsModal && currentViolation && (() => {
-                                    const v = currentViolation;
+                  )}
+                  {showViolationDetailsModal && currentViolation && (() => {
+                  const v = currentViolation;
 
                         // ===== DOCX DOWNLOAD FUNCTION ===== //
                         const downloadDocx = async () => {
