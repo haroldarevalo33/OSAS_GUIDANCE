@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { EyeIcon, EyeSlashIcon, Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 import { Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -37,7 +39,7 @@ export default function StudentHome() {
   const [profilePic, setProfilePic] = useState("");
   const [savedProfilePic, setSavedProfilePic] = useState(null);
   const [tempProfilePic, setTempProfilePic] = useState(null);
-  const [studentProfile, setStudentProfile] = useState(null); // SAVED (used by header)
+  const [studentProfile, setStudentProfile] = useState(null); 
 
   // Good moral
   const [notifications, setNotifications] = useState([]);
@@ -81,7 +83,6 @@ export default function StudentHome() {
   }
   const studentNumber = studentData.student_number || null;
   const fallbackName = studentData.student_name || "Student";
-  
 
   // ---------------------------
   // Effects: fetch news (when News active)
@@ -1168,6 +1169,8 @@ useEffect(() => {
 
   return () => clearInterval(intervalId);
 }, [studentNumber]);
+
+const navigate = useNavigate();
   // ---------------------------
   // Render
   return (
@@ -1257,55 +1260,58 @@ useEffect(() => {
             <span className="font-medium">Account Settings</span>
           </button>
         </nav><br></br>
-
+        
         {/* DESKTOP LOGOUT BUTTON */}
+        
         <div className="px-4 pb-6 mt-auto">
-          <button
+         <button
             onClick={() => {
-          Swal.fire({
-            title: "Logout",
-            text: "Are you sure you want to log out?",
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonText: "Logout",
-            cancelButtonText: "Cancel",
-            confirmButtonColor: "#d33",
-            cancelButtonColor: "#3085d6",
-          }).then((result) => {
-            if (result.isConfirmed) {
-
-              
               Swal.fire({
-                toast: true,
-                position: "top-end",
-                icon: "success",
-                title: "Logged out successfully",
-                showConfirmButton: false,
-                timer: 500,
-                timerProgressBar: true,
-              });
+                title: "Logout",
+                text: "Are you sure you want to log out?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Logout",
+                cancelButtonText: "Cancel",
+                confirmButtonColor: "#d33",
+                cancelButtonColor: "#3085d6",
+              }).then((result) => {
+                if (result.isConfirmed) {
 
-              // DELAY REDIRECT
-              setTimeout(() => {
-                localStorage.removeItem("student");
-                window.location.href = "/";
-              }, 500);
-            }
-          });
-        }}
-        className="
-          flex items-center justify-center gap-3 
-          w-full py-3
-          bg-red-600 text-white 
-          rounded-lg shadow-md 
-          hover:bg-red-700 
-          transition-all select-none
-        "
-      >
-        <ArrowRightOnRectangleIcon className="w-6 h-6" />
-        <span className="text-base font-semibold">Logout</span>
-      </button>
-    </div>
+                
+                  localStorage.removeItem("student");
+                  localStorage.removeItem("token");
+
+                
+                  Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "Logged out successfully",
+                    showConfirmButton: false,
+                    timer: 800,
+                    timerProgressBar: true,
+                  });
+
+                  setTimeout(() => {
+                    navigate("/", { replace: true });
+                  }, 400);
+                }
+              });
+            }}
+            className="
+              flex items-center justify-center gap-3 
+              w-full py-3
+              bg-red-600 text-white 
+              rounded-lg shadow-md 
+              hover:bg-red-700 
+              transition-all select-none
+            "
+          >
+            <ArrowRightOnRectangleIcon className="w-6 h-6" />
+            <span className="text-base font-semibold">Logout</span>
+          </button>
+        </div>
      </aside>
 
       {/* Sidebar drawer for mobile */}

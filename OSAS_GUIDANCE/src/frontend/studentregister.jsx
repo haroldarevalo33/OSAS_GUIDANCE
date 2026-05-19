@@ -96,6 +96,17 @@ const handleRegister = async () => {
       return;
     }
 
+    // CHECK IF EXACTLY 11 DIGITS
+    if (phone.length !== 11) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Phone Number",
+        text: "Phone number must be exactly 11 digits",
+      });
+      stopLoading();
+      return;
+    }
+
     // STUDENT NUMBER
     if (!/^\d{9}$/.test(studentNumber)) {
       Swal.fire({

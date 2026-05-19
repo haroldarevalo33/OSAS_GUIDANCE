@@ -6,6 +6,7 @@ import { Document, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -779,32 +780,59 @@ useEffect(() => {
 
   fetchSavedFiles();
 }, []);
-//fetch user
+// =========================
+// FETCH USER (FIXED)
+// =========================
 useEffect(() => {
+
   async function fetchUser() {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/me?admin_id=1`);
+
+      const token = localStorage.getItem("token");
+
+      if (!token) return;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/admin/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       if (!res.ok) throw new Error("Failed to fetch user info");
+
       const data = await res.json();
 
       setUser({
-        id: data.admin_id,           // fixed key
-        name: data.name || "Admin",
-        email: data.email || "",
-        profile_pic: data.profile_pic,  // backend already returns full URL
+        id: data.admin.admin_id,
+        name: data.admin.name || "Admin",
+        email: data.admin.email || "",
+        profile_pic: data.admin.profile_pic,
       });
+
     } catch (err) {
       console.error(err);
     }
   }
 
   fetchUser();
+
 }, []);
 
-  if (!user) return <p>Loading...</p>;
 
-  //Resolve
-  async function handleResolveViolation(v) {
+// =========================
+// LOADING STATE CHECK
+// =========================
+if (!user) return <p>Loading...</p>;
+
+
+// =========================
+// RESOLVE VIOLATION
+// =========================
+async function handleResolveViolation(v) {
+
   // PREVENT DOUBLE RESOLVE
   if (v.is_resolved === "Resolved") return;
 
@@ -823,18 +851,28 @@ useEffect(() => {
   if (!result.isConfirmed) return;
 
   try {
+
+    const token = localStorage.getItem("token");
+
     const res = await fetch(
-    `${import.meta.env.VITE_API_URL}/violations/resolve/${v.id}`,
-    { method: "PUT" }
-   );
+      `${import.meta.env.VITE_API_URL}/violations/resolve/${v.id}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
     if (!res.ok) {
       const data = await res.json();
+
       Swal.fire({
         icon: "error",
         title: "Error",
         text: data?.message || "Resolve failed",
       });
+
       return;
     }
 
@@ -849,7 +887,7 @@ useEffect(() => {
       timerProgressBar: true,
     });
 
-    // SMOOTH UI UPDATE
+    // UPDATE UI
     setViolations((prev) =>
       prev.map((item) =>
         item.id === v.id
@@ -875,6 +913,7 @@ useEffect(() => {
 
   } catch (err) {
     console.error(err);
+
     Swal.fire({
       icon: "error",
       title: "Error",
@@ -1028,6 +1067,10 @@ function handleLogout() {
     cancelButtonColor: "#d33",
   }).then((result) => {
     if (result.isConfirmed) {
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("admin");
+
       Swal.fire({
         title: "Logged out",
         text: "You have been successfully logged out.",
@@ -1035,9 +1078,20 @@ function handleLogout() {
         timer: 1200,
         showConfirmButton: false,
       }).then(() => (window.location.href = "/"));
+
     }
   });
 }
+
+  const navigate = useNavigate(); 
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      navigate("/", { replace: true });
+    }
+  }, []);
 
 // ------------------ Submit Violation ------------------
 async function handleSubmitViolation() {

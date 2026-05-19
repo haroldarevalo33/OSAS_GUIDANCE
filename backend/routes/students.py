@@ -105,6 +105,8 @@ def register_student():
 # ===========================
 # LOGIN
 # ===========================
+active_student_tokens = {}  # add sa taas ng file
+
 @student_bp.route("/login", methods=["POST", "OPTIONS"])
 @cross_origin(origin=FRONTEND_URL, supports_credentials=True)
 def login_student():
@@ -127,8 +129,14 @@ def login_student():
         if not student or not verify_password(student.password, password):
             return jsonify({"message": "Invalid credentials"}), 401
 
+        # CREATE TOKEN
+        token = str(uuid.uuid4())
+        active_student_tokens[token] = student.id
+
         return jsonify({
+            "success": True,
             "message": "Login successful",
+            "token": token,
             "student": {
                 "id": student.id,
                 "student_number": student.student_number,
@@ -144,6 +152,9 @@ def login_student():
         traceback.print_exc()
         return jsonify({"message": "Internal Server Error"}), 500
 
+    except Exception:
+        traceback.print_exc()
+        return jsonify({"message": "Internal Server Error"}), 500
 
 # ===========================
 # GET STUDENT BY ID OR NAME

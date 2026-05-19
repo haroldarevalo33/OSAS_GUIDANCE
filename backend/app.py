@@ -31,7 +31,7 @@ def create_app():
     app.config["DEBUG"] = True
     
 
-    # ==========================
+    # ========================== 
     # CORS
     # ==========================
     FRONTEND_URL = os.getenv("FRONTEND_URL", "https://osasguidance.pages.dev")

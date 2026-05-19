@@ -30,60 +30,99 @@ export default function AdminLogin2() {
   }, []);
 
   // Handle login
-  const handleLogin = async () => {
+const handleLogin = async () => {
+
   setLoading(true);
 
+  // CHECK EMPTY FIELDS
   if (!email || !password) {
+
     setLoading(false);
+
     Swal.fire({
       icon: "warning",
       title: "Incomplete Form",
       text: "Please enter both email and password",
     });
+
     return;
   }
 
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: email,
-        password: password,
-      }),
-    });
+
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/admin/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+        }),
+      }
+    );
 
     const data = await res.json();
 
-    if (res.ok) {
+    // SUCCESS LOGIN
+    if (res.ok && data.success) {
+
       Swal.fire({
         icon: "success",
         title: "Login Successful",
         text: data.message,
         confirmButtonColor: "#22c55e",
       }).then(() => {
+
+        // SAVE TOKEN
+        localStorage.setItem(
+          "token",
+          data.token
+        );
+
+        // SAVE ADMIN DATA
+        localStorage.setItem(
+          "admin",
+          JSON.stringify(data.admin)
+        );
+
         setLoading(false);
-        navigate("/admin_homepage");
+
+        // REDIRECT
+        navigate("/admin_homepage", {
+          replace: true,
+        });
+
       });
+
       return;
     }
 
     setLoading(false);
 
+    // INVALID LOGIN
     if (res.status === 401) {
+
       Swal.fire({
         icon: "error",
         title: "Login Failed",
         text: "Incorrect email or password",
       });
+
     } else {
+
       Swal.fire({
         icon: "error",
         title: "Error",
         text: data.message || "Something went wrong",
       });
+
     }
+
   } catch (err) {
+
     console.error(err);
 
     setLoading(false);
@@ -93,9 +132,9 @@ export default function AdminLogin2() {
       title: "Server Error",
       text: "Could not connect to backend",
     });
+
   }
 };
-
   return (
     <div className="w-screen h-screen bg-gray-900 flex overflow-hidden">
       {/* LEFT SIDE */}
