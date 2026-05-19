@@ -1029,22 +1029,24 @@ function handleLogout() {
   }).then((result) => {
     if (result.isConfirmed) {
 
+      // clear auth data
       localStorage.removeItem("token");
       localStorage.removeItem("admin");
 
       Swal.fire({
         title: "Logged out",
-        text: "You have been successfully logged out.",
         icon: "success",
-        timer: 1200,
+        timer: 800,
         showConfirmButton: false,
-      }).then(() => (window.location.href = "/"));
-
+      }).then(() => {
+        // IMPORTANT: use react navigation only
+        navigate("/", { replace: true });
+      });
     }
   });
 }
 
-  const navigate = useNavigate(); // ✔ OK NA DITO
+  const navigate = useNavigate(); 
 
   useEffect(() => {
     const token = localStorage.getItem("token");

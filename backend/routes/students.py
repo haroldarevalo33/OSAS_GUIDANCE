@@ -105,7 +105,7 @@ def register_student():
 # ===========================
 # LOGIN
 # ===========================
-active_student_tokens = {}  # add sa taas ng file
+active_student_tokens = {} 
 
 @student_bp.route("/login", methods=["POST", "OPTIONS"])
 @cross_origin(origin=FRONTEND_URL, supports_credentials=True)

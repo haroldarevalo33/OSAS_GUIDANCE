@@ -248,7 +248,6 @@ def add_violation():
 
     vectorized = vectorizer.transform([text_proc])
 
-
     probs = model.predict_proba(vectorized)[0]
     classes = model.classes_
 

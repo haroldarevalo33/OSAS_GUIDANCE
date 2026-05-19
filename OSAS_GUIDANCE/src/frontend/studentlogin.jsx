@@ -44,10 +44,10 @@ export default function StudentLogin() {
     return () => clearInterval(interval);
   }, []);
 
-  // ==================
-  // LOGIN
-  // ==================
- const handleLogin = async () => {
+ // ==================
+// LOGIN
+// ==================
+const handleLogin = async () => {
   if (!studentNumber || !password) {
     Swal.fire({
       icon: "warning",
@@ -71,14 +71,31 @@ export default function StudentLogin() {
 
     const data = await res.json().catch(() => ({}));
 
-    if (res.ok) {
+    // =========================
+    // CHECK BACKEND RESPONSE
+    // =========================
+    if (res.ok && data.success && data.student && data.token) {
+
+      // =========================
+      // SAVE STUDENT DATA
+      // =========================
       localStorage.setItem(
         "student",
         JSON.stringify({
+          id: data.student.id,
           student_number: data.student.student_number,
           student_name: data.student.student_name,
+          email: data.student.email,
+          phone: data.student.phone,
+          course: data.student.course,
+          profile_pic: data.student.profile_pic,
         })
       );
+
+      // =========================
+      // SAVE TOKEN
+      // =========================
+      localStorage.setItem("token", data.token);
 
       Swal.fire({
         icon: "success",
@@ -88,6 +105,7 @@ export default function StudentLogin() {
       }).then(() => {
         navigate("/student_homepage");
       });
+
     } else {
       Swal.fire({
         icon: "error",
@@ -95,6 +113,7 @@ export default function StudentLogin() {
         text: data.message || "Invalid credentials",
       });
     }
+
   } catch (err) {
     Swal.fire({
       icon: "error",
@@ -105,7 +124,6 @@ export default function StudentLogin() {
     setLoading(false);
   }
 };
-
 
 
 // ==================
