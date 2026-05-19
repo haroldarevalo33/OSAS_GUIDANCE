@@ -1388,7 +1388,7 @@ const navigate = useNavigate();
             </button>
           </nav><br></br>
 
-          {/* MOBILE LOGOUT BUTTON */}
+        {/* MOBILE LOGOUT BUTTON */}
           <div className="px-4 pb-6 mt-auto">
             <button
               onClick={() => {
@@ -1404,22 +1404,25 @@ const navigate = useNavigate();
                 }).then((result) => {
                   if (result.isConfirmed) {
 
-                    // SUCCESS TOAST BAGO MAG-REDIRECT
+                    // 1. CLEAR ALL AUTH DATA (IMPORTANT FIX)
+                    localStorage.removeItem("student");
+                    localStorage.removeItem("token");
+
+                    // 2. SUCCESS TOAST
                     Swal.fire({
                       toast: true,
                       position: "top-end",
                       icon: "success",
                       title: "Logged out successfully",
                       showConfirmButton: false,
-                      timer: 1500,
+                      timer: 1000,
                       timerProgressBar: true,
                     });
 
-                    // DELAY REDIRECT
+                    // 3. SAFE REDIRECT (NO window.location)
                     setTimeout(() => {
-                      localStorage.removeItem("student");
-                      window.location.href = "/";
-                    }, 1500);
+                      navigate("/", { replace: true });
+                    }, 800);
                   }
                 });
               }}

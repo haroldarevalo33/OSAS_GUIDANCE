@@ -44,7 +44,7 @@ export default function StudentLogin() {
     return () => clearInterval(interval);
   }, []);
 
- // ==================
+// ==================
 // LOGIN
 // ==================
 const handleLogin = async () => {
@@ -60,7 +60,7 @@ const handleLogin = async () => {
   setLoading(true);
 
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/login`, {
+    const res = await fetch(`${API}/students/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -71,30 +71,23 @@ const handleLogin = async () => {
 
     const data = await res.json().catch(() => ({}));
 
-    // =========================
-    // CHECK BACKEND RESPONSE
-    // =========================
     if (res.ok && data.success && data.student && data.token) {
 
-      // =========================
-      // SAVE STUDENT DATA
-      // =========================
-      localStorage.setItem(
-        "student",
-        JSON.stringify({
-          id: data.student.id,
-          student_number: data.student.student_number,
-          student_name: data.student.student_name,
-          email: data.student.email,
-          phone: data.student.phone,
-          course: data.student.course,
-          profile_pic: data.student.profile_pic,
-        })
-      );
+      const userData = {
+        id: data.student.id,
+        student_number: data.student.student_number,
+        student_name: data.student.student_name,
+        email: data.student.email,
+        phone: data.student.phone,
+        course: data.student.course,
+        profile_pic: data.student.profile_pic,
+        role: "student"
+      };
 
-      // =========================
-      // SAVE TOKEN
-      // =========================
+
+      localStorage.setItem("user", JSON.stringify(userData));
+
+
       localStorage.setItem("token", data.token);
 
       Swal.fire({
@@ -103,7 +96,7 @@ const handleLogin = async () => {
         text: data.message,
         confirmButtonColor: "#22c55e",
       }).then(() => {
-        navigate("/student_homepage");
+        navigate("/student_homepage", { replace: true });
       });
 
     } else {
@@ -124,7 +117,6 @@ const handleLogin = async () => {
     setLoading(false);
   }
 };
-
 
 // ==================
 // FORGOT PASSWORD
