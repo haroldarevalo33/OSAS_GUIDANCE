@@ -1615,7 +1615,7 @@ useEffect(() => {
 const [courseFilter, setCourseFilter] = useState("ALL");
 const [dateFrom, setDateFrom] = useState("");
 const [dateTo, setDateTo] = useState("");
-const [sortOrder, setSortOrder] = useState("ASC");
+const [sortOrder, setSortOrder] = useState("latest");
 
 
 // ===================== FETCH WHEN FILTERS CHANGE ===================== //
@@ -1798,9 +1798,13 @@ useEffect(() => {
       else if (activePage === "search") {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`);
         const data = await res.json();
-        setViolations(data);
-      }
 
+        const sorted = [...data].sort((a, b) =>
+          new Date(b.violation_date || 0) - new Date(a.violation_date || 0)
+        );
+
+        setViolations(sorted);
+      }
       //  ENCODE VIOLATION (optional, usually no fetch)
       else if (activePage === "violation") {
           const res = await fetch(`${import.meta.env.VITE_API_URL}/violations`);
@@ -2794,360 +2798,474 @@ return (
                 ))}
             </div>
           )}
+            {/* Search Students */}
+            {activePage === "search" && (
+              <div className="space-y-6">
 
-               {/* Search Students */}
-                {activePage === "search" && (
-                  <div className="space-y-6">
+                {/* Search Section */}
+                <div className="flex flex-wrap items-center gap-4 w-full p-4 bg-blue-50 rounded-lg shadow">
 
-                    {/* Search Section (Aligned to Backend Filters) */}
-                    <div className="flex flex-wrap items-center gap-4 w-full p-4 bg-blue-50 rounded-lg shadow">
+                  {/* Search Input */}
+                  <div className="flex items-center space-x-2 flex-1 min-w-[250px] bg-white px-3 py-2 rounded-lg shadow-inner border border-blue-300">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-blue-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-4.35-4.35M5 11a6 6 0 1112 0 6 6 0 01-12 0z"
+                      />
+                    </svg>
 
-                      {/* Search Input (q) */}
-                      <div className="flex items-center space-x-2 flex-1 min-w-[250px] bg-white px-3 py-2 rounded-lg shadow-inner border border-blue-300">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 text-blue-600"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-4.35-4.35M5 11a6 6 0 1112 0 6 6 0 01-12 0z"
-                          />
-                        </svg>
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search anything (name, id, text...)"
+                      className="w-full bg-transparent focus:outline-none text-gray-700"
+                    />
+                  </div>
 
-                        <input
-                          type="text"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder="Search anything (name, id, text...)"
-                          className="w-full bg-transparent focus:outline-none text-gray-700"
-                        />
-                      </div>
+                  {/* Course Filter */}
+                  <select
+                    value={courseFilter}
+                    onChange={(e) => setCourseFilter(e.target.value)}
+                    className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ALL">All Courses</option>
+                    <option value="BEED">BEED</option>
+                    <option value="BSED">BSED</option>
+                    <option value="BSBM">BSBM</option>
+                    <option value="BSCS">BSCS</option>
+                    <option value="BSHM">BSHM</option>
+                    <option value="BSIT">BSIT</option>
+                    <option value="BSFAS">BSFAS</option>
+                  </select>
 
-                      {/* Course Filter */}
-                      <select
-                        value={courseFilter}
-                        onChange={(e) => setCourseFilter(e.target.value)}
-                        className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="ALL">All Courses</option>
-                        <option value="BEED">BEED</option>
-                        <option value="BSED">BSED</option>
-                        <option value="BSBM">BSBM</option>
-                        <option value="BSCS">BSCS</option>
-                        <option value="BSHM">BSHM</option>
-                        <option value="BSIT">BSIT</option>
-                        <option value="BSFAS">BSFAS</option>
-                      </select>
+                  {/* Date Range */}
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
 
-                        {/* Date Range */}
-                        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <label className="text-blue-700 text-sm font-medium">
+                        From
+                      </label>
 
-                          <div className="flex items-center gap-2">
-                            <label className="text-blue-700 text-sm font-medium">
-                              From
-                            </label>
-                            <input
-                              type="date"
-                              value={dateFrom}
-                              onChange={(e) => setDateFrom(e.target.value)}
-                              className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow
-                              focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <label className="text-blue-700 text-sm font-medium">
-                              To
-                            </label>
-                            <input
-                              type="date"
-                              value={dateTo}
-                              onChange={(e) => setDateTo(e.target.value)}
-                              className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow
-                              focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-
-                        </div>
-
-                      {/* Sort ASC / DESC */}
-                      <select
-                        value={sortOrder}
-                        onChange={(e) => setSortOrder(e.target.value)}
-                        className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
-                      >
-                        <option value="ASC">A → Z</option>
-                        <option value="DESC">Z → A</option>
-                      </select>
-                      {/* Reset Filters Button */}
-                        <button
-                          onClick={() => {
-                            setQuery("");
-                            setCourseFilter("ALL");
-                            setDateFrom("");
-                            setDateTo("");
-                            setSortOrder("ASC");
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
-                        >
-                          {/* refresh icon */}
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 4v6h6M20 20v-6h-6M4 10a8 8 0 0114.32-4.906M20 14a8 8 0 01-14.32 4.906"
-                            />
-                          </svg>
-
-                          Reset Filters
-                        </button>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow
+                        focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
 
-                  {/* TABLE */}
-                    <div className="bg-white shadow-xl rounded-lg overflow-x-auto border border-blue-300">
+                    <div className="flex items-center gap-2">
+                      <label className="text-blue-700 text-sm font-medium">
+                        To
+                      </label>
 
-                      <div className="w-full overflow-x-auto">
-                        <table className="w-full min-w-[900px] table-fixed text-left">
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow
+                        focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
 
-                          <thead className="bg-blue-600 text-white">
-                            <tr>
-                              {(filterCategory === "all" || filterCategory === "id") && (
-                                <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
-                                  Student Number
-                                </th>
-                              )}
+                  </div>
 
-                              {(filterCategory === "all" || filterCategory === "name") && (
-                                <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
-                                  Student Name
-                                </th>
-                              )}
+                  {/* Sort */}
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    className="border border-blue-300 rounded-lg px-3 py-2 bg-white shadow"
+                  >
+                    {/* DEFAULT = LATEST VIOLATION */}
+                    <option value="latest">
+                      Latest Violation
+                    </option>
 
-                              {(filterCategory === "all" || filterCategory === "gender") && (
-                                <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
-                                  Gender
-                                </th>
-                              )}
+                    <option value="oldest">
+                      Oldest Violation
+                    </option>
 
-                              {(filterCategory === "all" || filterCategory === "course") && (
-                                <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
-                                  Course/Year/Section
-                                </th>
-                              )}
+                    <option value="asc">
+                      A → Z
+                    </option>
 
-                              {(filterCategory === "all" || filterCategory === "date") && (
-                                <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
-                                  Date
-                                </th>
-                              )}
+                    <option value="desc">
+                      Z → A
+                    </option>
+                  </select>
 
-                              {(filterCategory === "all" || filterCategory === "violation") && (
-                                <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
-                                  Violation
-                                </th>
-                              )}
+                  {/* Reset Filters */}
+                  <button
+                    onClick={() => {
+                      setQuery("");
+                      setCourseFilter("ALL");
+                      setDateFrom("");
+                      setDateTo("");
 
-                              <th className="py-[11px] px-6 text-sm font-semibold whitespace-nowrap">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
+                      {/* RESET DEFAULT */}
+                      setSortOrder("latest");
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v6h6M20 20v-6h-6M4 10a8 8 0 0114.32-4.906M20 14a8 8 0 01-14.32 4.906"
+                      />
+                    </svg>
 
-                          <tbody>
-                            {(() => {
-                              const filtered = violations.filter((v) => {
-                                const q = (query || "").toLowerCase();
-                                if (!q) return true;
+                    Reset Filters
+                  </button>
+                </div>
 
-                                const studentName = (v.student_name || "").toLowerCase();
-                                const studentId = String(v.student_id || "");
-                                const course = (v.course_year_section || "").toLowerCase();
-                                const violationText = (v.violation_text || "").toLowerCase();
-                                const dateStr = v.violation_date
-                                  ? new Date(v.violation_date).toLocaleDateString("en-US")
-                                  : "";
-                                const gender = v.gender?.toLowerCase() || "";
+                {/* TABLE */}
+                <div className="bg-white shadow-xl rounded-lg overflow-x-auto border border-blue-300">
 
-                                switch (filterCategory) {
-                                  case "name":
-                                    return studentName.includes(q);
-                                  case "id":
-                                    return studentId.includes(q);
-                                  case "course":
-                                    return course.includes(q);
-                                  case "violation":
-                                    return violationText.includes(q);
-                                  case "date":
-                                    return dateStr.includes(q);
-                                  case "gender":
-                                    return gender.includes(q);
-                                  case "all":
-                                  default:
-                                    return (
-                                      studentName.includes(q) ||
-                                      studentId.includes(q) ||
-                                      course.includes(q) ||
-                                      violationText.includes(q) ||
-                                      dateStr.includes(q) ||
-                                      gender.includes(q)
-                                    );
-                                }
-                              });
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full min-w-[900px] table-fixed text-left">
 
-                              if (filtered.length === 0) {
-                                return (
-                                  <tr>
-                                    <td colSpan="7" className="text-center py-6 text-gray-500">
-                                      No results found. Type to search...
-                                    </td>
-                                  </tr>
-                                );
-                              }
+                      <thead className="bg-blue-600 text-white">
+                        <tr>
 
-                              const formatDate = (dateStr) => {
-                                if (!dateStr) return "";
-                                const date = new Date(dateStr);
-                                const mm = String(date.getMonth() + 1).padStart(2, "0");
-                                const dd = String(date.getDate()).padStart(2, "0");
-                                const yy = String(date.getFullYear()).slice(-2);
-                                return `${mm}/${dd}/${yy}`;
-                              };
+                          {(filterCategory === "all" || filterCategory === "id") && (
+                            <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
+                              Student Number
+                            </th>
+                          )}
 
-                            return filtered.map((v, idx) => {
-                                const isResolved =
-                                  String(v.is_resolved).toLowerCase() === "resolved" ||
-                                  v.is_resolved === true ||
-                                  v.is_resolved === 1;
+                          {(filterCategory === "all" || filterCategory === "name") && (
+                            <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
+                              Student Name
+                            </th>
+                          )}
 
-                                return (
-                                  <tr
-                                   key={v.id || v.violation_id}
-                                    className="border-b border-blue-200 last:border-b-0 hover:bg-blue-100 transition"
-                                  >
+                          {(filterCategory === "all" || filterCategory === "gender") && (
+                            <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
+                              Gender
+                            </th>
+                          )}
 
-                                    {/* ID */}
-                                    {(filterCategory === "all" || filterCategory === "id") && (
-                                      <td className="py-3 px-4 truncate max-w-[120px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                        {v.student_id}
-                                      </td>
-                                    )}
+                          {(filterCategory === "all" || filterCategory === "course") && (
+                            <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
+                              Course/Year/Section
+                            </th>
+                          )}
 
-                                    {/* NAME */}
-                                    {(filterCategory === "all" || filterCategory === "name") && (
-                                      <td className="py-3 px-4 truncate max-w-[150px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                        {v.student_name}
-                                      </td>
-                                    )}
+                          {(filterCategory === "all" || filterCategory === "date") && (
+                            <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
+                              Date
+                            </th>
+                          )}
 
-                                    {/* GENDER */}
-                                    {(filterCategory === "all" || filterCategory === "gender") && (
-                                      <td className="py-3 px-4 truncate max-w-[100px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                        {v.gender}
-                                      </td>
-                                    )}
+                          {(filterCategory === "all" || filterCategory === "violation") && (
+                            <th className="py-[11px] px-3 text-sm font-semibold whitespace-nowrap">
+                              Violation
+                            </th>
+                          )}
 
-                                    {/* COURSE */}
-                                    {(filterCategory === "all" || filterCategory === "course") && (
-                                      <td className="py-3 px-4 truncate max-w-[180px] whitespace-nowrap overflow-hidden text-ellipsis">
-                                        {v.course_year_section}
-                                      </td>
-                                    )}
+                          <th className="py-[11px] px-6 text-sm font-semibold whitespace-nowrap">
+                            Actions
+                          </th>
 
-                                    {/* DATE */}
-                                    {(filterCategory === "all" || filterCategory === "date") && (
-                                      <td className="py-3 px-4 whitespace-nowrap">
-                                        {formatDate(v.violation_date)}
-                                      </td>
-                                    )}
+                        </tr>
+                      </thead>
 
-                                    {/* VIOLATION */}
-                                    {(filterCategory === "all" || filterCategory === "violation") && (
-                                      <td className="py-3 px-4 max-w-[220px]">
-                                        <div
-                                          className="truncate whitespace-nowrap overflow-hidden text-ellipsis"
-                                          title={v.violation_text}
-                                        >
-                                          {v.violation_text}
-                                        </div>
-                                      </td>
-                                    )}
+                      <tbody>
+                        {(() => {
 
-                                    {/* ACTIONS */}
-                                    <td className="py-3 px-4">
-                                      <div className="flex items-center gap-2 justify-center">
+                          const filtered = violations.filter((v) => {
 
-                                        <button
-                                          onClick={() => {
-                                            setCurrentViolation(v);
-                                            setShowViolationDetailsModal(true);
-                                          }}
-                                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
-                                        >
-                                          View
-                                        </button>
+                            const q = (query || "").toLowerCase();
 
-                                        <button
-                                          onClick={() => handleResolveViolation(v)}
-                                          disabled={isResolved}
-                                          className={`px-3 py-1 rounded text-white transition ${
-                                            isResolved
-                                              ? "bg-gray-400 cursor-not-allowed"
-                                              : "bg-green-600 hover:bg-green-700"
-                                          }`}
-                                        >
-                                          {isResolved ? "Resolved" : "Resolve"}
-                                        </button>
+                            {/* COURSE FILTER */}
+                            const matchCourse =
+                              courseFilter === "ALL"
+                                ? true
+                                : (v.course_year_section || "")
+                                    .toUpperCase()
+                                    .includes(courseFilter);
 
-                                        <div className="relative">
+                            {/* DATE FILTER */}
+                            const violationDate = v.violation_date
+                              ? new Date(v.violation_date)
+                              : null;
+
+                            const matchFrom = dateFrom
+                              ? violationDate >= new Date(dateFrom)
+                              : true;
+
+                            const matchTo = dateTo
+                              ? violationDate <= new Date(dateTo + "T23:59:59")
+                              : true;
+
+                            if (!q) {
+                              return matchCourse && matchFrom && matchTo;
+                            }
+
+                            const studentName = (v.student_name || "").toLowerCase();
+                            const studentId = String(v.student_id || "");
+                            const course = (v.course_year_section || "").toLowerCase();
+                            const violationText = (v.violation_text || "").toLowerCase();
+                            const dateStr = v.violation_date
+                              ? new Date(v.violation_date).toLocaleDateString("en-US")
+                              : "";
+
+                            const gender = v.gender?.toLowerCase() || "";
+
+                            let searchMatch = false;
+
+                            switch (filterCategory) {
+
+                              case "name":
+                                searchMatch = studentName.includes(q);
+                                break;
+
+                              case "id":
+                                searchMatch = studentId.includes(q);
+                                break;
+
+                              case "course":
+                                searchMatch = course.includes(q);
+                                break;
+
+                              case "violation":
+                                searchMatch = violationText.includes(q);
+                                break;
+
+                              case "date":
+                                searchMatch = dateStr.includes(q);
+                                break;
+
+                              case "gender":
+                                searchMatch = gender.includes(q);
+                                break;
+
+                              case "all":
+                              default:
+                                searchMatch =
+                                  studentName.includes(q) ||
+                                  studentId.includes(q) ||
+                                  course.includes(q) ||
+                                  violationText.includes(q) ||
+                                  dateStr.includes(q) ||
+                                  gender.includes(q);
+                            }
+
+                            return (
+                              searchMatch &&
+                              matchCourse &&
+                              matchFrom &&
+                              matchTo
+                            );
+                          });
+
+                          {/* SORTING */}
+                          const sorted = [...filtered].sort((a, b) => {
+
+                            {/* DEFAULT = LATEST VIOLATION */}
+                            if (sortOrder === "latest") {
+                              return (
+                                new Date(b.violation_date).getTime() -
+                                new Date(a.violation_date).getTime()
+                              );
+                            }
+
+                            {/* OLDEST */}
+                            if (sortOrder === "oldest") {
+                              return (
+                                new Date(a.violation_date).getTime() -
+                                new Date(b.violation_date).getTime()
+                              );
+                            }
+
+                            {/* A-Z */}
+                            if (sortOrder === "asc") {
+                              return (a.student_name || "").localeCompare(
+                                b.student_name || ""
+                              );
+                            }
+
+                            {/* Z-A */}
+                            if (sortOrder === "desc") {
+                              return (b.student_name || "").localeCompare(
+                                a.student_name || ""
+                              );
+                            }
+
+                            return 0;
+                          });
+
+                          if (sorted.length === 0) {
+                            return (
+                              <tr>
+                                <td
+                                  colSpan="7"
+                                  className="text-center py-6 text-gray-500"
+                                >
+                                  No results found. Type to search...
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          const formatDate = (dateStr) => {
+
+                            if (!dateStr) return "";
+
+                            const date = new Date(dateStr);
+
+                            const mm = String(date.getMonth() + 1).padStart(2, "0");
+                            const dd = String(date.getDate()).padStart(2, "0");
+                            const yy = String(date.getFullYear()).slice(-2);
+
+                            return `${mm}/${dd}/${yy}`;
+                          };
+
+                          return sorted.map((v, idx) => {
+
+                            const isResolved =
+                              String(v.is_resolved).toLowerCase() === "resolved" ||
+                              v.is_resolved === true ||
+                              v.is_resolved === 1;
+
+                            return (
+                              <tr
+                                key={v.id || v.violation_id}
+                                className="border-b border-blue-200 last:border-b-0 hover:bg-blue-100 transition"
+                              >
+
+                                {/* ID */}
+                                {(filterCategory === "all" || filterCategory === "id") && (
+                                  <td className="py-3 px-4 truncate max-w-[120px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {v.student_id}
+                                  </td>
+                                )}
+
+                                {/* NAME */}
+                                {(filterCategory === "all" || filterCategory === "name") && (
+                                  <td className="py-3 px-4 truncate max-w-[150px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {v.student_name}
+                                  </td>
+                                )}
+
+                                {/* GENDER */}
+                                {(filterCategory === "all" || filterCategory === "gender") && (
+                                  <td className="py-3 px-4 truncate max-w-[100px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {v.gender}
+                                  </td>
+                                )}
+
+                                {/* COURSE */}
+                                {(filterCategory === "all" || filterCategory === "course") && (
+                                  <td className="py-3 px-4 truncate max-w-[180px] whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {v.course_year_section}
+                                  </td>
+                                )}
+
+                                {/* DATE */}
+                                {(filterCategory === "all" || filterCategory === "date") && (
+                                  <td className="py-3 px-4 whitespace-nowrap">
+                                    {formatDate(v.violation_date)}
+                                  </td>
+                                )}
+
+                                {/* VIOLATION */}
+                                {(filterCategory === "all" || filterCategory === "violation") && (
+                                  <td className="py-3 px-4 max-w-[220px]">
+                                    <div
+                                      className="truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                      title={v.violation_text}
+                                    >
+                                      {v.violation_text}
+                                    </div>
+                                  </td>
+                                )}
+
+                                {/* ACTIONS */}
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2 justify-center">
+
+                                    <button
+                                      onClick={() => {
+                                        setCurrentViolation(v);
+                                        setShowViolationDetailsModal(true);
+                                      }}
+                                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+                                    >
+                                      View
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleResolveViolation(v)}
+                                      disabled={isResolved}
+                                      className={`px-3 py-1 rounded text-white transition ${
+                                        isResolved
+                                          ? "bg-gray-400 cursor-not-allowed"
+                                          : "bg-green-600 hover:bg-green-700"
+                                      }`}
+                                    >
+                                      {isResolved ? "Resolved" : "Resolve"}
+                                    </button>
+
+                                    <div className="relative">
+                                      <button
+                                        onClick={() =>
+                                          setOpenMenuId(openMenuId === idx ? null : idx)
+                                        }
+                                        className="px-2 py-1 text-gray-700 hover:bg-gray-300 rounded-lg"
+                                      >
+                                        ⋮
+                                      </button>
+
+                                      {openMenuId === idx && (
+                                        <div className="absolute right-0 mt-2 w-32 bg-white border rounded-lg shadow-lg z-50">
+
                                           <button
-                                            onClick={() =>
-                                              setOpenMenuId(openMenuId === idx ? null : idx)
-                                            }
-                                            className="px-2 py-1 text-gray-700 hover:bg-gray-300 rounded-lg"
+                                            onClick={() => {
+                                              handleDeleteViolation(v);
+                                              setOpenMenuId(null);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-100"
                                           >
-                                            ⋮
+                                            Delete
                                           </button>
 
-                                          {openMenuId === idx && (
-                                            <div className="absolute right-0 mt-2 w-32 bg-white border rounded-lg shadow-lg z-50">
-                                              <button
-                                                onClick={() => {
-                                                  handleDeleteViolation(v);
-                                                  setOpenMenuId(null);
-                                                }}
-                                                className="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-100"
-                                              >
-                                                Delete
-                                              </button>
-                                            </div>
-                                          )}
                                         </div>
+                                      )}
+                                    </div>
 
-                                      </div>
-                                    </td>
+                                  </div>
+                                </td>
 
-                                  </tr>
-                                );
-                              });
-                            })()}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    </div>
-                  )}
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
                   {showViolationDetailsModal && currentViolation && (() => {
                   const v = currentViolation;
 
@@ -4088,205 +4206,213 @@ return (
           </div>
         </div>
       )}
-      {/* STUDENT RECORDS */}
-      {activePage === "records" && (
-        <div className="bg-[#e8f5e9] p-3 sm:p-4 md:p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
+        {/* STUDENT RECORDS */}
+        {activePage === "records" && (() => {
 
-          {/* ================= FILTER BAR ================= */}
-          <div className="flex flex-col gap-3 bg-white p-3 sm:p-4 rounded-lg border border-green-300 shadow-sm">
+          const sortedStudents = [...filteredStudents].sort((a, b) => {
 
-            {/* TOP ROW: Search + Course */}
-            <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-3">
+            const nameA = (a.student_name || "").toLowerCase();
+            const nameB = (b.student_name || "").toLowerCase();
 
-              {/* SEARCH */}
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search student..."
-                className="w-full md:flex-1 px-3 py-2 border border-green-300 rounded-lg 
-                focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+            switch (sortOrder) {
 
-              {/* COURSE */}
-              <select
-                value={courseFilter}
-                onChange={(e) => setCourseFilter(e.target.value)}
-                className="w-full md:flex-1 px-3 py-2 border border-green-300 rounded-lg bg-white 
-                focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">All Courses</option>
-                <option value="Bachelor of Elementary Education">Bachelor of Elementary Education</option>
-                <option value="Bachelor of Secondary Education">Bachelor of Secondary Education</option>
-                <option value="BS Business Management">BS Business Management</option>
-                <option value="BS Computer Science">BS Computer Science</option>
-                <option value="BS Fisheries">BS Fisheries</option>
-                <option value="BS Hospitality Management">BS Hospitality Management (formerly BS HRM)</option>
-                <option value="BS Information Technology">BS Information Technology</option>
-              </select>
+              case "asc":
+                return nameA.localeCompare(nameB);
 
-            </div>
+              case "desc":
+                return nameB.localeCompare(nameA);
 
-            {/* SECOND ROW: DATE FILTERS */}
-            <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-3">
+              case "oldest":
+                return new Date(a.created_at) - new Date(b.created_at);
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
-                <span className="text-green-700 font-medium">From:</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full sm:w-auto px-3 py-2 border border-green-300 rounded-lg 
-                  focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+              case "latest":
+              default:
+                return new Date(b.created_at) - new Date(a.created_at);
+            }
+          });
+
+          return (
+            <div className="bg-[#e8f5e9] p-3 sm:p-4 md:p-6 rounded-xl shadow-lg space-y-6 border border-green-300">
+
+              {/* ================= FILTER BAR ================= */}
+              <div className="flex flex-col gap-3 bg-white p-3 sm:p-4 rounded-lg border border-green-300 shadow-sm">
+
+                {/* TOP ROW */}
+                <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-3">
+
+                  {/* SEARCH */}
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search student..."
+                    className="w-full md:flex-1 px-3 py-2 border border-green-300 rounded-lg 
+                    focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+
+                  {/* COURSE */}
+                  <select
+                    value={courseFilter}
+                    onChange={(e) => setCourseFilter(e.target.value)}
+                    className="w-full md:flex-1 px-3 py-2 border border-green-300 rounded-lg bg-white 
+                    focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="all">All Courses</option>
+                    <option value="Bachelor of Elementary Education">Bachelor of Elementary Education</option>
+                    <option value="Bachelor of Secondary Education">Bachelor of Secondary Education</option>
+                    <option value="BS Business Management">BS Business Management</option>
+                    <option value="BS Computer Science">BS Computer Science</option>
+                    <option value="BS Fisheries">BS Fisheries</option>
+                    <option value="BS Hospitality Management">BS Hospitality Management (formerly BS HRM)</option>
+                    <option value="BS Information Technology">BS Information Technology</option>
+                  </select>
+
+                </div>
+
+                {/* SECOND ROW */}
+                <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-3">
+
+                  {/* FROM */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
+                    <span className="text-green-700 font-medium">From:</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="w-full sm:w-auto px-3 py-2 border border-green-300 rounded-lg 
+                      focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  {/* TO */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
+                    <span className="text-green-700 font-medium">To:</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="w-full sm:w-auto px-3 py-2 border border-green-300 rounded-lg 
+                      focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  {/* SORT */}
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    className="w-full md:w-auto px-3 py-2 border border-green-300 rounded-lg bg-white 
+                    focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="latest">Latest Registered</option>
+                    <option value="oldest">Oldest Registered</option>
+                    <option value="asc">Sort A → Z</option>
+                    <option value="desc">Sort Z → A</option>
+                  </select>
+
+                  {/* RESET */}
+                  <button
+                    onClick={() => {
+                      setQuery("");
+                      setCourseFilter("all");
+                      setDateFrom("");
+                      setDateTo("");
+                      setSortOrder("latest");
+                    }}
+                    className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
+                  >
+                    Reset Filters
+                  </button>
+
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
-                <span className="text-green-700 font-medium">To:</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full sm:w-auto px-3 py-2 border border-green-300 rounded-lg 
-                  focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
+              {/* ================= TABLE ================= */}
+              <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
 
-              {/* SORT (UPDATED) */}
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className="w-full md:w-auto px-3 py-2 border border-green-300 rounded-lg bg-white 
-                focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="latest">Latest Registered</option>
-                <option value="asc">Sort A → Z</option>
-                <option value="desc">Sort Z → A</option>
-              </select>
+                <table className="min-w-full table-fixed text-left">
 
-              {/* RESET */}
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setCourseFilter("all");
-                  setDateFrom("");
-                  setDateTo("");
-                  setSortOrder("latest"); // FIX DEFAULT RESET
-                }}
-                className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
-              >
-                Reset Filters
-              </button>
+                  <thead className="bg-green-600 text-white">
+                    <tr>
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Student Name</th>
+                      <th className="px-4 py-3">Student Number</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Phone</th>
+                      <th className="px-4 py-3">Course</th>
+                      <th className="px-4 py-3">Date Registered</th>
+                      <th className="px-4 py-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
 
-            </div>
-
-          </div>
-
-          {/* ================= TABLE ================= */}
-          <div className="overflow-x-auto border border-green-300 rounded-lg bg-white">
-            <table className="min-w-full table-fixed text-left">
-              <thead className="bg-green-600 text-white">
-                <tr>
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Student Name</th>
-                  <th className="px-4 py-3">Student Number</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Course</th>
-                  <th className="px-4 py-3">Date Registered</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-6 text-green-700">
-                      No students found.
-                    </td>
-                  </tr>
-                ) : (
-                  [...filteredStudents]
-                    .sort((a, b) => {
-                      // ================= DEFAULT: LATEST FIRST =================
-                      if (!sortOrder || sortOrder === "latest") {
-                        return new Date(b.created_at) - new Date(a.created_at);
-                      }
-
-                      // ================= A → Z =================
-                      if (sortOrder === "asc") {
-                        return (a.student_name || "").localeCompare(
-                          b.student_name || ""
-                        );
-                      }
-
-                      // ================= Z → A =================
-                      if (sortOrder === "desc") {
-                        return (b.student_name || "").localeCompare(
-                          a.student_name || ""
-                        );
-                      }
-
-                      return 0;
-                    })
-                    .map((s) => (
-                      <tr
-                        key={s.id}
-                        className="border-b border-green-200 hover:bg-green-100 transition-colors"
-                      >
-                        <td className="py-3 px-4">{s.id}</td>
-
-                        <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_name}>
-                          {s.student_name}
-                        </td>
-
-                        <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_number}>
-                          {s.student_number}
-                        </td>
-
-                        <td className="py-3 px-4 truncate max-w-[180px]" title={s.email}>
-                          {s.email}
-                        </td>
-
-                        <td className="py-3 px-4 truncate max-w-[120px]" title={s.phone}>
-                          {s.phone}
-                        </td>
-
-                        <td className="py-3 px-4 truncate max-w-[140px]" title={s.course}>
-                          {s.course}
-                        </td>
-
-                        <td className="py-3 px-4">
-                          {s.created_at ? s.created_at.slice(0, 10) : "—"}
-                        </td>
-
-                        <td className="py-3 px-4 flex gap-2 justify-center">
-                          <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            onClick={() => setViewStudent(s)}
-                          >
-                            View
-                          </button>
-
-                          <button
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            onClick={() => setDeleteStudent(s)}
-                          >
-                            Delete
-                          </button>
+                  <tbody>
+                    {sortedStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-6 text-green-700">
+                          No students found.
                         </td>
                       </tr>
-                    ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      sortedStudents.map((s) => (
+                        <tr
+                          key={s.id}
+                          className="border-b border-green-200 hover:bg-green-100 transition-colors"
+                        >
 
-        </div>
-      )}
+                          <td className="py-3 px-4">{s.id}</td>
 
-         </section>
-        </main>
-      </div>
-    );
-  }
+                          <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_name}>
+                            {s.student_name}
+                          </td>
+
+                          <td className="py-3 px-4 truncate max-w-[140px]" title={s.student_number}>
+                            {s.student_number}
+                          </td>
+
+                          <td className="py-3 px-4 truncate max-w-[180px]" title={s.email}>
+                            {s.email}
+                          </td>
+
+                          <td className="py-3 px-4 truncate max-w-[120px]" title={s.phone}>
+                            {s.phone}
+                          </td>
+
+                          <td className="py-3 px-4 truncate max-w-[140px]" title={s.course}>
+                            {s.course}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {s.created_at ? s.created_at.slice(0, 10) : "—"}
+                          </td>
+
+                          <td className="py-3 px-4 flex gap-2 justify-center">
+                            <button
+                              className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                              onClick={() => setViewStudent(s)}
+                            >
+                              View
+                            </button>
+
+                            <button
+                              className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                              onClick={() => setDeleteStudent(s)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+
+                </table>
+              </div>
+
+            </div>
+          );
+        })()}
+        </section>
+      </main>
+    </div>
+  );
+}
