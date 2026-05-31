@@ -21,6 +21,7 @@ export default function StudentRegister() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // ================= Course List =================
   const courses = [
@@ -46,16 +47,18 @@ export default function StudentRegister() {
     return () => clearInterval(interval);
   }, []);
 
-  // =========================
-  // Handle registration
-  // =========================
+ // =========================
+// Handle registration
+// =========================
 const handleRegister = async () => {
+
+  if (loading) return; // prevent double click
+
   setLoading(true);
 
-  const stopLoading = () => setLoading(false);
-
   try {
-    // Check empty fields
+
+    // EMPTY FIELDS
     if (
       !studentNumber ||
       !studentName ||
@@ -65,88 +68,87 @@ const handleRegister = async () => {
       !password ||
       !confirmPassword
     ) {
-      Swal.fire({
+      await Swal.fire({
         icon: "warning",
         title: "Incomplete Form",
         text: "Please fill out all fields",
       });
-      stopLoading();
       return;
     }
 
     // PASSWORD VALIDATION
-    if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{6,}$/.test(password)) {
-      Swal.fire({
+    const passwordRegex =
+      /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{6,}$/;
+
+    if (!passwordRegex.test(password)) {
+      await Swal.fire({
         icon: "error",
         title: "Invalid Password",
         text: "Password must contain letters, numbers, and at least 1 special character",
       });
-      stopLoading();
       return;
     }
 
-    // PHONE
-    if (!/^[0-9]+$/.test(phone)) {
-      Swal.fire({
+    // PHONE VALIDATION
+    if (!/^\d+$/.test(phone)) {
+      await Swal.fire({
         icon: "error",
         title: "Invalid Phone Number",
         text: "Numbers only",
       });
-      stopLoading();
       return;
     }
 
-    // CHECK IF EXACTLY 11 DIGITS
     if (phone.length !== 11) {
-      Swal.fire({
+      await Swal.fire({
         icon: "warning",
         title: "Invalid Phone Number",
         text: "Phone number must be exactly 11 digits",
       });
-      stopLoading();
       return;
     }
 
     // STUDENT NUMBER
     if (!/^\d{9}$/.test(studentNumber)) {
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Invalid Student Number",
         text: "Student number must be exactly 9 digits.",
       });
-      stopLoading();
       return;
     }
 
-    // EMAIL
-    const cvsuEmailRegex = /^([a-zA-Z]+(\.[a-zA-Z]+){1,3})@cvsu\.edu\.ph$/;
-    const normalizedEmail = email.toLowerCase();
+    // EMAIL VALIDATION
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const cvsuEmailRegex =
+      /^([a-zA-Z]+(\.[a-zA-Z]+){1,3})@cvsu\.edu\.ph$/;
 
     if (!cvsuEmailRegex.test(normalizedEmail)) {
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Invalid Email",
-        text: "Only CvSU Email Account (e.g., example@cvsu.edu.ph) are allowed.",
+        text: "Only CvSU Email Account are allowed.",
       });
-      stopLoading();
       return;
     }
 
     // PASSWORD MATCH
     if (password !== confirmPassword) {
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Password Mismatch",
         text: "Password and Confirm Password do not match.",
       });
-      stopLoading();
       return;
     }
 
-    // API CALL
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/students/register`, {
+    // API REQUEST
+    const res = await fetch(`${API}/students/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         student_number: studentNumber,
         student_name: studentName,
@@ -159,255 +161,286 @@ const handleRegister = async () => {
 
     const data = await res.json();
 
-    if (res.ok) {
-      Swal.fire({
-        icon: "success",
-        title: "Registration Successful",
-        text: data.message,
-        confirmButtonColor: "#22c55e",
-      }).then(() => navigate("/student_login"));
-    } else {
-      Swal.fire({
-        icon: "error",
-        title: "Registration Failed",
-        text: data.message || "Something went wrong",
-      });
+    if (!res.ok) {
+      throw new Error(data.message || "Registration failed");
     }
 
+    await Swal.fire({
+      icon: "success",
+      title: "Registration Successful",
+      text: data.message,
+      confirmButtonColor: "#22c55e",
+    });
+
+    navigate("/student_login");
+
   } catch (err) {
+
     console.error(err);
+
     Swal.fire({
       icon: "error",
       title: "Server Error",
-      text: "Could not connect to backend",
+      text: err.message || "Could not connect to backend",
     });
+
   } finally {
-    stopLoading(); // ALWAYS STOP, success or error
+
+    setLoading(false);
+
   }
 };
 
-  return (
-    <div className="w-screen h-screen bg-gray-900 flex overflow-hidden">
+return (
+  <div className="relative w-screen h-screen overflow-hidden flex">
 
-      {/* LEFT SIDE */}
-      <div className="w-full md:w-[55%] h-full flex flex-col items-center justify-start pt-16 md:pt-5 p-6 md:p-8 text-center bg-white overflow-auto">
+    {/* BACKGROUND */}
+    <img
+      src="./cvsu-naic.jpg.jpg"
+      className="absolute inset-0 w-full h-full object-cover"
+    />
 
-        {/* LOGO */}
-        <img
-          src="/cvsu-logo.png"
-          alt="School Logo"
-          className="w-20 md:w-28 h-20 md:h-28 mb-1"
-        />
+    {/* OVERLAY */}
+    <div className="absolute inset-0 bg-green-900/50 backdrop-blur-[6px]" />
 
-        <h2 className="text-base md:text-xl font-medium">
-          Cavite State University Naic
-        </h2>
+  {/* LOWER RIGHT WORDS */}
+        <div
+          key={index}
+          className={`absolute bottom-6 right-6 md:bottom-10 md:right-10
+          text-white/70 text-2xl md:text-5xl font-bold tracking-[8px]
+          uppercase z-20 ${fade ? "slideRight" : "fadeOnly"}`}
+        >
+          {words[index]}
+        </div>
+        {/* ANIMATIONS */}
+      <style>{`
 
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">
-          Guidance Student Record
-        </h1>
+      @keyframes slideRight {
 
-        {/* ICON */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative w-18 h-18 flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-12 h-12 text-gray-700"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z"
-              />
-            </svg>
+        from{
+          opacity:0;
+          transform:translateX(-80px);
+        }
+
+        to{
+          opacity:.65;
+          transform:translateX(0);
+        }
+
+      }
+
+      @keyframes fadeOnly {
+
+        from{
+          opacity:.65;
+        }
+
+        to{
+          opacity:0;
+        }
+
+      }
+
+      .slideRight{
+        animation:slideRight 1.8s ease-out forwards;
+      }
+
+      .fadeOnly{
+        animation:fadeOnly 1.2s ease-out forwards;
+      }
+
+      `}</style>
+    {/* CENTER WRAPPER (RESPONSIVE COMPACT) */}
+    <div className="relative z-10 flex items-center justify-center w-full min-h-screen px-3 py-2">
+
+      {/* GLASS CARD (SLIGHTLY SMALLER HEIGHT) */}
+      <div className="
+        w-full 
+        max-w-[400px] 
+        bg-white/20 
+        backdrop-blur-2xl 
+        border border-white/20 
+        rounded-2xl 
+        shadow-xl 
+        p-4
+        max-h-[92vh]
+        overflow-hidden
+      ">
+
+        {/* HEADER */}
+        <div className="flex flex-col items-center mb-2">
+
+          <img
+            src="/Cavite_State_University_(CvSU).png"
+            className="w-18 h-17 mb-1"
+          />
+
+          <h2 className="text-green-200 text-sm font-medium">
+            Cavite State University Naic
+          </h2>
+
+          <h1 className="text-white text-xl font-bold mb-1">
+            Guidance Services System
+          </h1>
+
+          <div className="flex flex-col items-center mb-1">
+            <div className="w-10 h-10 flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-9 h-9 text-white"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z"
+                />
+              </svg>
+            </div>
+
+            <p className="text-white font-bold text-m">
+              Create Student Account
+            </p>
           </div>
-
-          <p className="text-xl font-bold text-gray-800 -mt-1">
-            Create Student Account
-          </p>
         </div>
 
         {/* FORM */}
-        <div className="w-full max-w-xs space-y-3 text-left">
+        <div className="space-y-2">
 
-          <label className="text-gray-700 font-medium">Student Number</label>
           <input
+            className="w-full p-2 rounded-full bg-white/80 outline-none text-sm"
+            placeholder="Student Number"
             type="number"
             value={studentNumber}
             onChange={(e) => setStudentNumber(e.target.value)}
-            placeholder="Enter your Student Number"
-            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
-          <label className="text-gray-700 font-medium">Student Name</label>
           <input
-            type="text"
+            className="w-full p-2 rounded-full bg-white/80 text-sm"
+            placeholder="First Name / Middle Initial / Last Name"
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
-            placeholder="First / Middle / Last Name"
-            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
           />
 
-          <label className="text-gray-700 font-medium">CvSU Email</label>
           <input
-            type="email"
+            className="w-full p-2 rounded-full bg-white/80 text-sm"
+            placeholder="CvSU Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="example@cvsu.edu.ph"
-            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
+            type="email"
           />
 
-          <label className="text-gray-700 font-medium">Phone Number</label>
           <input
-            type="number"
+            className="w-full p-2 rounded-full bg-white/80 text-sm"
+            placeholder="Phone Number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="Enter phone number"
-            className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
+            type="number"
           />
 
-          {/* COURSE */}
-          <label className="font-semibold">Select Course</label>
           <select
+            className="w-full p-2 rounded-full bg-white/80 text-sm"
             value={selectedCourse}
             onChange={(e) => setSelectedCourse(e.target.value)}
-            className="border border-gray-300 rounded-lg p-2 w-full"
           >
-            <option value="">-- Select a Course --</option>
-            {courses.map((course, i) => (
-              <option key={i} value={course}>
-                {course}
-              </option>
+            <option value="">Select Course</option>
+            {courses.map((c, i) => (
+              <option key={i}>{c}</option>
             ))}
           </select>
 
           {/* PASSWORD */}
-            <div className="space-y-1">
-              <label className="text-gray-700 font-medium block">
-                Password
-              </label>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              className="w-full p-2 rounded-full bg-white/80 pr-10 text-sm"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
 
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter Password"
-                  className="border p-3 rounded-full w-full pr-10 focus:ring-2 focus:ring-green-500"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="w-5 h-5" />
-                  ) : (
-                    <EyeIcon className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-
-              {/* PASSWORD HINT */}
-              <p className="text-xs text-gray-500">
-                Password must contain letters, numbers, and at least 1 special character
-              </p>
-            </div>
-
-            {/* CONFIRM PASSWORD */}
-            <div className="space-y-1">
-              <label className="text-gray-700 font-medium block">
-                Confirm Password
-              </label>
-
-              <input
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm Password"
-                className="border p-3 rounded-full w-full focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          {/* BUTTON */}
-          <button
-            onClick={handleRegister}
-            disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {loading ? (
-              <>
-                <svg
-                  className="animate-spin h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
-                </svg>
-
-                <span>Registering...</span>
-              </>
-            ) : (
-              "Register"
-            )}
-          </button>
-
-          <p className="text-center text-gray-600 mb-10">
-            Already have an account?{" "}
-            <span
-              onClick={() => navigate("/student_login")}
-              className="text-green-600 font-semibold cursor-pointer hover:underline"
+            <button
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-2 text-gray-600"
             >
-              Login here
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT SIDE */}
-      <div className="hidden md:block w-[100%] h-full relative">
-        <img
-          src="./cvsu-background.png"
-          alt="Campus"
-          className="absolute w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 p-10 text-white flex flex-col justify-between">
-          <p className="text-2xl leading-relaxed font-semibold text-justify tracking-wide drop-shadow-lg max-w-3xl mx-auto mt-70 animate-fadein">
-            Cavite State University - Naic (CvSU) is required by law to process your
-            personal information and sensitive personal information in order to
-            safeguard academic freedom, uphold your right to quality education,
-            and protect your right to data privacy in conformity with Republic Act
-            No. 10173.
-          </p>
-
-          <div
-            className="absolute bottom-10 right-10 text-5xl font-bold tracking-widest uppercase transition-all duration-1000"
-            style={{
-              opacity: fade ? 0.5 : 1,
-              transform: fade ? "translateX(20px)" : "translateX(0)",
-            }}
-          >
-            {words[index]}
+              {showPassword ? (
+                <EyeSlashIcon className="w-5 h-5" />
+              ) : (
+                <EyeIcon className="w-5 h-5" />
+              )}
+            </button>
           </div>
+          {/* PASSWORD HINT */}
+        <div className="mt-2 flex items-start gap-2 text-[10px] text-white/80">
+          <div className="mt-0.5 w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <p className="leading-snug">
+            Password must contain{" "}
+            <span className="text-green-300 font-medium">letters</span>,{" "}
+            <span className="text-green-300 font-medium">numbers</span>, and{" "}
+            <span className="text-yellow-300 font-medium">1 special character</span>
+          </p>
         </div>
+
+
+          {/* CONFIRM PASSWORD */}
+          <div className="relative">
+            <input
+              type={showConfirm ? "text" : "password"}
+              className="w-full p-2 rounded-full bg-white/80 pr-10 text-sm"
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+
+            <button
+              onClick={() => setShowConfirm(!showConfirm)}
+              className="absolute right-3 top-2 text-gray-600"
+            >
+              {showConfirm ? (
+                <EyeSlashIcon className="w-5 h-5" />
+              ) : (
+                <EyeIcon className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+        </div>
+        {/* BUTTON */}
+          <button
+          onClick={handleRegister}
+          disabled={loading}
+          className={`w-full mt-2 text-white py-2 rounded-full font-semibold text-sm
+          flex items-center justify-center gap-2 transition-all
+          ${loading
+            ? "bg-green-500 cursor-not-allowed"
+            : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Registering...
+            </>
+          ) : (
+            "REGISTER"
+          )}
+        </button>
+
+        <p className="text-center text-white text-xs mt-1">
+          Already have an account?{" "}
+          <span
+            onClick={() => navigate("/student_login")}
+            className="text-green-300 font-bold cursor-pointer"
+          >
+            Login
+          </span>
+        </p>
+
       </div>
     </div>
-  );
-}
+    </div>
+    );
+    }

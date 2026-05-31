@@ -153,6 +153,10 @@ def create_app():
     from routes.news import news_bp
     from routes.upload_routes import upload_bp
     from routes.good_moral_request import good_moral_bp
+    from routes.notifications import notification_bp
+    from routes.counseling_request import counseling_bp
+    from routes.psychological_request import psychological_bp
+    from routes.exit_request import exit_request_bp
 
     app.register_blueprint(student_bp, url_prefix="/students")
     app.register_blueprint(violation_bp, url_prefix="/violations")
@@ -161,7 +165,11 @@ def create_app():
     app.register_blueprint(news_bp)
     app.register_blueprint(upload_bp)
     app.register_blueprint(good_moral_bp, url_prefix="/good-moral")
-
+    app.register_blueprint(notification_bp, url_prefix="/notification")
+    app.register_blueprint(counseling_bp, url_prefix="/counseling")
+    app.register_blueprint(psychological_bp, url_prefix="/psychological")
+    app.register_blueprint(exit_request_bp, url_prefix="/exit_request")
+  
     @app.route("/")
     def home():
         return {"message": "Backend is running successfully"}

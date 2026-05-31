@@ -33,7 +33,22 @@ class Admin(db.Model):
         back_populates="processed_by_admin",
         cascade="all, delete-orphan"
     )
-
+    counseling_processed = db.relationship(
+    "CounselingRequest",
+    back_populates="processed_by_admin",
+    cascade="all, delete-orphan"
+)
+    psychological_processed = db.relationship(
+    "PsychologicalRequest",
+    back_populates="processed_by_admin",
+    cascade="all, delete-orphan"
+)
+    exit_processed = db.relationship(
+        "ExitRequest",
+        back_populates="processed_by_admin",
+        cascade="all, delete-orphan"
+    )
+    
 
 # -----------------------------
 # Student Table
@@ -66,6 +81,21 @@ class Student(db.Model):
         back_populates="student",
         cascade="all, delete-orphan"
     )
+    counseling_requests = db.relationship(
+    "CounselingRequest",
+    back_populates="student",
+    cascade="all, delete-orphan"
+)
+    psychological_requests = db.relationship(
+    "PsychologicalRequest",
+    back_populates="student",
+    cascade="all, delete-orphan"
+)
+    exit_requests = db.relationship(
+        "ExitRequest",
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )
 
 
 # -----------------------------
@@ -76,7 +106,7 @@ class UploadedFile(db.Model):
 
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     file_type = db.Column(
-        db.Enum("good_moral", "rules", "other", name="file_type_enum"),
+        db.Enum("good_moral", "rules","counseling_appointment", "psychological_request", "exit_request","other", name="file_type_enum"),
         nullable=False,
         default="other"
     )
@@ -117,6 +147,7 @@ class Violation(db.Model):
     predicted_section = db.Column(db.String(100), nullable=True)
     predictive_text = db.Column(db.Text, nullable=True)
     standard_text = db.Column(db.Text, nullable=True)
+    sanction = db.Column(db.String(255),nullable=True)
 
     semester = db.Column(
         db.Enum('1st Semester', '2nd Semester', 'Summer'),
@@ -124,6 +155,11 @@ class Violation(db.Model):
     )
 
     is_resolved = db.Column(db.String(20), nullable=False, default="Pending")
+    notification_sent_at = db.Column(db.DateTime, nullable=True)
+    is_notified = db.Column(db.Boolean, default=False)
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    notification_sent_at = db.Column(db.DateTime, nullable=True)
 
     encoded_by = db.Column(
         db.Integer,
@@ -141,47 +177,266 @@ class Violation(db.Model):
 class GoodMoralRequest(db.Model):
     __tablename__ = "good_moral_requests"
 
-    request_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    
-    # Link to student
+    request_id = db.Column(db.Integer, primary_key=True)
+
     student_number = db.Column(
         db.Integer,
         db.ForeignKey("students.student_number", ondelete="CASCADE"),
         nullable=False
     )
-    
-    # Optional uploaded file
-    filename_stored = db.Column(db.String(255), nullable=True)
-    filename_original = db.Column(db.String(255), nullable=True) 
 
-    # Request status
+    filename_stored = db.Column(db.String(255))
+    filename_original = db.Column(db.String(255))
+
     status = db.Column(
-        db.Enum("Pending", "Approved", "Rejected", name="gmr_status_enum"),
-        nullable=False,
-        default="Pending"
+        db.Enum("Pending","Approved","Rejected",name="gmr_status_enum"),
+        default="Pending",
+        nullable=False
     )
-    
-    # Timestamps
-    requested_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    processed_at = db.Column(db.DateTime, nullable=True)
-    
-    # Admin who processed the request
+
+    requested_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    processed_at = db.Column(db.DateTime)
+
     processed_by = db.Column(
         db.Integer,
-        db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL"),
-        nullable=True
+        db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL")
     )
-    
-    # Optional remarks by admin
-    remarks = db.Column(db.Text, nullable=True)
 
-    # -----------------------------
-    # Notification / read / delete tracking
-    # -----------------------------
-    is_notified = db.Column(db.Boolean, nullable=False, default=False)  # retain for old code
-    is_read = db.Column(db.Boolean, nullable=False, default=False)      # new: mark as opened
-    is_deleted = db.Column(db.Boolean, nullable=False, default=False)   # new: soft delete
+    remarks = db.Column(db.Text)
 
-    # Relationships
-    student = db.relationship("Student", back_populates="good_moral_requests")
-    processed_by_admin = db.relationship("Admin", back_populates="good_moral_processed")
+    is_notified = db.Column(db.Boolean, default=False)
+    is_read = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    student = db.relationship(
+        "Student",
+        back_populates="good_moral_requests"
+    )
+
+    processed_by_admin = db.relationship(
+        "Admin",
+        back_populates="good_moral_processed"
+    )
+# -----------------------------
+# Counseling Requests Table (UPDATED)
+# -----------------------------
+class CounselingRequest(db.Model):
+    __tablename__ = "counseling_requests"
+
+    request_id = db.Column(db.Integer, primary_key=True)
+
+    student_number = db.Column(
+        db.Integer,
+        db.ForeignKey("students.student_number", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    filename_stored = db.Column(db.String(255))
+    filename_original = db.Column(db.String(255))
+
+    # =========================
+    # STATUS FLOW
+    # =========================
+    status = db.Column(
+        db.Enum("Pending", "Approved", "Rejected", name="counseling_status_enum"),
+        default="Pending",
+        nullable=False
+    )
+
+    # =========================
+    # STUDENT PREFERRED SCHEDULE
+    # =========================
+    preferred_date = db.Column(db.Date, nullable=False)
+    preferred_time = db.Column(db.Time, nullable=False)
+
+    # =========================
+    # ADMIN FINAL SCHEDULE (OVERRIDE ON APPROVAL)
+    # =========================
+    admin_set_date = db.Column(db.Date)
+    admin_set_time = db.Column(db.Time)
+
+    requested_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    processed_at = db.Column(db.DateTime)
+
+    processed_by = db.Column(
+        db.Integer,
+        db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL")
+    )
+
+    # =========================
+    # FLAGS
+    # =========================
+    is_notified = db.Column(db.Boolean, default=False)
+    is_read = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    # =========================
+    # RELATIONSHIPS
+    # =========================
+    student = db.relationship(
+        "Student",
+        back_populates="counseling_requests"
+    )
+
+    processed_by_admin = db.relationship(
+        "Admin",
+        back_populates="counseling_processed"
+    )
+
+   # -----------------------------
+# Exit Request
+# -----------------------------
+class ExitRequest(db.Model):
+    __tablename__ = "exit_request"
+
+    request_id = db.Column(db.Integer, primary_key=True)
+
+    student_number = db.Column(
+        db.Integer,
+        db.ForeignKey("students.student_number", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    filename_stored = db.Column(db.String(255))
+    filename_original = db.Column(db.String(255))
+
+    # =========================
+    # STATUS FLOW
+    # =========================
+    status = db.Column(
+        db.Enum("Pending", "Approved", "Rejected", name="exit_status_enum"),
+        default="Pending",
+        nullable=False
+    )
+
+    # =========================
+    # STUDENT PREFERRED SCHEDULE
+    # =========================
+    preferred_date = db.Column(db.Date, nullable=False)
+    preferred_time = db.Column(db.Time, nullable=False)
+
+    # =========================
+    # ADMIN FINAL SCHEDULE (OVERRIDE ON APPROVAL)
+    # =========================
+    admin_set_date = db.Column(db.Date)
+    admin_set_time = db.Column(db.Time)
+
+    requested_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    processed_at = db.Column(db.DateTime)
+
+    processed_by = db.Column(
+        db.Integer,
+        db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL")
+    )
+
+    # =========================
+    # FLAGS
+    # =========================
+    is_notified = db.Column(db.Boolean, default=False)
+    is_read = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    # =========================
+    # RELATIONSHIPS
+    # =========================
+    student = db.relationship(
+        "Student",
+        back_populates="exit_requests"
+    )
+
+    processed_by_admin = db.relationship(
+        "Admin",
+        back_populates="exit_processed"
+    )
+# -----------------------------
+# Psychological Requests Table
+# -----------------------------
+class PsychologicalRequest(db.Model):
+    __tablename__ = "psychological_requests"
+
+    request_id = db.Column(db.Integer, primary_key=True)
+
+    student_number = db.Column(
+        db.Integer,
+        db.ForeignKey("students.student_number", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    # ADDITIONAL FIELD
+    concern_purpose = db.Column(db.Text)
+
+    filename_stored = db.Column(db.String(255))
+    filename_original = db.Column(db.String(255))
+
+    # =========================
+    # STATUS FLOW
+    # =========================
+    status = db.Column(
+        db.Enum(
+            "Pending",
+            "Approved",
+            "Rejected",
+            name="psychological_status_enum"
+        ),
+        default="Pending",
+        nullable=False
+    )
+
+    # =========================
+    # STUDENT PREFERRED SCHEDULE
+    # =========================
+    preferred_date = db.Column(db.Date, nullable=False)
+    preferred_time = db.Column(db.Time, nullable=False)
+
+    # =========================
+    # ADMIN FINAL SCHEDULE
+    # =========================
+    admin_set_date = db.Column(db.Date)
+    admin_set_time = db.Column(db.Time)
+
+    requested_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    processed_at = db.Column(db.DateTime)
+
+    processed_by = db.Column(
+        db.Integer,
+        db.ForeignKey(
+            "admin_tbl.admin_id",
+            ondelete="SET NULL"
+        )
+    )
+
+    # =========================
+    # FLAGS
+    # =========================
+    is_notified = db.Column(db.Boolean, default=False)
+    is_read = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+    # =========================
+    # RELATIONSHIPS
+    # =========================
+    student = db.relationship(
+        "Student",
+        back_populates="psychological_requests"
+    )
+
+    processed_by_admin = db.relationship(
+        "Admin",
+        back_populates="psychological_processed"
+    )

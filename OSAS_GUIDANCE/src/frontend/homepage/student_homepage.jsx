@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { EyeIcon, EyeSlashIcon, Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon,} from "@heroicons/react/24/solid";
+import { EyeIcon, EyeSlashIcon, Squares2X2Icon, UserCircleIcon, ArrowRightOnRectangleIcon, NewspaperIcon, DocumentCheckIcon, BellIcon, BookOpenIcon, Bars3Icon, XMarkIcon, CalendarDaysIcon, ClipboardDocumentCheckIcon, FlagIcon } from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 import { Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 
 const API = import.meta.env.VITE_API_URL;
@@ -21,6 +22,29 @@ export default function StudentHome() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [originalPasswordHash, setOriginalPasswordHash] = useState("");
+
+  // Counseling
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTime, setPreferredTime] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [requests, setRequests] = useState([]);
+  const [selectedRequest, setSelectedRequest] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  //Psychological Exam Request
+  const [concernPurpose, setConcernPurpose] = useState("");
+  const [psyRequests, setPsyRequests] = useState([]);
+  const hasPsyPending = psyRequests?.some(r => r.status === "Pending");
+
+
+// EXIT INTERVIEW STATES
+const [exitPreferredDate, setExitPreferredDate] = useState("");
+const [exitPreferredTime, setExitPreferredTime] = useState("");
+const [exitRequests, setExitRequests] = useState([]);
+const [exitLoading, setExitLoading] = useState(false);
+const [hasExitPending, setHasExitPending] = useState(false);
+  
+
   
 
   // Small states
@@ -28,6 +52,7 @@ export default function StudentHome() {
   const [section, setSection] = useState("—");
   const [lastVisit, setLastVisit] = useState("—");
   const [visits, setVisits] = useState(0);
+  const [latestSanction, setLatestSanction] = useState(null);
 
   // Modals / previews
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -44,6 +69,7 @@ export default function StudentHome() {
   // Good moral
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [autoRevoked, setAutoRevoked] = useState(false);
   const [isRevoked, setIsRevoked] = useState(false);
   const [hasShownRevokeAlert, setHasShownRevokeAlert] = useState(false);
   const [violationsCount, setViolationsCount] = useState(0);
@@ -435,7 +461,9 @@ useEffect(() => {
 
   async function fetchSummary() {
     try {
-     const res = await fetch(`${import.meta.env.VITE_API_URL}/violations/summary/${studentNumber}`);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/violations/summary/${studentNumber}`
+      );
       const data = await res.json();
 
       if (!isMounted) return;
@@ -444,6 +472,8 @@ useEffect(() => {
       setSection(data.predicted_section ?? "—");
       setLastVisit(data.violation_date ?? "—");
       setVisits(data.visits ?? 0);
+      setLatestSanction(data.sanction ?? "—");
+
     } catch (err) {
       console.error(err);
     }
@@ -622,204 +652,202 @@ function openHistoryModal() {
   const API_BASE = import.meta.env.VITE_API_URL;
 
 // =========================
-// AUTO-FETCH LATEST GOOD MORAL
-// =========================
-useEffect(() => {
-  if (!studentNumber) return;
-
-  let interval;
-
-  const fetchGoodMoralFile = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
-      const data = await res.json();
-
-      const totalViolations = Number(data.violation_count) || 0;
-      setViolationsCount(totalViolations);
-
-      const latest = data.history?.[0] || null;
-
-      const revoked =
-        latest?.status === "Rejected" &&
-        (latest?.remarks || "").toLowerCase().includes("auto-revoked");
-
-      setIsRevoked(revoked);
-      setCanSubmit(!revoked);
-
-      setStudentRecord(prev => ({
-        ...prev,
-        lastGoodMoralRequest: latest,
-      }));
-
-      // Unified revoke / violations alert (only once)
-      if (
-        (revoked || totalViolations >= 3) &&
-        activePage === "GoodMoral" &&
-        !hasShownRevokeAlert
-      ) {
-        Swal.fire({
-          icon: "warning",
-          title: revoked ? "Access Revoked" : "You've Reached 3 Violations",
-          text: revoked
-            ? "Your Good Moral has been revoked due to multiple violations."
-            : "You cannot submit a Good Moral request until your violations are cleared.",
-        }).then(() => {
-          // Redirect to Info page after user clicks OK
-          setActivePage("Info");
-        });
-
-        setHasShownRevokeAlert(true);
-        setCanSubmit(false);
-      }
-
-      if (latest?.status === "Approved" && !revoked) {
-        setCurrentGoodMoral({
-          name: latest.filename_original || "Good Moral Certificate",
-          url: `${API_BASE}/good-moral/download/${latest.request_id}`,
-        });
-      } else {
-        setCurrentGoodMoral(null);
-      }
-
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  fetchGoodMoralFile();
-
-  return () => clearInterval(interval);
-}, [studentNumber, activePage, hasShownRevokeAlert]);
-
-// =========================
 // FETCH LATEST GOOD MORAL
 // =========================
 const fetchLatestGoodMoral = async () => {
+
   if (!studentNumber) return;
 
   try {
-    const res = await fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`);
-    const data = await res.json();
 
-    const totalViolations = Number(data.violation_count) || 0;
-    setViolationsCount(totalViolations);
+    const res = await fetch(
+      `${API_BASE}/good-moral/history?student_number=${studentNumber}`
+    );
+
+    const data = await res.json();
 
     const latest = data.history?.[0] || null;
 
-    const revoked =
-      latest?.status === "Rejected" &&
-      (latest?.remarks || "").toLowerCase().includes("auto-revoked");
+    // BACKEND SOURCE OF TRUTH
+    const autoRevoked =
+      data.auto_revoked || false;
 
-    setIsRevoked(revoked);
-    setCanSubmit(!revoked && totalViolations < 3);
+    setIsRevoked(autoRevoked);
+    setCanSubmit(!autoRevoked);
 
     setStudentRecord(prev => ({
       ...prev,
       lastGoodMoralRequest: latest,
     }));
 
-    // =============================
-    // SINGLE ALERT LOGIC (REVOKE OR 3 VIOLATIONS)
-    // =============================
+    // =========================
+    // SINGLE REVOKE ALERT
+    // =========================
     if (
-      (revoked || totalViolations >= 3) &&
+      autoRevoked &&
       activePage === "GoodMoral" &&
       !hasShownRevokeAlert
     ) {
+
       Swal.fire({
         icon: "warning",
-        title: revoked ? "Access Revoked" : "You've Reached 3 Violations",
-        text: revoked
-          ? "Your Good Moral has been revoked due to multiple violations."
-          : "You cannot submit a Good Moral request until your violations are cleared.",
+        title: "Access Revoked",
+        text:
+          "Your Good Moral request is blocked due to violation sanction level."
       }).then(() => {
-        // Redirect to Info page after user clicks OK
+
         setActivePage("Info");
+
       });
 
       setHasShownRevokeAlert(true);
       setCanSubmit(false);
     }
 
-    // =============================
-    // CURRENT GOOD MORAL FILE
-    // =============================
-    if (latest?.status === "Approved" && !revoked) {
+    // =========================
+    // APPROVED FILE
+    // =========================
+    if (
+      latest?.status === "Approved" &&
+      !autoRevoked
+    ) {
+
       setCurrentGoodMoral({
-        name: latest.filename_original || "Good Moral Certificate",
-        url: `${API_BASE}/good-moral/download/${latest.request_id}`,
+        name:
+          latest.filename_original ||
+          "Good Moral Certificate",
+
+        url:
+          `${API_BASE}/good-moral/download/${latest.request_id}`
       });
+
     } else {
+
       setCurrentGoodMoral(null);
+
     }
 
   } catch (err) {
-    console.error("Fetch error:", err);
+
+    console.error(
+      "Fetch error:",
+      err
+    );
+
   }
 };
+
+// =========================
+// AUTO FETCH
+// =========================
+useEffect(() => {
+
+  if (!studentNumber) return;
+
+  fetchLatestGoodMoral();
+
+}, [
+  studentNumber,
+  activePage,
+  hasShownRevokeAlert
+]);
+
 // =========================
 // SUBMIT GOOD MORAL REQUEST
 // =========================
-
-
 const submitGoodMoralRequest = async (file) => {
+
   if (!studentNumber) {
+
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: "Student number is missing",
+      text:
+        "Student number is missing",
     });
+
     return;
   }
 
   if (!file) {
+
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: "Please select a file to upload",
+      text:
+        "Please select a file to upload",
     });
+
     return;
   }
 
   try {
-    // START LOADING
+
     setLoadingGoodMoral(true);
 
-    const formData = new FormData();
-    formData.append("student_number", studentNumber);
-    formData.append("certificate_file", file);
+    const formData =
+      new FormData();
 
-    const res = await fetch(`${API_BASE}/good-moral/request`, {
-      method: "POST",
-      body: formData,
-    });
+    formData.append(
+      "student_number",
+      studentNumber
+    );
 
-    const data = await res.json();
+    formData.append(
+      "certificate_file",
+      file
+    );
+
+    const res = await fetch(
+      `${API_BASE}/good-moral/request`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data =
+      await res.json();
 
     if (!res.ok) {
-      if (res.status === 403) {
+
+      if (
+        res.status === 403
+      ) {
+
         await Swal.fire({
           icon: "warning",
-          title: "Access Denied",
-          text: data.message || "You have reached 3 violations.",
-          confirmButtonText: "OK",
+          title:
+            "Access Denied",
+
+          text:
+            data.message ||
+            "Cannot submit: violation sanction level blocks Good Moral request.",
+
+          confirmButtonText:
+            "OK",
         });
+
+        setIsRevoked(true);
+        setCanSubmit(false);
 
         setActivePage("Info");
 
-        // STOP LOADING
-        setLoadingGoodMoral(false);
         return;
       }
 
-      throw new Error(data.message || "Failed to submit request");
+      throw new Error(
+        data.message ||
+        "Failed to submit request"
+      );
     }
 
     Swal.fire({
       toast: true,
       position: "top-end",
       icon: "success",
-      title: "Good Moral request submitted",
+      title:
+        "Good Moral request submitted",
       showConfirmButton: false,
       timer: 2000,
     });
@@ -827,191 +855,306 @@ const submitGoodMoralRequest = async (file) => {
     await fetchLatestGoodMoral();
 
   } catch (err) {
+
     console.error(err);
 
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: err.message || "Something went wrong",
+      text:
+        err.message ||
+        "Something went wrong",
     });
 
   } finally {
-    // END LOADING
+
     setLoadingGoodMoral(false);
+
   }
 };
 
 // =========================
-// AUTO-FETCH ON PAGE LOAD
+// LIGHT POLLING
 // =========================
 useEffect(() => {
-  if (!studentNumber) return;
-  fetchLatestGoodMoral();
-}, [studentNumber]);
 
-// =========================
-// LIGHT POLLING FOR REAL-TIME UPDATES
-// =========================
-useEffect(() => {
   if (!studentNumber) return;
 
-  const interval = setInterval(() => {
-    if (document.visibilityState === "visible") {
-      fetchLatestGoodMoral();
-    }
-  }, 1000);
+  const interval =
+    setInterval(() => {
 
-  return () => clearInterval(interval);
+      if (
+        document.visibilityState ===
+        "visible"
+      ) {
+
+        fetchLatestGoodMoral();
+
+      }
+
+    }, 1000);
+
+  return () =>
+    clearInterval(interval);
+
 }, [studentNumber]);
 // =========================
 // Constants
 // =========================
 const POLL_INTERVAL = 2000;
 // =========================
-// Fetch unread notification count (backend-based)
+// Fetch unread notification count
+// COMBINED
 // =========================
-const fetchUnreadCount = async (overrideLocal = false) => {
+const fetchUnreadCount = async () => {
+
   if (!studentNumber) return;
 
   try {
-    const res = await fetch(
-      `${API_BASE}/good-moral/student/notifications/unread-count?student_number=${studentNumber}`
-    );
-    const data = await res.json();
 
-    if (overrideLocal || data.unread_count > badgeCount) {
-      setBadgeCount(data.unread_count);
-    }
-  } catch (err) {
-    console.error("Error fetching unread count:", err);
+    const res = await fetch(
+
+      `${API_BASE}/notification/student?student_number=${studentNumber}&student_id=${studentNumber}`
+
+    );
+
+    const data = res.ok
+      ? await res.json()
+      : { notifications: [] };
+
+    const unreadCount =
+
+      Array.isArray(
+        data.notifications
+      )
+
+        ? data.notifications.filter(
+
+            n =>
+
+              !n.is_read
+
+              &&
+
+              !n.is_deleted
+
+          ).length
+
+        : 0;
+
+    setBadgeCount(
+      unreadCount
+    );
+
   }
+
+  catch (err) {
+
+    console.error(
+      "Unread count error:",
+      err
+    );
+
+  }
+
 };
 
 // =========================
-// Fetch notifications + Good Moral history
+// Fetch Notifications
+// COMBINED GOOD MORAL + VIOLATIONS
 // =========================
 const fetchNotifications = async () => {
+
   if (!studentNumber) return;
 
   try {
-    const [notifRes, historyRes] = await Promise.all([
-      fetch(`${API_BASE}/good-moral/student/notifications?student_number=${studentNumber}`),
-      fetch(`${API_BASE}/good-moral/history?student_number=${studentNumber}`)
-    ]);
 
-    const notifData = notifRes.ok ? await notifRes.json() : { notifications: [] };
-    const historyData = historyRes.ok ? await historyRes.json() : { history: [] };
+    const response = await fetch(
 
-    const normalize = (n, isHistory = false) => {
-      if (n.status !== "Approved" && n.status !== "Rejected") return null;
+      `${API_BASE}/notification/student?student_number=${studentNumber}&student_id=${studentNumber}`
 
-      return {
-        request_id: n.request_id,
-        status: n.status,
-        message: isHistory
-          ? n.status === "Approved"
-            ? "Your Good Moral request has been approved."
-            : n.remarks?.toLowerCase().includes("auto-revoked")
-            ? "Your Good Moral has been revoked due to multiple violations."
-            : "Your Good Moral request has been rejected."
-          : n.message,
-        is_read: n.is_read || false,
-        requested_at: n.requested_at,
-        is_deleted: n.is_deleted || false
-      };
-    };
+    );
 
-    const newNotifs = Array.isArray(notifData.notifications)
-      ? notifData.notifications.map(n => normalize(n)).filter(Boolean)
-      : [];
+    const data = response.ok
 
-    const fullHistory = Array.isArray(historyData.history)
-      ? historyData.history.map(r => normalize(r, true)).filter(Boolean)
-      : [];
+      ? await response.json()
 
-    const merged = [...notifications, ...fullHistory, ...newNotifs];
+      : { notifications: [] };
 
-    const updated = merged
-      .map(n => {
-        const local = notifications.find(
-          l => l.request_id === n.request_id && l.requested_at === n.requested_at
-        );
-        return {
-          ...n,
-          is_read: local?.is_read ?? n.is_read,
-          is_deleted: local?.is_deleted ?? n.is_deleted
-        };
-      })
-      .filter((n, index, arr) =>
-        index === arr.findIndex(m =>
-          m.request_id === n.request_id &&
-          m.status === n.status &&
-          m.message === n.message &&
-          m.requested_at === n.requested_at
-        )
+
+
+    const notifications =
+
+      Array.isArray(
+        data.notifications
       )
-      .filter(n => !n.is_deleted)
-      .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
 
-    setNotifications(updated);
-    setBadgeCount(updated.filter(n => !n.is_read).length);
+        ? data.notifications.map(
 
-    fetchUnreadCount();
-  } catch (err) {
-    console.error("Error fetching notifications/history:", err);
+            n => ({
+
+              request_id:
+
+                n.id ||
+
+                n.request_id,
+
+              status:
+
+                n.status ||
+
+                "Notification",
+
+              message:
+
+                n.message ||
+
+                "New notification",
+
+              type:
+
+                n.type ||
+
+                "general",
+
+              is_read:
+
+                n.is_read ||
+
+                false,
+
+              requested_at:
+
+                n.created_at ||
+
+                null,
+
+              is_deleted:
+
+                n.is_deleted ||
+
+                false
+
+            })
+
+          )
+
+        : [];
+
+
+
+    const updated =
+
+      notifications
+
+        .filter(
+          n => !n.is_deleted
+        )
+
+        .sort(
+
+          (
+            a,
+            b
+          ) =>
+
+            new Date(
+              b.requested_at || 0
+            )
+
+            -
+
+            new Date(
+              a.requested_at || 0
+            )
+
+        );
+
+
+
+    setNotifications(
+      updated
+    );
+
+    await fetchUnreadCount();
+
   }
+
+  catch (err) {
+
+    console.error(
+      "Error fetching notifications:",
+      err
+    );
+
+  }
+
+};
+// =========================
+// SAFE KEY (GOOD MORAL + VIOLATION)
+// =========================
+const getKey = (note) =>
+  `${note.type || "unknown"}_${note.request_id || note.id}_${note.requested_at || note.violation_date}`;
+
+// =========================
+// STATE HELPERS (SAFE UPDATE)
+// =========================
+const updateNotifications = (updater) => {
+  setNotifications((prev) => {
+    const updated = typeof updater === "function" ? updater(prev) : updater;
+
+    setBadgeCount(updated.filter((n) => !n.is_read).length);
+    return updated;
+  });
 };
 
 // =========================
-// SELECT LOGIC
+// SELECT TOGGLE
 // =========================
 const toggleSelect = (note) => {
-  const exists = checkedNotifications.find(
-    (n) =>
-      n.request_id === note.request_id &&
-      n.requested_at === note.requested_at
+  const key = getKey(note);
+
+  const exists = checkedNotifications.some(
+    (n) => getKey(n) === key
   );
 
   if (exists) {
-    setCheckedNotifications(prev =>
-      prev.filter(
-        (n) =>
-          !(
-            n.request_id === note.request_id &&
-            n.requested_at === note.requested_at
-          )
-      )
+    setCheckedNotifications((prev) =>
+      prev.filter((n) => getKey(n) !== key)
     );
   } else {
-    setCheckedNotifications(prev => [...prev, note]);
+    setCheckedNotifications((prev) => [...prev, note]);
   }
 };
 
+// =========================
+// SELECT ALL
+// =========================
 const handleSelectAll = () => {
   if (isSelectAll) {
     setCheckedNotifications([]);
   } else {
-    setCheckedNotifications(notifications);
+    setCheckedNotifications([...notifications]);
   }
   setIsSelectAll(!isSelectAll);
 };
 
-// auto sync select all
+// =========================
+// AUTO SYNC SELECT ALL
+// =========================
 useEffect(() => {
   if (notifications.length === 0) {
     setIsSelectAll(false);
     return;
   }
 
-  if (checkedNotifications.length === notifications.length) {
-    setIsSelectAll(true);
-  } else {
-    setIsSelectAll(false);
-  }
+  setIsSelectAll(
+    checkedNotifications.length === notifications.length
+  );
 }, [checkedNotifications, notifications]);
 
 // =========================
-// Select Deleted
+// BULK DELETE (GOOD MORAL + VIOLATION SAFE)
 // =========================
 const handleDeleteSelected = async () => {
   if (checkedNotifications.length === 0) return;
@@ -1030,9 +1173,22 @@ const handleDeleteSelected = async () => {
   if (!result.isConfirmed) return;
 
   try {
-    for (let note of checkedNotifications) {
-      await deleteNotification(note.request_id, note.requested_at);
-    }
+    await Promise.all(
+      checkedNotifications.map(async (note) => {
+        const endpoint =
+          note.type === "violation"
+            ? `${API_BASE}/violations/student/notifications/${note.request_id}`
+            : `${API_BASE}/good-moral/student/notifications/${note.request_id}`;
+
+        await fetch(endpoint, { method: "DELETE" });
+      })
+    );
+
+    const deletedKeys = new Set(checkedNotifications.map(getKey));
+
+    updateNotifications((prev) =>
+      prev.filter((n) => !deletedKeys.has(getKey(n)))
+    );
 
     setCheckedNotifications([]);
     setIsSelectAll(false);
@@ -1063,92 +1219,110 @@ const handleDeleteSelected = async () => {
 };
 
 // =========================
-// Mark notification as read
+// MARK AS READ (FIXED MULTI API)
 // =========================
 const markAsRead = async (note) => {
-  setNotifications(prev => {
-    const updated = prev.map(n =>
-      n.request_id === note.request_id && n.requested_at === note.requested_at
+  const endpoint =
+    note.type === "violation"
+      ? `${API_BASE}/violations/student/notifications/close/${note.request_id}`
+      : `${API_BASE}/good-moral/student/notifications/close/${note.request_id}`;
+
+  updateNotifications((prev) =>
+    prev.map((n) =>
+      getKey(n) === getKey(note)
         ? { ...n, is_read: true }
         : n
-    );
-    setBadgeCount(updated.filter(n => !n.is_read).length);
-    return updated;
-  });
+    )
+  );
 
   try {
-    await fetch(`${API_BASE}/good-moral/student/notifications/close/${note.request_id}`, {
-      method: "PATCH"
-    });
+    await fetch(endpoint, { method: "PATCH" });
     fetchUnreadCount();
   } catch (err) {
-    console.error("Failed to mark notification as read:", err);
+    console.error("Failed mark as read:", err);
   }
 };
 
 // =========================
-// Open / Close
+// OPEN NOTIFICATION
 // =========================
 const openNotification = async (note) => {
   setSelectedNotification(note);
-  if (!note.is_read) await markAsRead(note);
+
+  if (!note.is_read) {
+    await markAsRead(note);
+  }
 };
 
+// =========================
+// CLOSE NOTIFICATION
+// =========================
 const closeNotification = (note) => {
-  if (!note) return;
   setSelectedNotification(null);
-  if (!note.is_read) markAsRead(note);
-};
 
+  if (note && !note.is_read) {
+    markAsRead(note);
+  }
+};
+/// =========================
+// DELETE SINGLE (CLEAN + SAFE + FIXED)
 // =========================
-// Delete (existing)
-// =========================
-const deleteNotification = async (request_id, requested_at) => {
+const deleteNotification = async (note) => {
   try {
-    await fetch(`${API_BASE}/good-moral/student/notifications/${request_id}`, {
+    if (!note) return;
+
+    const id = typeof note === "object" ? (note.id || note.request_id) : note;
+    const type = typeof note === "object" ? note.type : null;
+
+    if (!id) {
+      console.error("Missing ID:", note);
+      return;
+    }
+
+    const endpoint =
+      type === "violation"
+        ? `${API_BASE}/violations/student/notifications/${id}`
+        : `${API_BASE}/good-moral/student/notifications/${id}`;
+
+    const res = await fetch(endpoint, {
       method: "DELETE",
     });
 
-    setNotifications(prev => {
-      const updated = prev.filter(
-        n => !(n.request_id === request_id && n.requested_at === requested_at)
-      );
-      setBadgeCount(updated.filter(n => !n.is_read).length);
-      return updated;
-    });
-
-    fetchUnreadCount();
-
-    if (
-      selectedNotification?.request_id === request_id &&
-      selectedNotification?.requested_at === requested_at
-    ) {
-      setSelectedNotification(null);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || "Delete failed");
     }
+
+    // =========================
+    // REMOVE FROM UI (SAFE)
+    // =========================
+    updateNotifications((prev) =>
+      prev.filter((n) => (n.id || n.request_id) !== id)
+    );
+
+    setSelectedNotification(null);
 
     Swal.fire({
       title: "Deleted!",
-      text: "Notification has been deleted.",
+      text: "Notification deleted successfully.",
       icon: "success",
-      timer: 2300,
+      timer: 1500,
       showConfirmButton: false,
-      position: "top-end",
       toast: true,
-      timerProgressBar: true,
+      position: "top-end",
     });
 
   } catch (err) {
-    console.error("Failed to delete notification:", err);
+    console.error("Delete error:", err);
 
     Swal.fire({
       title: "Error!",
       text: "Failed to delete notification.",
       icon: "error",
-      timer: 1000,
+      timer: 2000,
       showConfirmButton: false,
-      position: "top-end",
       toast: true,
-      timerProgressBar: true,
+      position: "top-end",
     });
   }
 };
@@ -1209,6 +1383,564 @@ const handleLogout = () => {
     }
   });
 };
+//-------- COUNSELING REQUEST --------//
+
+const fetchRequests = async () => {
+
+  if (!studentNumber) return;
+
+  try {
+
+    const res = await axios.get(
+      `${API}/counseling/history`,
+      {
+        params: {
+          student_number: studentNumber
+        }
+      }
+    );
+
+    const data = Array.isArray(res.data)
+      ? res.data
+      : [];
+
+    // ALIGN FILE DATA
+    const formatted = data.map((r) => ({
+      ...r,
+
+      file_url:
+        r.file_url ?? null,
+
+      filename_stored:
+        r.filename_stored ?? null,
+
+      filename_original:
+        r.filename_original ?? null
+    }));
+
+    setRequests(formatted);
+
+    console.log(
+      "Counseling History:",
+      formatted
+    );
+
+  } catch (err) {
+
+    console.log(
+      "Fetch Requests Error:",
+      err?.response?.data || err
+    );
+
+    setRequests([]);
+
+    Swal.fire({
+      icon: "error",
+      title: "Failed to load requests",
+      text: "Please try again later"
+    });
+
+  }
+
+};
+
+
+// =========================
+// SUBMIT COUNSELING REQUEST
+// =========================
+const handleSubmit = async () => {
+
+  if (!preferredDate || !preferredTime) {
+    Swal.fire({
+      icon: "warning",
+      title: "Incomplete form",
+      text: "Please select date and time"
+    });
+    return;
+  }
+
+  if (loading) return;
+
+  setLoading(true);
+
+  try {
+
+    const formData = new FormData();
+
+    formData.append("student_number", studentNumber);
+    formData.append("preferred_date", preferredDate);
+    formData.append("preferred_time", preferredTime);
+
+    if (selectedFile) {
+      formData.append("file", selectedFile);
+    }
+
+    const res = await axios.post(
+      `${API}/counseling/request`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+
+   Swal.fire({
+      position: "top-end",
+      icon: "success",
+      title: "Request Submitted",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true,
+      width: "300px"
+    });
+    // RESET FIELDS
+    setPreferredDate("");
+    setPreferredTime("");
+    setSelectedFile(null);
+
+    // REFRESH DATA
+    await fetchRequests();
+
+  } catch (err) {
+
+    console.log("Submit Error:", err?.response?.data || err);
+
+    Swal.fire({
+      icon: "error",
+      title: "Submission Failed",
+      text: err?.response?.data?.message || "Something went wrong"
+    });
+
+  } finally {
+
+    setLoading(false);
+
+  }
+};
+
+// =========================
+// cancel counseling request
+// =========================
+ const hasPending = requests?.some(r => r.status === "Pending");
+
+const handleCancel = async () => {
+  const pendingRequest = requests?.find(
+    r => r.status === "Pending"
+  );
+
+  if (!pendingRequest) return;
+
+  try {
+    setLoading(true);
+
+  await axios.delete(
+    `${API}/counseling/request/cancel/${pendingRequest.request_id}`
+  );
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "Request cancelled",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true
+    });
+
+    await fetchRequests();
+
+  } catch (err) {
+
+    console.log("Delete Error:", err?.response?.data || err);
+
+    Swal.fire({
+      icon: "error",
+      title: "Delete Failed"
+    });
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+// =========================
+// AUTO LOAD
+// =========================
+useEffect(() => {
+  fetchRequests();
+
+  const interval = setInterval(() => {
+    fetchRequests();
+  }, 1000); 
+  return () => clearInterval(interval);
+}, [studentNumber]);
+
+// =========================
+// EXIT INTERVIEW REQUEST
+// =========================
+
+const fetchExitRequests = async () => {
+  if (!studentNumber) return;
+
+  try {
+    const res = await axios.get(
+      `${API}/exit_request/history`,
+      {
+        params: { student_number: studentNumber }
+      }
+    );
+
+    const data = Array.isArray(res.data) ? res.data : [];
+
+    const formatted = data.map((r) => ({
+      ...r,
+      file_url: r.file_url ?? null,
+      filename_stored: r.filename_stored ?? null,
+      filename_original: r.filename_original ?? null
+    }));
+
+    setExitRequests(formatted);
+
+    const pending = formatted.some((r) => r.status === "Pending");
+    setHasExitPending(pending);
+
+    console.log("Exit Request History:", formatted);
+
+  } catch (err) {
+    console.log("Fetch Exit Requests Error:", err?.response?.data || err);
+
+    setExitRequests([]);
+
+    Swal.fire({
+      icon: "error",
+      title: "Failed to load exit requests",
+      text: "Please try again later"
+    });
+  }
+};
+
+
+// =========================
+// SUBMIT EXIT REQUEST
+// =========================
+const handleExitSubmit = async () => {
+
+  if (!exitPreferredDate || !exitPreferredTime) {
+    Swal.fire({
+      icon: "warning",
+      title: "Incomplete form",
+      text: "Please select date and time"
+    });
+    return;
+  }
+
+  if (exitLoading) return;
+  setExitLoading(true);
+
+  try {
+    const formData = new FormData();
+
+    formData.append("student_number", studentNumber);
+    formData.append("preferred_date", exitPreferredDate);
+    formData.append("preferred_time", exitPreferredTime);
+
+    if (selectedFile) {
+      formData.append("file", selectedFile);
+    }
+
+    await axios.post(
+      `${API}/exit_request/request`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+
+    Swal.fire({
+      position: "top-end",
+      icon: "success",
+      title: "Exit request submitted",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true,
+      width: "300px"
+    });
+
+    // RESET FIELDS
+    setExitPreferredDate("");
+    setExitPreferredTime("");
+    setSelectedFile(null);
+
+    await fetchExitRequests();
+
+  } catch (err) {
+    console.log("Submit Exit Request Error:", err?.response?.data || err);
+
+    Swal.fire({
+      icon: "error",
+      title: "Submission Failed",
+      text: err?.response?.data?.message || "Something went wrong"
+    });
+
+  } finally {
+    setExitLoading(false);
+  }
+};
+
+
+// =========================
+// CANCEL EXIT REQUEST
+// =========================
+const handleExitCancel = async () => {
+
+  const pendingRequest = exitRequests.find(
+    (r) => r.status === "Pending"
+  );
+
+  if (!pendingRequest) return;
+
+  try {
+    setExitLoading(true);
+
+    await axios.delete(
+      `${API}/exit_request/request/cancel/${pendingRequest.request_id}`
+    );
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "Exit request cancelled",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true
+    });
+
+    await fetchExitRequests();
+
+  } catch (err) {
+    console.log("Cancel Exit Request Error:", err?.response?.data || err);
+
+    Swal.fire({
+      icon: "error",
+      title: "Cancel Failed"
+    });
+
+  } finally {
+    setExitLoading(false);
+  }
+};
+
+
+// =========================
+// AUTO LOAD EXIT REQUESTS
+// =========================
+useEffect(() => {
+  fetchExitRequests();
+
+  const interval = setInterval(() => {
+    fetchExitRequests();
+  }, 1000);
+
+  return () => clearInterval(interval);
+
+}, [studentNumber]);
+//-------- PSYCHOLOGICAL REQUEST --------//
+
+const fetchPsyRequests = async () => {
+
+  if (!studentNumber) return;
+
+  try {
+
+    const res = await axios.get(
+      `${API}/psychological/history`,
+      {
+        params: {
+          student_number: studentNumber
+        }
+      }
+    );
+
+    const data = Array.isArray(res.data)
+      ? res.data
+      : [];
+
+    // ALIGN FILE DATA
+    const formatted = data.map((r) => ({
+      ...r,
+
+      file_url:
+        r.file_url ?? null,
+
+      filename_stored:
+        r.filename_stored ?? null,
+
+      filename_original:
+        r.filename_original ?? null
+    }));
+
+    // Binago mula setRequests -> setPsyRequests para hindi mag-conflict
+    setPsyRequests(formatted);
+
+    console.log(
+      "Psychological History:",
+      formatted
+    );
+
+  } catch (err) {
+
+    console.log(
+      "Fetch Psy Requests Error:",
+      err?.response?.data || err
+    );
+
+    setPsyRequests([]);
+
+    Swal.fire({
+      icon: "error",
+      title: "Failed to load requests",
+      text: "Please try again later"
+    });
+
+  }
+
+};
+// =========================
+// SUBMIT PSYCHOLOGICAL REQUEST
+// =========================
+const handlePsySubmit = async () => {
+
+  if (!preferredDate || !preferredTime || !concernPurpose) {
+    Swal.fire({
+      icon: "warning",
+      title: "Incomplete form",
+      text: "Please select date, time, and state your concern/purpose"
+    });
+    return;
+  }
+
+  if (loading) return;
+
+  setLoading(true);
+
+  try {
+    const formData = new FormData();
+
+    
+    formData.append("student_number", studentNumber);
+    formData.append("preferred_date", preferredDate);
+    formData.append("preferred_time", preferredTime);
+    formData.append("concern_purpose", concernPurpose); 
+
+    // 2. PINAKAHULI DAPAT PALAGI ANG FILE FIELD
+    if (selectedFile) {
+      formData.append("file", selectedFile);
+    }
+
+    const res = await axios.post(
+      `${API}/psychological/request`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+
+    Swal.fire({
+      position: "top-end",
+      icon: "success",
+      title: "Psychological Request Submitted",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true,
+      width: "300px"
+    });
+
+    // RESET FIELDS
+    setPreferredDate("");
+    setPreferredTime("");
+    setConcernPurpose(""); 
+    setSelectedFile(null);
+
+    // REFRESH DATA
+    await fetchPsyRequests();
+
+  } catch (err) {
+
+    console.log("Psy Submit Error:", err?.response?.data || err);
+
+    Swal.fire({
+      icon: "error",
+      title: "Submission Failed",
+      text: err?.response?.data?.message || "Something went wrong"
+    });
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+// =========================
+// CANCEL PSYCHOLOGICAL REQUEST
+// =========================
+const handlePsyCancel = async () => {
+  const pendingRequest = psyRequests?.find(
+    r => r.status === "Pending"
+  );
+
+  if (!pendingRequest) return;
+
+  try {
+    setLoading(true);
+
+    await axios.delete(
+      `${API}/psychological/request/cancel/${pendingRequest.request_id}`
+    );
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "Request cancelled",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true
+    });
+
+    await fetchPsyRequests();
+
+  } catch (err) {
+
+    console.log("Psy Delete Error:", err?.response?.data || err);
+
+    Swal.fire({
+      icon: "error",
+      title: "Delete Failed"
+    });
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+// =========================
+// AUTO LOAD
+// =========================
+useEffect(() => {
+  // PINALITAN: Iniba na mula fetchRequests -> fetchPsyRequests para mag-sync sa state mo
+  fetchPsyRequests();
+
+  const interval = setInterval(() => {
+    fetchPsyRequests();
+  }, 1000); 
+
+  return () => clearInterval(interval);
+}, [studentNumber]);
   // ---------------------------
   // Render
   return (
@@ -1266,19 +1998,52 @@ const handleLogout = () => {
             }`}
           >
             <BookOpenIcon className="w-5 h-5" />
-            <span className="font-medium">Rules & Regulations</span>
+            <span className="font-medium">CvSU Handbook</span>
           </button>
+           <button
+              onClick={() => setActivePage("CounselingRequest")}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                activePage === "CounselingRequest"
+                  ? "bg-green-600"
+                  : "hover:bg-gray-700/60"
+              }`}
+            >
+              <CalendarDaysIcon className="w-5 h-5 text-white" />
+              <span className="font-medium">Counseling Request</span>
+            </button>
 
-      <button
-        onClick={() => setActivePage("Notifications")}
-        className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
-          activePage === "Notifications" ? "bg-green-600" : "hover:bg-gray-700/60"
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <BellIcon className="w-5 h-5" />
-          <span className="font-medium">Notifications</span>
-        </div>
+            <button
+              onClick={() => setActivePage("PsychologicalExamRequest")}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                activePage === "PsychologicalExamRequest"
+                  ? "bg-green-600"
+                  : "hover:bg-gray-700/60"
+              }`}
+            >
+              <ClipboardDocumentCheckIcon className="w-5 h-5 text-white" />
+              <span className="font-medium">Psych. Exam Request</span>
+            </button>
+              <button
+                onClick={() => setActivePage("exitInterviewRequest")}
+                className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                  activePage === "exitInterviewRequest"
+                    ? "bg-green-600"
+                    : "hover:bg-gray-700/60"
+                }`}
+              >
+                <FlagIcon className="w-5 h-5 text-white" />
+                <span className="font-medium">Exit Interview Request</span>
+              </button>
+              <button
+                onClick={() => setActivePage("Notifications")}
+                className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                  activePage === "Notifications" ? "bg-green-600" : "hover:bg-gray-700/60"
+                }`}
+              >
+            <div className="flex items-center gap-3">
+              <BellIcon className="w-5 h-5" />
+              <span className="font-medium">Notifications</span>
+            </div>
 
         {/* Badge: show only on desktop if there are unread notifications */}
         {notifications.filter(n => !n.is_read).length > 0 && (
@@ -1354,7 +2119,49 @@ const handleLogout = () => {
             </button>
             <button onClick={() => { setActivePage("Rules"); setSidebarOpen(false); }} className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${activePage === "Rules" ? "bg-green-600" : "hover:bg-white/10"}`}>
               <BookOpenIcon className="w-5 h-5" />
-              <span className="font-medium">Rules & Regulations</span>
+              <span className="font-medium">CvSU Handbook</span>
+            </button>
+            <button
+              onClick={() => {
+                setActivePage("CounselingRequest");
+                setSidebarOpen(false);
+              }}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${
+                activePage === "CounselingRequest"
+                  ? "bg-green-600"
+                  : "hover:bg-white/10"
+              }`}
+            >
+              <CalendarDaysIcon className="w-5 h-5 text-white" />
+              <span className="font-medium">Counseling Request</span>
+            </button>
+            <button
+              onClick={() => {
+                setActivePage("PsychologicalExamRequest");
+                setSidebarOpen(false);
+              }}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${
+                activePage === "PsychologicalExamRequest"
+                  ? "bg-green-600"
+                  : "hover:bg-white/10"
+              }`}
+            >
+              <ClipboardDocumentCheckIcon className="w-5 h-5 text-white" />
+              <span className="font-medium">Psych. Exam Request</span>
+            </button>
+             <button
+              onClick={() => {
+                setActivePage("exitInterviewRequest");
+                setSidebarOpen(false);
+              }}
+              className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg ${
+                activePage === "exitInterviewRequest"
+                  ? "bg-green-600"
+                  : "hover:bg-white/10"
+              }`}
+            >
+              <ClipboardDocumentCheckIcon className="w-5 h-5 text-white" />
+              <span className="font-medium">Exit Interview Request</span>
             </button>
             <button
               onClick={() => {
@@ -1528,72 +2335,147 @@ const handleLogout = () => {
         </header>
 
         {/*Dashboard*/}
-        {/* CONTENT */}
-        <main className="flex-1 overflow-auto p-4 md:p-10">
-          {/* INFO */}
-          {activePage === "Info" && (
-            <>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-green-800 mb-6 md:mb-10">
-                Welcome, {studentRecord?.student_name || fallbackName}!
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md flex flex-col justify-between">
-                  <div>
+          {/* CONTENT */}
+          <main className="flex-1 overflow-auto p-4 md:p-10">
+
+            {/* INFO */}
+            {activePage === "Info" && (
+              <>
+                <h2 className="text-3xl md:text-4xl font-extrabold text-green-800 mb-6 md:mb-10">
+                  Welcome, {studentRecord?.student_name || fallbackName}!
+                </h2>
+
+                {/* TOP CARDS */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+                  {/* GUIDANCE VISITS */}
+                  <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-4xl">📋</span>
+                        <h3 className="text-xl font-semibold text-green-700">
+                          Guidance Visits
+                        </h3>
+                      </div>
+                      <p className="text-4xl md:text-5xl font-extrabold text-green-900 mt-3">
+                        {visits}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={openHistoryModal}
+                      className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+                    >
+                      View Visit History
+                    </button>
+                  </div>
+
+                  {/* LAST VISIT */}
+                  <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-4xl">📋</span>
+                      <span className="text-4xl">📅</span>
                       <h3 className="text-xl font-semibold text-green-700">
-                        Guidance Visits
+                        Last Visit
                       </h3>
                     </div>
-                    <p className="text-4xl md:text-5xl font-extrabold text-green-900 mt-3">
-                      {visits}
+
+                    <p className="text-2xl md:text-3xl font-extrabold text-green-900 mt-4">
+                      {lastVisit}
                     </p>
                   </div>
-                  <button onClick={openHistoryModal} className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-                    View Visit History
-                  </button>
+
+                  {/* LATEST CONCERN */}
+                  <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-4xl">⚠️</span>
+                      <h3 className="text-xl font-semibold text-green-700">
+                        Latest Violation
+                      </h3>
+                    </div>
+
+                    <p className="text-2xl md:text-3xl font-bold text-green-900 mt-4">
+                      {violation}
+                    </p>
+                  </div>
+
+                  {/* RECOMMENDATION */}
+                  <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-4xl">📌</span>
+                      <h3 className="text-xl font-semibold text-green-700">
+                        Latest Section
+                      </h3>
+                    </div>
+
+                    <p className="text-2xl md:text-3xl font-bold text-green-900 mt-4">
+                      {section}
+                    </p>
+                  </div>
+
                 </div>
 
-                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-4xl">📅</span>
-                    <h3 className="text-xl font-semibold text-green-700">Last Visit</h3>
+             {/* =============================== */}
+              {/* LATEST SANCTION BIG CARD */}
+              {/* =============================== */}
+              <div className="mt-8 md:mt-12">
+
+                <div className="w-full bg-white border-2 border-green-600 rounded-2xl shadow-md p-6 md:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+
+                  {/* LEFT */}
+                  <div className="flex items-start gap-4">
+
+                    {/* ICON */}
+                    <div className="text-4xl md:text-5xl">
+                      ⚖️
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg md:text-2xl font-bold text-green-700">
+                        Latest Sanction
+                      </h3>
+
+                      <p className="text-sm md:text-base mt-2 text-gray-600">
+                        Most recent disciplinary action recorded for this student
+                      </p>
+                    </div>
+
                   </div>
-                  <p className="text-2xl md:text-3xl font-extrabold text-green-900 mt-4">{lastVisit}</p>
+
+                  {/* RIGHT */}
+                  <div className="bg-green-100 border border-green-600 px-5 py-4 rounded-xl w-full md:w-auto">
+
+                    <p className="text-sm md:text-base font-semibold text-red-600">
+                      Current Status
+                    </p>
+
+                    <p className="text-xl md:text-3xl font-extrabold text-red-800 mt-1">
+                      {latestSanction || "No sanction recorded"}
+                    </p>
+
+                  </div>
+
                 </div>
 
-                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-4xl">⚠️</span>
-                    <h3 className="text-xl font-semibold text-green-700">Latest Concern</h3>
-                  </div>
-                  <p className="text-2xl md:text-3xl font-bold text-green-900 mt-4">{violation}</p>
-                </div>
-
-                <div className="p-6 bg-white border-2 border-green-600 rounded-2xl shadow-md">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-4xl">📌</span>
-                    <h3 className="text-xl font-semibold text-green-700">Recommendation</h3>
-                  </div>
-                  <p className="text-2xl md:text-3xl font-bold text-green-900 mt-4">{section}</p>
-                </div>
               </div>
-            </>
-          )}
-          {/* ====================== */}
-            {/* Global Loading Spinner */}
+              </>
+            )}
+
+            {/* ====================== */}
+            {/* GLOBAL LOADING SPINNER */}
             {/* ====================== */}
             {loading && (
               <div className="fixed bottom-10 right-10 flex flex-col items-center justify-center z-50">
                 <div className="relative">
-                  {/* Large professional green spinner */}
                   <div className="animate-spin rounded-full h-28 w-28 border-t-4 border-b-4 border-green-600 shadow-lg"></div>
                 </div>
+
                 <p className="text-green-700 mt-4 text-lg font-semibold text-center">
                   Loading...
                 </p>
               </div>
             )}
+
+
           {/* NEWS */}
           {activePage === "News" && (
             <>
@@ -1615,249 +2497,198 @@ const handleLogout = () => {
               )}
             </>
           )}
-      {/* =========================
-           GOOD MORAL COMPONENT
-      ========================= */}
-      {activePage === "GoodMoral" && (
-        <div className="flex flex-col items-center w-full relative min-h-[400px] px-4">
+          {/* =========================
+              GOOD MORAL COMPONENT
+          ========================= */}
+          {activePage === "GoodMoral" && (
+            <div className="flex flex-col items-center w-full relative min-h-[400px] px-4">
 
-          {/* Title */}
-          <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
-            Good Moral Certificate
-          </h2>
+              {/* Title */}
+              <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6 text-center">
+                Good Moral Certificate
+              </h2>
 
-          {/* Revoke Banner */}
-          {isRevoked && (
-            <div className="w-full max-w-lg bg-red-100 border border-red-600 text-red-800 p-4 rounded-xl mb-6 text-center font-semibold">
-              Your Good Moral Certificate has been revoked due to multiple violations.
-            </div>
-          )}
+                {isRevoked ? (
+                <div className="w-full max-w-lg bg-red-100 border border-red-600 text-red-800 p-4 rounded-xl mb-6 text-center font-semibold">
+                  Your Good Moral request is restricted due to violation sanctions.
+                </div>
+              ) : null}
 
-          {/* Request Form / Status */}
-          {!studentRecord?.lastGoodMoralRequest ||
-          studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md mx-4 sm:mx-auto text-center">
+              {/* REQUEST FORM */}
+              {!studentRecord?.lastGoodMoralRequest ||
+              studentRecord?.lastGoodMoralRequest?.status === "Rejected" ? (
+                <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600 w-full max-w-md mx-4 sm:mx-auto text-center">
 
-              {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
-                <p className="text-red-700 font-medium mb-4">
-                  Remarks:{" "}
-                  {studentRecord?.lastGoodMoralRequest?.remarks ||
-                    "Your previous request was rejected."}
-                </p>
-              )}
-
-              <p className="text-gray-700 mb-4">
-                Request your Good Moral Certificate here.
-              </p>
-
-              {/* Submit Button */}
-              <div className="text-center mt-4">
-                <button
-                  onClick={submitGoodMoralRequest}
-                  disabled={
-                    (isRevoked && violationsCount >= 3) || loadingGoodMoral
-                  }
-                  className={`flex items-center justify-center gap-2 w-full sm:w-auto mx-auto bg-green-600 text-white px-6 py-3 rounded-lg transition-all duration-200 ${
-                    (isRevoked && violationsCount >= 3) || loadingGoodMoral
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-green-700"
-                  }`}
-                  title={
-                    isRevoked && violationsCount >= 3
-                      ? "Your Good Moral request has been revoked due to multiple violations."
-                      : ""
-                  }
-                >
-                  {loadingGoodMoral ? (
-                    <>
-                      {/* Spinner */}
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Submitting...</span>
-                    </>
-                  ) : (
-                    <>
-                      {studentRecord?.lastGoodMoralRequest?.status === "Rejected"
-                        ? "Submit Again"
-                        : "Request Good Moral"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600">
-
-              {/* Status & Remarks */}
-              <div className="mb-4">
-                <p className="text-green-600 font-semibold">
-                  Status:{" "}
-                  {isRevoked
-                    ? "Rejected"
-                    : studentRecord?.lastGoodMoralRequest?.status || "Pending"}
-                </p>
-
-                {studentRecord?.lastGoodMoralRequest?.status === "Pending" &&
-                  !isRevoked && (
-                    <p className="text-yellow-700 font-medium">
-                      Waiting for admin approval...
+                  {studentRecord?.lastGoodMoralRequest?.status === "Rejected" && (
+                    <p className="text-red-700 font-medium mb-4">
+                      Remarks:{" "}
+                      {studentRecord?.lastGoodMoralRequest?.remarks ||
+                        "Your previous request was rejected."}
                     </p>
                   )}
 
-                {(studentRecord?.lastGoodMoralRequest?.status === "Rejected" ||
-                  isRevoked) && (
-                  <p className="text-red-700 font-medium">
-                    Remarks:{" "}
-                    {studentRecord?.lastGoodMoralRequest?.remarks ||
-                      (isRevoked
-                        ? "Auto-revoked due to multiple violations."
-                        : "Your request was rejected.")}
-                  </p>
-                )}
-              </div>
-
-             {/* Approved Good Moral File Preview */}
-              {currentGoodMoral && !isRevoked && (
-                <div className="border rounded-lg p-3 sm:p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4 w-full">
-
-                  {/* FILE NAME */}
-                  <p className="text-gray-800 font-semibold break-words text-sm sm:text-base">
-                    {(() => {
-                      const name = currentGoodMoral.name || "Good Moral Certificate";
-                      const parts = name.split(".");
-                      if (parts.length === 1) return name;
-
-                      const extension = parts.pop();
-                      const baseName = parts.join(".");
-
-                      return (
-                        <>
-                          {baseName}
-                          {extension && <span className="font-bold">.{extension}</span>}
-                        </>
-                      );
-                    })()}
+                  <p className="text-gray-700 mb-4">
+                    Request your Good Moral Certificate here.
                   </p>
 
-                  {/* PDF PREVIEW */}
-                  <div className="w-full border rounded overflow-hidden 
-                                  h-[220px] sm:h-[280px] md:h-[300px] 
-                                  aspect-auto sm:aspect-[4/3]">
-
-                    <iframe
-                      src={currentGoodMoral?.url}
-                      className="w-full h-full"
-                      title={currentGoodMoral?.name || "Good Moral Certificate Preview"}
-                    />
-                  </div>
-
-                  {/* BUTTON */}
-                  <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-
+                  {/* Submit Button */}
+                  <div className="text-center mt-4">
                     <button
-                      onClick={() => window.open(currentGoodMoral?.url, "_blank")}
-                      className="w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
+                      onClick={submitGoodMoralRequest}
+                      disabled={
+                        isRevoked ||
+                        violationsCount >= 3 ||
+                        loadingGoodMoral
+                      }
+                      className={`flex items-center justify-center gap-2 w-full sm:w-auto mx-auto bg-green-600 text-white px-6 py-3 rounded-lg transition-all duration-200 ${
+                        isRevoked || violationsCount >= 3 || loadingGoodMoral
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-green-700"
+                      }`}
+                      title={
+                        isRevoked || violationsCount >= 3
+                          ? "Blocked due to violation sanction level"
+                          : ""
+                      }
                     >
-                      View File
+                      {loadingGoodMoral ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          {studentRecord?.lastGoodMoralRequest?.status === "Rejected"
+                            ? "Submit Again"
+                            : "Request Good Moral"}
+                        </>
+                      )}
                     </button>
-
                   </div>
                 </div>
-              )}
+              ) : (
+                <div className="w-full max-w-lg bg-white p-6 md:p-8 rounded-2xl shadow-md border-2 border-green-600">
 
-             {/* CANCEL REQUEST */}
-              {studentRecord?.lastGoodMoralRequest?.status === "Pending" &&
-                !isRevoked && (
-                  <button
-                    onClick={() => {
-                      Swal.fire({
-                        title: "Are you sure?",
-                        text: "Do you want to cancel your Good Moral request?",
-                        icon: "warning",
-                        showCancelButton: true,
-                        confirmButtonColor: "#3085d6",
-                        cancelButtonColor: "#d33",
-                        confirmButtonText: "Yes, cancel it!",
-                      }).then((result) => {
-                        if (result.isConfirmed) {
+                  {/* Status & Remarks */}
+                  <div className="mb-4">
+                    <p className="text-green-600 font-semibold">
+                      Status:{" "}
+                      {isRevoked || violationsCount >= 3
+                        ? "Rejected"
+                        : studentRecord?.lastGoodMoralRequest?.status || "Pending"}
+                    </p>
 
-                          // START LOADING
-                          setCancelLoading(true);
+                    {studentRecord?.lastGoodMoralRequest?.status === "Pending" &&
+                      !isRevoked && (
+                        <p className="text-yellow-700 font-medium">
+                          Waiting for admin approval...
+                        </p>
+                      )}
 
-                          fetch(
-                            `${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`,
-                            { method: "DELETE" }
-                          )
-                            .then((res) => {
-                              if (res.ok) {
-                                Swal.fire({
-                                  toast: true,
-                                  position: "top-end",
-                                  icon: "success",
-                                  title: "Request cancelled!",
-                                  showConfirmButton: false,
-                                  timer: 800,
-                                });
-
-                                setTimeout(() => {
-                                  window.location.reload();
-                                }, 800);
-
-                              } else {
-                                Swal.fire({
-                                  toast: true,
-                                  position: "top-end",
-                                  icon: "error",
-                                  title: "Failed to cancel request",
-                                  showConfirmButton: false,
-                                  timer: 1500,
-                                });
-
-                                // STOP LOADING
-                                setCancelLoading(false);
-                              }
-                            })
-                            .catch(() => {
-                              Swal.fire({
-                                toast: true,
-                                position: "top-end",
-                                icon: "error",
-                                title: "Failed to cancel request",
-                                showConfirmButton: false,
-                                timer: 1500,
-                              });
-
-                              // STOP LOADING
-                              setCancelLoading(false);
-                            });
-                        }
-                      });
-                    }}
-                    disabled={cancelLoading}
-                    className={`mt-4 w-full text-white py-2 rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-200 ${
-                      cancelLoading
-                        ? "bg-red-400 cursor-not-allowed"
-                        : "bg-red-600 hover:bg-red-700"
-                    }`}
-                  >
-                    {cancelLoading ? (
-                      <>
-                        {/* Spinner */}
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Cancelling...</span>
-                      </>
-                    ) : (
-                      "Cancel Request"
+                    {(studentRecord?.lastGoodMoralRequest?.status === "Rejected" ||
+                      isRevoked) && (
+                      <p className="text-red-700 font-medium">
+                        Remarks:{" "}
+                        {studentRecord?.lastGoodMoralRequest?.remarks ||
+                          (isRevoked
+                            ? "Auto-revoked due to violation sanction level."
+                            : "Your request was rejected.")}
+                      </p>
                     )}
-                  </button>
+                  </div>
+
+                  {/* Approved File */}
+                  {currentGoodMoral && !isRevoked && violationsCount < 3 && (
+                    <div className="border rounded-lg p-3 sm:p-4 flex flex-col gap-3 shadow-sm bg-gray-50 mt-4 w-full">
+
+                      <p className="text-gray-800 font-semibold break-words text-sm sm:text-base">
+                        {(() => {
+                          const name = currentGoodMoral.name || "Good Moral Certificate";
+                          const parts = name.split(".");
+                          if (parts.length === 1) return name;
+
+                          const ext = parts.pop();
+                          const base = parts.join(".");
+
+                          return (
+                            <>
+                              {base}
+                              {ext && <span className="font-bold">.{ext}</span>}
+                            </>
+                          );
+                        })()}
+                      </p>
+
+                      <div className="w-full border rounded overflow-hidden h-[220px] sm:h-[280px] md:h-[300px]">
+                        <iframe
+                          src={currentGoodMoral?.url}
+                          className="w-full h-full"
+                          title="Good Moral Preview"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => window.open(currentGoodMoral?.url, "_blank")}
+                        className="w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+                      >
+                        View File
+                      </button>
+
+                    </div>
+                  )}
+
+                  {/* CANCEL */}
+                  {studentRecord?.lastGoodMoralRequest?.status === "Pending" &&
+                    !isRevoked && (
+                      <button
+                        onClick={() => {
+                          Swal.fire({
+                            title: "Are you sure?",
+                            text: "Cancel request?",
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonText: "Yes",
+                          }).then((result) => {
+                            if (result.isConfirmed) {
+                              setCancelLoading(true);
+
+                              fetch(
+                                `${API_BASE}/good-moral/request/${studentRecord.lastGoodMoralRequest.request_id}`,
+                                { method: "DELETE" }
+                              )
+                                .then(() => {
+                                  Swal.fire("Cancelled", "", "success");
+                                  window.location.reload();
+                                })
+                                .finally(() => setCancelLoading(false));
+                            }
+                          });
+                        }}
+                        disabled={cancelLoading}
+                        className={`mt-4 w-full text-white py-2 rounded-lg flex items-center justify-center gap-2 ${
+                          cancelLoading
+                            ? "bg-red-400 cursor-not-allowed"
+                            : "bg-red-600 hover:bg-red-700"
+                        }`}
+                      >
+                        {cancelLoading ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Cancelling...</span>
+                          </>
+                        ) : (
+                          "Cancel Request"
+                        )}
+                      </button>
+                    )}
+                </div>
               )}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
          {/* RULES */}
           {activePage === "Rules" && (
             <div className="flex flex-col items-center">
-              <h2 className="text-2xl md:text-3xl font-bold text-green-800 mb-4 text-center">CvSU Rules and Regulations</h2>
+              <h2 className="text-2xl md:text-3xl font-bold text-green-800 mb-4 text-center">CvSU Handbook</h2>
 
               <div className="bg-white p-4 md:p-6 rounded-2xl shadow-md border w-full max-w-md">
                 {currentRules ? (
@@ -1914,7 +2745,758 @@ const handleLogout = () => {
               </div>
             </div>
             )}
-            {/* ======================== MANAGE ACCOUNT ========================= */}
+            {/* COUNSELING */}
+            {activePage === "CounselingRequest" && (
+
+              <div className="w-full p-4 md:p-6">
+
+                {/* HEADER */}
+                <div className="pb-6">
+                  <h2 className="text-2xl md:text-4xl font-bold text-green-800">
+                    Counseling Request
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Schedule and track your counseling appointments
+                  </p>
+                </div>
+
+                {/* MAIN GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+                  {/* ===================== LEFT PANEL ===================== */}
+                  <div className="
+                    bg-white border rounded-xl shadow-md p-5
+                    h-fit
+                    lg:sticky lg:top-4
+                    self-start
+                  ">
+
+                    <h3 className="text-lg font-semibold mb-4">
+                      Submit Request
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      <div>
+                        <label className="text-sm font-semibold">Preferred Date</label>
+                        <input
+                          type="date"
+                          value={preferredDate}
+                          onChange={(e) => setPreferredDate(e.target.value)}
+                          className="w-full mt-1 p-2 border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-semibold">Preferred Time</label>
+                        <input
+                          type="time"
+                          value={preferredTime}
+                          onChange={(e) => setPreferredTime(e.target.value)}
+                          className="w-full mt-1 p-2 border rounded-lg"
+                        />
+                      </div>
+
+                    </div>
+
+                    {/* SYSTEM INFO */}
+                    <div className="mt-5">
+                      <label className="text-sm font-semibold">
+                        Latest Violation Information
+                      </label>
+
+                      <textarea
+                        disabled
+                        value={
+                          requests[0]
+                            ? `Violation: ${requests[0]?.predicted_violation || "—"}
+                               Sanction: ${requests[0]?.sanction || "—"}`
+                            : "No violation record found"
+                        }
+                        className="w-full mt-1 p-3 border rounded-lg bg-gray-100 text-sm"
+                      />
+                    </div>
+
+             {/* BUTTON */}
+              <button
+                onClick={hasPending ? handleCancel : handleSubmit}
+                disabled={
+                  loading ||
+                  (!hasPending && (!preferredDate || !preferredTime))
+                }
+                className={`mt-5 px-5 py-3 rounded-lg w-full text-white transition
+                  ${
+                    loading || (!hasPending && (!preferredDate || !preferredTime))
+                      ? "bg-gray-400 cursor-not-allowed opacity-70"
+                      : hasPending
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-green-600 hover:bg-green-700"
+                  }
+                `}
+              >
+                {loading
+                  ? "Processing..."
+                  : hasPending
+                    ? "Cancel Request"
+                    : "Submit Request"}
+              </button>
+
+              {/* HELPER MESSAGE */}
+              {!hasPending && (!preferredDate || !preferredTime) && (
+                <p className="text-xs text-red-600 mt-2 font-semibold text-center">
+                  Please select a date and time before submitting your request.
+                </p>
+              )}
+              </div>
+                  {/* ===================== RIGHT PANEL ===================== */}
+                  <div className="
+                    bg-white border rounded-xl shadow-md p-5
+
+                    h-[70vh] lg:h-[75vh]
+                    flex flex-col
+                    overflow-hidden
+                    self-start
+                  ">
+
+                    {/* HEADER */}
+                    <h3 className="text-lg font-semibold mb-4 flex-shrink-0">
+                      My Appointments
+                    </h3>
+
+                    {/* EMPTY STATE */}
+                    {requests.length === 0 && (
+                      <p className="text-sm text-gray-500">
+                        No counseling requests yet
+                      </p>
+                    )}
+
+                    {/* SCROLL AREA ONLY */}
+                    <div className="
+                      flex-1
+                      min-h-0
+                      overflow-y-auto
+                      overscroll-contain
+                      pr-2
+                    ">
+
+                      {requests.map((r) => (
+                        <div
+                          key={r.request_id}
+                          className={`border-l-4 p-4 rounded-lg mb-4 shadow-sm ${
+                            r.status === "Pending"
+                              ? "border-yellow-500 bg-yellow-50"
+                              : r.status === "Approved"
+                              ? "border-green-600 bg-green-50"
+                              : "border-red-500 bg-red-50"
+                          }`}
+                        >
+
+                          {/* STATUS */}
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold flex items-center gap-2">
+                              <span
+                                className={`w-3 h-3 rounded-full ${
+                                  r.status === "Pending"
+                                    ? "bg-yellow-500"
+                                    : r.status === "Approved"
+                                    ? "bg-green-600"
+                                    : "bg-red-500"
+                                }`}
+                              />
+                              {r.status}
+                            </span>
+                          </div>
+
+                          {/* REQUEST INFO */}
+                          <p className="text-sm mt-2">
+                            <b>Requested:</b> {r.preferred_date} {r.preferred_time}
+                          </p>
+
+                          {/* VIOLATION */}
+                          <div className="mt-4 border rounded-lg bg-white p-3">
+                            <h4 className="font-semibold text-red-700 mb-2">
+                              Latest Violation
+                            </h4>
+
+                            <p className="text-sm">
+                              <b>Violation:</b> {r.predicted_violation || "—"}
+                            </p>
+
+                            <p className="text-sm">
+                              <b>Sanction:</b> {r.sanction || "—"}
+                            </p>
+
+                            <p className="text-sm">
+                              <b>Date:</b> {r.violation_date || "—"}
+                            </p>
+                          </div>
+
+                          {/* PENDING */}
+                          {r.status === "Pending" && (
+                            <p className="text-xs text-yellow-700 mt-3">
+                              Waiting for admin approval...
+                            </p>
+                          )}
+
+                          {/* APPROVED */}
+                          {r.status === "Approved" && (
+                            <div className="mt-4">
+
+                              <p className="text-sm text-green-700 font-semibold mb-3">
+                                Approved Schedule: {r.admin_set_date} {r.admin_set_time}
+                              </p>
+
+                              {r.file_url ? (
+                                <div>
+
+                                  <p className="text-sm font-semibold mb-2">
+                                    Approved Attachment
+                                  </p>
+
+                                  <iframe
+                                    src={r.file_url}
+                                    title="PDF Preview"
+                                    className="w-full h-[250px] border rounded-lg bg-white"
+                                  />
+
+                                  <div className="flex gap-2 mt-3">
+                                    <a
+                                      href={r.file_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex-1 text-center hover:bg-blue-700"
+                                    >
+                                      Open PDF
+                                    </a>
+                                  </div>
+
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-gray-500 italic">
+                                  No approved attachment yet.
+                                </p>
+                              )}
+
+                            </div>
+                          )}
+
+                        </div>
+                      ))}
+
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+           {/* Exit Interview Request */}
+            {activePage === "exitInterviewRequest" && (
+              <div className="w-full p-4 md:p-6">
+
+                {/* HEADER */}
+                <div className="pb-6">
+                  <h2 className="text-2xl md:text-4xl font-bold text-green-800">
+                    Exit Interview Request
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Schedule and track your exit interview appointments
+                  </p>
+                </div>
+
+                {/* MAIN GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+                  {/* ===================== LEFT PANEL ===================== */}
+                  <div className="
+                    bg-white border rounded-xl shadow-md p-5
+                    h-fit
+                    lg:sticky lg:top-4
+                    self-start
+                  ">
+
+                    <h3 className="text-lg font-semibold mb-4">
+                      Submit Exit Interview Request
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      <div>
+                        <label className="text-sm font-semibold">Preferred Date</label>
+                        <input
+                          type="date"
+                          value={exitPreferredDate}
+                          onChange={(e) => setExitPreferredDate(e.target.value)}
+                          className="w-full mt-1 p-2 border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-semibold">Preferred Time</label>
+                        <input
+                          type="time"
+                          value={exitPreferredTime}
+                          onChange={(e) => setExitPreferredTime(e.target.value)}
+                          className="w-full mt-1 p-2 border rounded-lg"
+                        />
+                      </div>
+
+                    </div>
+
+                    {/* SYSTEM INFO */}
+                    <div className="mt-5">
+                      <label className="text-sm font-semibold">
+                        Latest Violation Information
+                      </label>
+
+                      <textarea
+                        disabled
+                        value={
+                          exitRequests[0]
+                            ? `Violation: ${exitRequests[0]?.predicted_violation || "—"}
+                             Sanction: ${exitRequests[0]?.sanction || "—"}`
+                            : "No violation record found"
+                        }
+                        className="w-full mt-1 p-3 border rounded-lg bg-gray-100 text-sm"
+                      />
+                    </div>
+
+                    {/* BUTTON */}
+                    <button
+                      onClick={hasExitPending ? handleExitCancel : handleExitSubmit}
+                      disabled={
+                        exitLoading ||
+                        (!hasExitPending && (!exitPreferredDate || !exitPreferredTime))
+                      }
+                      className={`mt-5 px-5 py-3 rounded-lg w-full text-white transition
+                        ${
+                          exitLoading ||
+                          (!hasExitPending && (!exitPreferredDate || !exitPreferredTime))
+                            ? "bg-gray-400 cursor-not-allowed opacity-70"
+                            : hasExitPending
+                              ? "bg-red-600 hover:bg-red-700"
+                              : "bg-green-600 hover:bg-green-700"
+                        }
+                      `}
+                    >
+                      {exitLoading
+                        ? "Processing..."
+                        : hasExitPending
+                          ? "Cancel Exit Request"
+                          : "Submit Exit Request"}
+                    </button>
+
+                    {/* HELPER MESSAGE */}
+                    {!hasExitPending && (!exitPreferredDate || !exitPreferredTime) && (
+                      <p className="text-xs text-red-600 mt-2 font-semibold text-center">
+                        Please select a date and time before submitting your exit request.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ===================== RIGHT PANEL ===================== */}
+                  <div className="
+                    bg-white border rounded-xl shadow-md p-5
+                    h-[70vh] lg:h-[75vh]
+                    flex flex-col
+                    overflow-hidden
+                    self-start
+                  ">
+
+                    <h3 className="text-lg font-semibold mb-4 flex-shrink-0">
+                      My Exit Interview Appointments
+                    </h3>
+
+                    {exitRequests.length === 0 && (
+                      <p className="text-sm text-gray-500">
+                        No exit interview requests yet
+                      </p>
+                    )}
+
+                    <div className="
+                      flex-1
+                      min-h-0
+                      overflow-y-auto
+                      overscroll-contain
+                      pr-2
+                    ">
+
+                      {exitRequests.map((r) => (
+                        <div
+                          key={r.request_id}
+                          className={`border-l-4 p-4 rounded-lg mb-4 shadow-sm ${
+                            r.status === "Pending"
+                              ? "border-yellow-500 bg-yellow-50"
+                              : r.status === "Approved"
+                              ? "border-green-600 bg-green-50"
+                              : "border-red-500 bg-red-50"
+                          }`}
+                        >
+
+                          {/* STATUS */}
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold flex items-center gap-2">
+                              <span
+                                className={`w-3 h-3 rounded-full ${
+                                  r.status === "Pending"
+                                    ? "bg-yellow-500"
+                                    : r.status === "Approved"
+                                    ? "bg-green-600"
+                                    : "bg-red-500"
+                                }`}
+                              />
+                              {r.status}
+                            </span>
+                          </div>
+
+                          {/* REQUEST INFO */}
+                          <p className="text-sm mt-2">
+                            <b>Requested:</b> {r.preferred_date} {r.preferred_time}
+                          </p>
+
+                          {/* VIOLATION */}
+                          <div className="mt-4 border rounded-lg bg-white p-3">
+                            <h4 className="font-semibold text-red-700 mb-2">
+                              Latest Violation
+                            </h4>
+
+                            <p className="text-sm">
+                              <b>Violation:</b> {r.predicted_violation || "—"}
+                            </p>
+
+                            <p className="text-sm">
+                              <b>Sanction:</b> {r.sanction || "—"}
+                            </p>
+
+                            <p className="text-sm">
+                              <b>Date:</b> {r.violation_date || "—"}
+                            </p>
+                          </div>
+
+                          {/* PENDING */}
+                          {r.status === "Pending" && (
+                            <p className="text-xs text-yellow-700 mt-3">
+                              Waiting for admin approval...
+                            </p>
+                          )}
+
+                          {/* APPROVED */}
+                          {r.status === "Approved" && (
+                            <div className="mt-4">
+
+                              <p className="text-sm text-green-700 font-semibold mb-3">
+                                Approved Schedule: {r.admin_set_date} {r.admin_set_time}
+                              </p>
+
+                              {r.file_url ? (
+                                <div>
+                                  <p className="text-sm font-semibold mb-2">
+                                    Approved Attachment
+                                  </p>
+
+                                  <iframe
+                                    src={r.file_url}
+                                    title="PDF Preview"
+                                    className="w-full h-[250px] border rounded-lg bg-white"
+                                  />
+
+                                  <div className="flex gap-2 mt-3">
+                                    <a
+                                      href={r.file_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex-1 text-center hover:bg-blue-700"
+                                    >
+                                      Open PDF
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-gray-500 italic">
+                                  No approved attachment yet.
+                                </p>
+                              )}
+
+                            </div>
+                          )}
+
+                        </div>
+                      ))}
+
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+           {/* PSYCHOLOGICAL EXAM SCHEDULING */}
+            {activePage === "PsychologicalExamRequest" && (
+
+              <div className="w-full p-4 md:p-6">
+
+                {/* HEADER */}
+                <div className="pb-6">
+                  <h2 className="text-2xl md:text-4xl font-bold text-green-800">
+                    Psychological Exam Scheduling
+                  </h2>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    Schedule and track your psychological examination request
+                  </p>
+                </div>
+
+                {/* MAIN GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+                  {/* LEFT PANEL */}
+                  <div className="
+                    bg-white border rounded-xl shadow-md p-5
+                    h-fit
+                    lg:sticky lg:top-4
+                    self-start
+                  ">
+
+                    <h3 className="text-lg font-semibold mb-4">
+                      Submit Request
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      <div>
+                        <label className="text-sm font-semibold">
+                          Preferred Date
+                        </label>
+
+                        <input
+                          type="date"
+                          value={preferredDate}
+                          onChange={(e) => setPreferredDate(e.target.value)}
+                          className="w-full mt-1 p-2 border rounded-lg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-semibold">
+                          Preferred Time
+                        </label>
+
+                        <input
+                          type="time"
+                          value={preferredTime}
+                          onChange={(e) => setPreferredTime(e.target.value)}
+                          className="w-full mt-1 p-2 border rounded-lg"
+                        />
+                      </div>
+
+                    </div>
+
+                    {/* CONCERN / PURPOSE */}
+                    <div className="mt-5">
+
+                      <label className="text-sm font-semibold">
+                        Concern / Purpose
+                      </label>
+
+                      <textarea
+                        rows={5}
+                        value={concernPurpose}
+                        onChange={(e) => setConcernPurpose(e.target.value)}
+                        placeholder="Enter your concern or purpose for psychological examination..."
+                        className="w-full mt-1 p-3 border rounded-lg text-sm resize-none"
+                      />
+
+                    </div>
+
+                 {/* BUTTON */}
+                    <button
+                        onClick={hasPsyPending ? handlePsyCancel : handlePsySubmit}
+                        disabled={
+                          loading ||
+                          (!hasPsyPending &&
+                            (!preferredDate || !preferredTime || !concernPurpose))
+                        }
+                        className={`mt-5 px-5 py-3 rounded-lg w-full text-white transition
+                          ${
+                            loading ||
+                            (!hasPsyPending &&
+                              (!preferredDate || !preferredTime || !concernPurpose))
+                              ? "bg-gray-400 cursor-not-allowed"
+                              : hasPsyPending
+                              ? "bg-red-600 hover:bg-red-700"
+                              : "bg-green-600 hover:bg-green-700"
+                          }
+                        `}
+                      >
+                        {loading
+                          ? "Processing..."
+                          : hasPsyPending
+                          ? "Cancel Request"
+                          : "Submit Request"}
+                      </button>
+                      {!hasPsyPending &&
+                          (!preferredDate || !preferredTime || !concernPurpose) && (
+                            <p className="text-sm text-red-500 mt-2 text-center font-semibold">
+                              Please complete date, time, and concern before submitting
+                            </p>
+                        )}
+                      </div>
+
+                  {/* RIGHT PANEL */}
+                  <div className="
+                    bg-white border rounded-xl shadow-md p-5
+                    h-[70vh] lg:h-[75vh]
+                    flex flex-col
+                    overflow-hidden
+                    self-start
+                  ">
+
+                    <h3 className="text-lg font-semibold mb-4 flex-shrink-0">
+                      My Requests
+                    </h3>
+
+                    {/* Binago mula requests.length -> psyRequests.length */}
+                    {psyRequests.length === 0 && (
+                      <p className="text-sm text-gray-500">
+                        No psychological exam requests yet
+                      </p>
+                    )}
+
+                    {/* SCROLL */}
+                    <div className="
+                      flex-1
+                      min-h-0
+                      overflow-y-auto
+                      overscroll-contain
+                      pr-2
+                    ">
+
+                      {/* Binago mula requests.map -> psyRequests.map */}
+                      {psyRequests.map((r) => (
+
+                        <div
+                          key={r.request_id}
+                          className={`border-l-4 p-4 rounded-lg mb-4 shadow-sm ${
+                            r.status === "Pending"
+                              ? "border-yellow-500 bg-yellow-50"
+                              : r.status === "Approved"
+                              ? "border-green-600 bg-green-50"
+                              : "border-red-500 bg-red-50"
+                          }`}
+                        >
+
+                          {/* STATUS */}
+                          <div className="flex justify-between items-center">
+
+                            <span className="font-semibold flex items-center gap-2">
+
+                              <span
+                                className={`w-3 h-3 rounded-full ${
+                                  r.status === "Pending"
+                                    ? "bg-yellow-500"
+                                    : r.status === "Approved"
+                                    ? "bg-green-600"
+                                    : "bg-red-500"
+                                }`}
+                              />
+
+                              {r.status}
+
+                            </span>
+
+                          </div>
+
+                          {/* REQUEST INFO */}
+                          <p className="text-sm mt-2">
+                            <b>Requested:</b> {r.preferred_date} {r.preferred_time}
+                          </p>
+
+                          {/* PURPOSE */}
+                          <div className="mt-4 border rounded-lg bg-white p-3">
+
+                            <h4 className="font-semibold text-blue-700 mb-2">
+                              Concern / Purpose
+                            </h4>
+
+                            <p className="text-sm whitespace-pre-wrap">
+                              {r.concern_purpose || "—"}
+                            </p>
+
+                          </div>
+
+                          {/* PENDING */}
+                          {r.status === "Pending" && (
+                            <p className="text-xs text-yellow-700 mt-3">
+                              Waiting for admin approval...
+                            </p>
+                          )}
+
+                          {/* APPROVED */}
+                          {r.status === "Approved" && (
+
+                            <div className="mt-4">
+
+                              <p className="text-sm text-green-700 font-semibold mb-3">
+                                Approved Schedule:
+                                {" "}
+                                {r.admin_set_date}
+                                {" "}
+                                {r.admin_set_time}
+                              </p>
+
+                              {r.file_url ? (
+
+                                <div>
+
+                                  <p className="text-sm font-semibold mb-2">
+                                    Approved Attachment
+                                  </p>
+
+                                  <iframe
+                                    src={r.file_url}
+                                    title="PDF Preview"
+                                    className="w-full h-[250px] border rounded-lg bg-white"
+                                  />
+
+                                  <div className="flex gap-2 mt-3">
+
+                                    <a
+                                      href={r.file_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex-1 text-center hover:bg-blue-700"
+                                    >
+                                      Open PDF
+                                    </a>
+
+                                  </div>
+
+                                </div>
+
+                              ) : (
+
+                                <p className="mt-3 text-gray-500 italic">
+                                  No approved attachment yet.
+                                </p>
+
+                              )}
+
+                            </div>
+
+                          )}
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+            
+                 {/* ======================== MANAGE ACCOUNT ========================= */}
                     {activePage === "ManageAccount" && (
                       <div className="w-full p-4 md:p-6">
 
@@ -2346,8 +3928,8 @@ const handleLogout = () => {
                           </div>
                           </div>
                         </div>
-                      )}
-                  {/* ======================== NOTIFICATIONS PAGE ========================= */}
+                            )}
+                {/* ======================== NOTIFICATIONS PAGE ========================= */}
                   {activePage === "Notifications" && (
                     <div className="w-full">
                       <h2 className="text-2xl md:text-4xl font-bold text-green-800 mb-6">
@@ -2385,27 +3967,59 @@ const handleLogout = () => {
                           {/* ===== LIST ===== */}
                           <div className="space-y-4">
                             {notifications.map((note) => {
-                              const { request_id, message, status, is_read } = note;
+                              const {
+                                request_id,
+                                message,
+                                status,
+                                is_read,
+                                requested_at
+                              } = note;
+
                               const isOpened = is_read;
 
-                              // Border & dot colors
+                              // =========================
+                              // BORDER + DOT COLORS
+                              // =========================
                               let borderColor = "border-gray-300";
                               let dotColor = "bg-gray-400";
 
                               if (!isOpened) {
+
                                 if (status === "Approved") {
                                   borderColor = "border-green-600";
                                   dotColor = "bg-green-600";
-                                } else if (status === "Rejected") {
+                                } 
+
+                                else if (status === "Rejected") {
                                   borderColor = "border-red-600";
                                   dotColor = "bg-red-600";
+                                } 
+
+                                else if (status === "Violation") {
+                                  borderColor = "border-yellow-500";
+                                  dotColor = "bg-yellow-500";
+                                } 
+
+                                else if (status === "Resolved") {
+                                  borderColor = "border-blue-500";
+                                  dotColor = "bg-blue-500";
+                                } 
+
+                                else if (status === "Cleared") {
+                                  borderColor = "border-emerald-600";
+                                  dotColor = "bg-emerald-600";
+                                }
+
+
+                                else if (status === "Pending") {
+                                  borderColor = "border-yellow-300";
+                                  dotColor = "bg-yellow-400";
                                 }
                               }
-
                               const isChecked = checkedNotifications.some(
                                 (n) =>
-                                  n.request_id === note.request_id &&
-                                  n.requested_at === note.requested_at
+                                  n.request_id === request_id &&
+                                  n.requested_at === requested_at
                               );
 
                               const handleOpen = async () => {
@@ -2418,9 +4032,9 @@ const handleLogout = () => {
 
                               return (
                                 <div
-                                  key={request_id + note.requested_at}
+                                  key={(request_id || "") + (requested_at || "")}
                                   onClick={handleOpen}
-                                   className={`cursor-pointer p-4 bg-white rounded-2xl shadow-md flex items-center justify-between hover:scale-[1.02] transition-transform duration-200 ${
+                                  className={`cursor-pointer p-4 bg-white rounded-2xl shadow-md flex items-center justify-between hover:scale-[1.02] transition-transform duration-200 ${
                                     isChecked
                                       ? "border-black border-2"
                                       : `border-2 ${borderColor}`
@@ -2428,8 +4042,7 @@ const handleLogout = () => {
                                 >
                                   {/* LEFT */}
                                   <div className="flex items-center space-x-3">
-                                    
-                                    {/* CHECKBOX */}
+
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
@@ -2439,12 +4052,18 @@ const handleLogout = () => {
                                     />
 
                                     <span className={`w-3 h-3 rounded-full ${dotColor}`}></span>
-                                    <p className="font-semibold text-gray-800">{message}</p>
+
+                                    <p className="font-semibold text-gray-800">
+                                      {message}
+                                    </p>
                                   </div>
 
                                   {/* RIGHT */}
                                   <div className="flex items-center space-x-2">
-                                    <p className="text-gray-600 font-medium">{status}</p>
+                                    <p className="text-gray-600 font-medium">
+                                      {status}
+                                    </p>
+
                                     {!isOpened && (
                                       <span className="px-2 py-0.5 text-xs font-semibold text-white bg-blue-500 rounded-full">
                                         NEW
@@ -2460,69 +4079,180 @@ const handleLogout = () => {
                     </div>
                   )}
 
-                  {/* ======================== MODAL FOR SELECTED NOTIFICATION ========================= */}
+                 {/* ======================== MODAL ========================= */}
                   {selectedNotification && (
                     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+
                       <div className="bg-white rounded-3xl p-8 w-[95%] max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl relative animate-fadeIn">
-                        
-                        {/* X BUTTON */}
+
+                        {/* CLOSE */}
                         <button
                           onClick={async () => {
+
                             if (!selectedNotification) return;
-                            await closeNotification(selectedNotification);
+
+                            await closeNotification(
+                              selectedNotification
+                            );
+
                           }}
                           className="absolute top-4 right-5 text-gray-500 hover:text-red-500 text-2xl font-bold"
                         >
                           ✕
                         </button>
 
+
                         {/* HEADER */}
                         {(() => {
+
+                          let icon = "🔔";
+
                           let iconBg = "bg-gray-100";
                           let contentBg = "bg-gray-50";
                           let textColor = "text-gray-700";
 
                           if (selectedNotification.status === "Approved") {
+
+                            icon = "✅";
                             iconBg = "bg-green-100";
                             contentBg = "bg-green-50";
                             textColor = "text-green-700";
-                          } else if (selectedNotification.status === "Rejected") {
+
+                          }
+
+                          else if (
+                            selectedNotification.status === "Rejected"
+                          ) {
+
+                            icon = "❌";
                             iconBg = "bg-red-100";
                             contentBg = "bg-red-50";
                             textColor = "text-red-700";
+
+                          }
+
+                          else if (
+                            selectedNotification.status === "Violation"
+                          ) {
+
+                            icon = "⚠️";
+                            iconBg = "bg-yellow-100";
+                            contentBg = "bg-yellow-50";
+                            textColor = "text-yellow-700";
+
+                          }
+
+                          else if (
+                            selectedNotification.status === "Resolved"
+                          ) {
+
+                            icon = "🛠️";
+                            iconBg = "bg-blue-100";
+                            contentBg = "bg-blue-50";
+                            textColor = "text-blue-700";
+
+                          }
+
+                          else if (
+                            selectedNotification.status === "Cleared"
+                          ) {
+
+                            icon = "🎉";
+                            iconBg = "bg-emerald-100";
+                            contentBg = "bg-emerald-50";
+                            textColor = "text-emerald-700";
+
                           }
 
                           return (
+
                             <>
+
+                              {/* TOP */}
                               <div className="flex items-center gap-4 mb-6">
-                                <div className={`w-14 h-14 flex items-center justify-center rounded-full text-2xl ${iconBg}`}>
-                                  🔔
+
+                                <div
+                                  className={`w-14 h-14 flex items-center justify-center rounded-full text-2xl ${iconBg}`}
+                                >
+                                  {icon}
                                 </div>
+
                                 <h3 className="text-2xl font-bold text-gray-800">
                                   Notification Details
                                 </h3>
+
                               </div>
 
-                              <div className={`${contentBg} p-6 rounded-2xl mb-6`}>
-                                <p className="text-gray-800 text-lg font-semibold mb-3">
+
+                              {/* CONTENT */}
+                              <div
+                                className={`${contentBg} p-6 rounded-2xl mb-6`}
+                              >
+
+                                <p className="text-gray-800 text-lg font-semibold mb-4">
+
                                   {selectedNotification.message}
+
                                 </p>
-                                <p className={`text-base font-semibold ${textColor}`}>
-                                  Status: {selectedNotification.status}
-                                </p>
+
+
+                                <div className="space-y-3">
+
+                                  <p className={`font-semibold ${textColor}`}>
+
+                                    Status:
+                                    {" "}
+                                    {selectedNotification.status}
+
+                                  </p>
+
+                                  {selectedNotification.type === "violation" && (
+
+                                    <>
+                                      <p className="text-gray-700">
+
+                                        <strong>Violation:</strong>
+
+                                        {" "}
+
+                                        {selectedNotification.status}
+
+                                      </p>
+
+                                      {selectedNotification.sanction && (
+
+                                        <p className="text-gray-700">
+
+                                          <strong>Sanction:</strong>
+
+                                          {" "}
+
+                                          {selectedNotification.sanction}
+
+                                        </p>
+
+                                      )}
+
+                                    </>
+
+                                  )}
+
+                                </div>
+
                               </div>
+
                             </>
+
                           );
+
                         })()}
+
 
                         {/* ACTIONS */}
                         <div className="flex justify-end gap-3">
                           <button
                             onClick={async () => {
-                              await deleteNotification(
-                                selectedNotification.request_id,
-                                selectedNotification.requested_at
-                              );
+                              await deleteNotification(selectedNotification);
                               setSelectedNotification(null);
                             }}
                             className="px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition"
@@ -2530,53 +4260,64 @@ const handleLogout = () => {
                             Delete
                           </button>
                         </div>
+
                       </div>
+
                     </div>
                   )}
-                </main>
-              </div>
-
-           {/* HISTORY MODAL */}
-            {historyModalOpen && (
-              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-
-                <div className="w-full max-w-lg bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-6">
-
-                  <h2 className="text-2xl font-bold text-gray-800 mb-5 flex items-center gap-2">
-                    📜 Visit History
-                  </h2>
-
-                  <div className="max-h-80 overflow-y-auto space-y-3 pr-2">
-                    {violationHistory.length === 0 ? (
-                      <p className="text-gray-500 text-center py-10">
-                        No visit history found.
-                      </p>
-                    ) : (
-                      violationHistory.map((item, index) => (
-                        <div
-                          key={index}
-                          onClick={() => {
-                            setSelectedHistory(item);
-                            setHistoryModalOpen(false);
-                            setDetailModalOpen(true);
-                          }}
-                          className="p-4 bg-gray-200 hover:bg-green-100 rounded-xl border border-gray-300 shadow-md cursor-pointer transition-all hover:scale-[1.02]"
-                        >
-                          <p className="font-semibold text-gray-900">
-                            {item.predicted_violation}
-                          </p>
-
-                          <p className="text-sm text-gray-700">
-                            Section: <span className="font-medium">{item.predicted_section}</span>
-                          </p>
-
-                          <p className="text-xs text-gray-600 mt-1">
-                            Last Visit Date: {item.violation_date || "—"}
-                          </p>
-                        </div>
-                      ))
-                    )}
+                  </main>
                   </div>
+            {/* HISTORY MODAL */}
+          {historyModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+
+              <div className="w-full max-w-lg bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-6">
+
+                <h2 className="text-2xl font-bold text-gray-800 mb-5 flex items-center gap-2">
+                  📜 Visit History
+                </h2>
+
+                <div className="max-h-80 overflow-y-auto space-y-3 pr-2">
+                  {violationHistory.length === 0 ? (
+                    <p className="text-gray-500 text-center py-10">
+                      No visit history found.
+                    </p>
+                  ) : (
+                    violationHistory.map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          setSelectedHistory(item);
+                          setHistoryModalOpen(false);
+                          setDetailModalOpen(true);
+                        }}
+                        className="p-4 bg-gray-200 hover:bg-green-100 rounded-xl border border-gray-300 shadow-md cursor-pointer transition-all hover:scale-[1.02]"
+                      >
+
+                        <p className="font-semibold text-gray-900">
+                          {item.predicted_violation}
+                        </p>
+
+                        <p className="text-sm text-gray-700">
+                          Section: <span className="font-medium">{item.predicted_section}</span>
+                        </p>
+
+                        <p className="text-xs text-gray-600 mt-1">
+                          Last Visit Date: {item.violation_date || "—"}
+                        </p>
+                        <div className="mt-2">
+                          <span className="text-xs font-semibold text-red-600">
+                            Sanction:
+                          </span>
+                          <span className="text-xs font-bold text-red-700 ml-1">
+                            {item.sanction || "—"}
+                          </span>
+                        </div>
+
+                      </div>
+                    ))
+                  )}
+                </div>
 
                   <button
                     onClick={() => setHistoryModalOpen(false)}
@@ -2589,7 +4330,7 @@ const handleLogout = () => {
               </div>
             )}
 
-            {/* DETAIL MODAL */}
+          {/* DETAIL MODAL */}
             {detailModalOpen && selectedHistory && (
               <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
 
@@ -2611,18 +4352,25 @@ const handleLogout = () => {
                       <p className="font-semibold">{selectedHistory.predicted_section}</p>
                     </div>
 
-                   <div className="p-3 bg-gray-200 rounded-lg">
+                    <div className="p-3 bg-gray-200 rounded-lg">
                       <p className="text-sm text-gray-500">Last Visit Date</p>
                       <p className="font-semibold">
                         {selectedHistory.violation_date || "—"}
                       </p>
                     </div>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-500">Sanction</p>
+                      <p className="font-bold text-red-700">
+                        {selectedHistory.sanction || "No sanction recorded"}
+                      </p>
+                    </div>
+
                   </div>
 
                   <button
                     onClick={() => {
                       setDetailModalOpen(false);
-                      setHistoryModalOpen(true); 
+                      setHistoryModalOpen(true);
                     }}
                     className="mt-6 w-full bg-gray-900 hover:bg-gray-800 text-white py-2.5 rounded-xl transition"
                   >
@@ -2632,7 +4380,6 @@ const handleLogout = () => {
                 </div>
               </div>
             )}
-
             {/* FULLSCREEN PREVIEW */}
             {previewFile && (
               <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">

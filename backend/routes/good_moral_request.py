@@ -1,11 +1,10 @@
 import os
 import uuid
 import io
-import requests
-
+import requests 
 from flask import Blueprint, request, jsonify, send_file, current_app
 from models import Student, GoodMoralRequest, UploadedFile, Violation, db
-
+from routes.violations import VIOLATION_RULES
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
@@ -126,35 +125,67 @@ def generate_good_moral_pdf(template_path, student_name, student_number):
 
     return output_buffer
 # =========================
-# Auto-revoke helper
+# Sanction-based revoke checker
 # =========================
-def auto_revoke_if_violations(student_number):
+def should_auto_revoke(student_number):
 
-    # ONLY COUNT ACTIVE (Pending) violations
-    violation_count = Violation.query.filter_by(
+    violations = Violation.query.filter_by(
         student_id=student_number,
         is_resolved="Pending"
-    ).count()
+    ).all()
 
-    if violation_count >= 3:
-        requests = GoodMoralRequest.query.filter(
-            GoodMoralRequest.student_number == student_number,
-            GoodMoralRequest.status.in_(["Pending", "Approved"])
-        ).all()
+    if not violations:
+        return False
+    revoke_keywords = [
+            "administrative review required",
+            "1 month to 1 semester",
+            "1 week to 1 semester exclusion",
+            "1 month to 1 semester exclusion",
+            "1 week to 1 semester exclusion",
+            "possible university exclusion",
+            "expulsion / permanent dismissal",
+            "escalated disciplinary action"
+        ]
 
-        for r in requests:
-            if "Auto-revoked" not in (r.remarks or ""):
-                r.status = "Rejected"
-                r.remarks = "Auto-revoked due to 3 or more violations"
-                r.is_notified = False
-                r.is_read = False
-                db.session.add(r)
+    for v in violations:
 
-        db.session.commit()
-        return True
+        sanction = (getattr(v, "sanction", "") or "").lower()
+
+        if any(k in sanction for k in revoke_keywords):
+            return True
 
     return False
 
+# =========================
+# AUTO REVOKE (SANCTION BASED)
+# =========================
+def auto_revoke_if_violations(student_number):
+
+    if not should_auto_revoke(student_number):
+        return False
+
+    requests = GoodMoralRequest.query.filter(
+        GoodMoralRequest.student_number == student_number,
+        GoodMoralRequest.status.in_(["Pending", "Approved"])
+    ).all()
+
+    for r in requests:
+
+        if "Auto-revoked" not in (r.remarks or ""):
+
+            r.status = "Rejected"
+            r.remarks = (
+                "Auto-revoked due to violation sanction level."
+            )
+
+            r.is_notified = False
+            r.is_read = False
+
+            db.session.add(r)
+
+    db.session.commit()
+
+    return True
 # =========================
 # Student submits a Good Moral request
 # =========================
@@ -171,12 +202,12 @@ def good_moral_request():
     if not student:
         return jsonify({"message": "Student not found"}), 404
 
-    violation_count = Violation.query.filter_by(
-    student_id=student_number,
-    is_resolved="Pending"
-        ).count()
-    if violation_count >= 3:
-        return jsonify({"message": "Cannot submit: 3 or more violations"}), 403
+    if should_auto_revoke(student_number):
+
+        return jsonify({
+            "message":
+            "Cannot submit: violation sanction level blocks Good Moral request."
+        }), 403
 
     pending_request = GoodMoralRequest.query.filter_by(
         student_number=student_number,
@@ -234,11 +265,6 @@ def student_history():
     student_number = request.args.get("student_number")
     if not student_number:
         return jsonify({"message": "student_number missing"}), 400
-
-    violation_count = Violation.query.filter_by(
-    student_id=student_number,
-    is_resolved="Pending"
-    ).count()
     auto_revoke_if_violations(student_number)
 
     requests = GoodMoralRequest.query.filter_by(student_number=student_number)\
@@ -251,15 +277,17 @@ def student_history():
         requested_at=r.requested_at,
         processed_at=r.processed_at,
         remarks=r.remarks,
+        message=r.remarks if r.status=="Rejected" else "",
         is_read=r.is_read,
         is_deleted=r.is_deleted
     ) for r in requests]
 
     return jsonify({
-        "violation_count": violation_count,
+        "auto_revoked":
+            should_auto_revoke(student_number),
+
         "history": result
     })
-
 # =========================
 # Student Notifications
 # =========================
@@ -362,24 +390,67 @@ def get_request(request_id):
 # =========================
 @good_moral_bp.get("/admin/requests")
 def admin_list_requests():
+
     status_filter = request.args.get("status", "Pending")
-    requests = GoodMoralRequest.query.filter_by(status=status_filter, is_deleted=False)\
-        .order_by(GoodMoralRequest.requested_at.desc()).all()
+
+    requests = GoodMoralRequest.query.filter_by(
+        status=status_filter,
+        is_deleted=False
+    ).order_by(
+        GoodMoralRequest.requested_at.desc()
+    ).all()
 
     result = []
+
     for r in requests:
-        student = Student.query.filter_by(student_number=r.student_number).first()
+
+        student = Student.query.filter_by(
+            student_number=r.student_number
+        ).first()
+
+        # ONLY ACTIVE / LATEST VIOLATION
+        latest_violation = (
+            Violation.query
+            .filter(
+                Violation.student_id == r.student_number,
+                Violation.is_resolved != "Resolved"
+            )
+            .order_by(Violation.id.desc())
+            .first()
+        )
+
         result.append(dict(
+
             request_id=r.request_id,
             student_number=r.student_number,
+
             student_name=student.student_name if student else "",
             course=student.course if student else "",
+
             status=r.status,
+
+            predicted_violation=
+                latest_violation.violation_text
+                if latest_violation else "",
+
+            predicted_section=
+                latest_violation.predicted_violation
+                if latest_violation else "",
+
+            sanction=
+                latest_violation.sanction
+                if latest_violation else "",
+
+            is_resolved=
+                latest_violation.is_resolved
+                if latest_violation else "",
+
             filename_original=r.filename_original,
             requested_at=r.requested_at,
             processed_at=r.processed_at,
             remarks=r.remarks,
             is_read=r.is_read
+
         ))
 
     return jsonify(result)
@@ -410,23 +481,67 @@ def student_notifications():
     ).order_by(GoodMoralRequest.requested_at.desc()).all()
 
     result = []
+    result = []
+
     for r in requests:
+
+        latest_violation = (
+            Violation.query
+            .filter(
+                Violation.student_id == r.student_number,
+                Violation.is_resolved != "Resolved"
+            )
+            .order_by(Violation.id.desc())
+            .first()
+        )
+
+        sanction_text = (
+            latest_violation.sanction
+            if latest_violation and latest_violation.sanction
+            else "Unknown sanction"
+        )
+
+        violation_name = (
+            latest_violation.predicted_violation
+            if latest_violation
+            else "Violation"
+        )
+
         if r.status == "Pending":
+
             message = "Your Good Moral request is pending."
+
         elif r.status == "Approved":
+
             message = "Your Good Moral request has been approved."
+
         elif r.status == "Rejected":
-            if r.remarks and "Auto-revoked" in r.remarks:
-                message = "Your Good Moral has been revoked due to multiple violations."
+
+            if r.remarks and "auto-revoked" in (r.remarks or "").lower():
+
+                message = (
+                    f"Your Good Moral was auto-revoked due to "
+                    f"{violation_name}. "
+                    f"Applied sanction: {sanction_text}."
+                )
+
             else:
-                message = "Your Good Moral request has been rejected."
+
+                message = (
+                    f"Your Good Moral request has been rejected. "
+                    f"Violation: {violation_name}. "
+                    f"Sanction: {sanction_text}."
+                )
+
         else:
+
             message = "Status unknown."
 
         result.append(dict(
             request_id=r.request_id,
             status=r.status,
             message=message,
+            remarks=r.remarks,
             requested_at=r.requested_at,
             is_read=r.is_read
         ))
@@ -494,7 +609,7 @@ def download_certificate(request_id):
 
     # auto revoke check
     if auto_revoke_if_violations(gm_request.student_number):
-        return jsonify({"message": "Your Good Moral certificate has been revoked due to violations."}), 403
+        return jsonify({"message": "Your Good Moral has been revoked due to sanction severity."}), 403
 
     # must be approved
     if gm_request.status != "Approved":

@@ -42,7 +42,375 @@ weird_vectorizer = joblib.load(os.path.join(BASE_DIR, "weird_vectorizer.pkl"))
 weird_matrix = joblib.load(os.path.join(BASE_DIR, "weird_matrix.pkl"))
 
 print("MODEL LOADED:", type(model))
+print("MODEL LOADED:", type(model))
 
+
+# ==========================
+# VIOLATION RULES
+# ==========================
+VIOLATION_RULES = {
+
+# ==========================
+# GRAVE OFFENSES (AUTO EXPULSION / MAX SANCTION)
+# ==========================
+"GRAVE OFFENSES": {
+
+    "keywords": [
+        # DRUGS
+        "drugs","drug use","drug possession","marijuana","weed","shabu","paraphernalia",
+
+        # WEAPONS
+        "weapons","knife","gun","bolo","balisong","icepick",
+
+        # SEXUAL HARASSMENT / ASSAULT
+        "sexual misconduct","sexual assault","sexual harassment","harassment",
+        "indecent acts","torrid kissing","petting","indecent exposure",
+
+        # EXTREME VIOLENCE
+        "serious injury","physical injury","attempted murder","assault","grave violence"
+
+        "hacking","hack", "destroy files","computer attack"
+    ],
+
+    "sanction": {
+        "AUTO": "IMMEDIATE SUSPENSION + POSSIBLE UNIVERSITY EXCLUSION",
+        "1": "Administrative Review Required",
+        "MAX": "EXPULSION / PERMANENT DISMISSAL"
+    }
+},
+
+# ==========================
+# ADMINISTRATIVE OFFENSES
+# ==========================
+"Administrative Offenses and Penalties": {
+
+    "keywords": [
+        "cheating","cheat","kodigo","copying","copy answer","exam cheating",
+        "plagiarism","copy paste","copyright","stolen work",
+
+        "fabrication","fake data","invented data","manipulated results",
+        "falsification","forge","forgery","fake signature","altered document",
+
+        "theft","stealing","nakaw","stolen","robbery",
+
+        "property damage","vandalism","destroy property","damage property",
+
+        "gambling","sugal","betting","casino","card game",
+
+        "trespassing","unauthorized entry","illegal entry",
+
+        "unauthorized assembly","illegal gathering","rally without permit",
+
+        "traffic violation","posted signs violation",
+
+        "bribery","bribe","money offer","gift to authority",
+
+        "fictitious name","fake identity","fake name",
+
+        "curfew violation","curfew","past curfew",
+
+        "system damage",
+        "unauthorized computer use",
+
+        "smoking","yosi","cigarette","vape",
+
+        "alcohol","beer","liquor","drinking","inom","alak",
+
+        "disturbance","peace and order","noise","riot",
+
+        "littering","trash","kalat",
+        "nakipagsuntukan","suntukan","bullying",
+        "binully","sinaktan","nanakit","nananakit",
+        "inaabuso","abuso","sinasaktan",
+        "nagmumura","minumura",
+        "fun","parada","pumarada","parking",
+        "sinira","nanira","ninakaw","nagnakaw","nagnanakaw",
+        "kinkuha","kumukuha"
+    ],
+
+    "sanction": {
+        "1": "Disciplinary Sanction / Reprimand",
+        "2": "1 week – 1 month exclusion",
+        "3": "1 month – 1 semester exclusion",
+        "4+": "Possible University Exclusion"
+    }
+},
+
+# ==========================
+# DRESS CODE
+# ==========================
+"Dress Code Violation": {
+    "keywords": [
+        "uniform","school uniform","improper uniform",
+        "dress code","civilian attire",
+        "haircut","long hair","hair violation",
+        "earrings","earring","accessories",
+        "grooming","improper attire",
+        "leggings","shorts","revealing clothes",
+        "unauthorized uniform modification",
+        "wash day violation",
+        "male long hair","improper appearance"
+    ],
+    "sanction": {
+        "1": "Disciplinary Sanction",
+        "2+": "1 week to 1 semester exclusion"
+    }
+},
+
+# ==========================
+# CELL PHONE / COMPUTER USE
+# ==========================
+"Use of Cellphone and Unauthorized Computer Use": {
+    "keywords": [
+        "cellphone","cp","phone","mobile phone",
+        "texting","text message","sms",
+        "naka cellphone","using phone",
+        "messenger","facebook","fb",
+        "gadgets during class",
+        "unauthorized computer use",
+        "computer misuse",
+        "destroy computer files","malware","unauthorized access"
+    ],
+    "sanction": {
+        "1": "Reprimand",
+        "2": "1 week – 1 month exclusion",
+        "3+": "1 month to 1 semester exclusion"
+    }
+},
+
+# ==========================
+# NO ID
+# ==========================
+"No ID Violation": {
+    "keywords": [
+        "id","school id","student id",
+        "no id","without id",
+        "forgot id","missing id",
+        "walang id","nakalimutan id",
+        "identification card",
+        "not wearing id",
+        "improper id use",
+        "another student's id"
+    ],
+    "sanction": {
+        "1": "Disciplinary Sanction",
+        "2+": "1 week to 1 semester exclusion",
+        
+    }
+},
+
+# ==========================
+# ATTENDANCE
+# ==========================
+"Attendance Violation": {
+    "keywords": [
+        "attendance","absent","absence",
+        "late","tardy","truancy",
+        "cutting class","skip class",
+        "missed class","unexcused absence",
+        "leave of absence","loa",
+        "chronic absence",
+        "attendance shortage",
+        "class attendance violation"
+    ],
+    "sanction": {
+        "1": "Warning / Attendance Action",
+        "2": "Possible exclusion / disciplinary action",
+        "3+": "Escalated disciplinary action"
+    }
+},
+
+# ==========================
+# MISCONDUCT
+# ==========================
+"Misconduct and Discipline": {
+    "keywords": [
+        "fighting","fight","away","violence",
+        "cursing","mura","foul language",
+        "disturbance","noise","riot",
+        "gambling","sugal",
+        "misbehavior","misconduct",
+        "aggressive behavior",
+        "threatening","bullying"
+    ],
+    "sanction": {
+        "1": "Disciplinary Sanction / Reprimand",
+        "2": "1 week – 1 month exclusion",
+        "3+": "1 month to 1 semester"
+    }
+},
+
+# ==========================
+# CONDUCT
+# ==========================
+"Conduct and Discipline": {
+    "keywords": [
+        "conduct","discipline",
+        "student conduct",
+        "behavior issue",
+        "misbehavior",
+        "disciplinary concern",
+        "decorum",
+        "classroom disturbance",
+        "ungentlemanly conduct"
+    ],
+    "sanction": {
+        "1": "Disciplinary Sanction",
+        "2+": "Escalated disciplinary action"
+    }
+}
+
+}
+# ==========================
+# Get Sanctions (FINAL FIX - TRUE ISOLATION)
+# ==========================
+def get_sanction(student_id, violation_category, violation_input=None):
+
+    if not violation_category:
+        return "No sanction rule"
+
+    category_text = str(violation_category).lower().strip()
+    input_text = str(violation_input or "").lower().strip()
+
+    resolved_category = None
+
+    # ==========================================================
+    # 1. PRIORITY: KEYWORD MATCH (BASED ON INPUT ONLY)
+    # ==========================================================
+    for category, rules in VIOLATION_RULES.items():
+
+        for kw in rules.get("keywords", []):
+            if kw and kw.lower() in input_text:
+                resolved_category = category
+                break
+
+        if resolved_category:
+            break
+
+    # ==========================================================
+    # 2. FALLBACK: CATEGORY MATCH
+    # ==========================================================
+    if not resolved_category:
+
+        for key in VIOLATION_RULES.keys():
+            if key.lower() == category_text:
+                resolved_category = key
+                break
+
+    if not resolved_category:
+        return "No sanction rule"
+
+    rules = VIOLATION_RULES.get(resolved_category, {})
+    sanctions = rules.get("sanction", {})
+
+    if not sanctions:
+        return "No sanction rule"
+
+    # ==========================================================
+    # 3. GRAVE OFFENSES (STRICT ISOLATION)
+    # ==========================================================
+    if resolved_category == "GRAVE OFFENSES":
+
+        grave_keywords = VIOLATION_RULES["GRAVE OFFENSES"]["keywords"]
+
+        grave_filters = [
+            Violation.violation_text.ilike(f"%{kw}%")
+            for kw in grave_keywords if kw
+        ]
+
+        grave_count = Violation.query.filter(
+            Violation.student_id == str(student_id),
+            Violation.is_resolved != "Resolved",
+            db.or_(*grave_filters)
+        ).count()
+
+        offense_number = grave_count + 1
+
+        print("GRAVE COUNT:", grave_count)
+        print("GRAVE OFFENSE:", offense_number)
+
+        if offense_number == 1:
+            return sanctions.get("1", "Administrative Review Required")
+
+        return sanctions.get("MAX", "EXPULSION / PERMANENT DISMISSAL")
+
+    # ==========================================================
+    # 4. ADMINISTRATIVE (FULL ISOLATION FIX - CLEAN COUNTING)
+    # ==========================================================
+    if resolved_category == "Administrative Offenses and Penalties":
+
+        admin_count = Violation.query.filter(
+            Violation.student_id == str(student_id),
+            Violation.is_resolved != "Resolved",
+            Violation.predicted_violation == "Administrative Offenses and Penalties"
+        ).count()
+
+        offense_number = admin_count + 1
+
+        print("ADMIN COUNT:", admin_count)
+        print("ADMIN OFFENSE:", offense_number)
+
+        # ======================================================
+        # EXACT MATCH (1, 2, 3)
+        # ======================================================
+        if str(offense_number) in sanctions:
+            return sanctions[str(offense_number)]
+
+        # ======================================================
+        # PLUS MATCH (4+)
+        # ======================================================
+        plus_key = f"{offense_number}+"
+        if plus_key in sanctions:
+            return sanctions[plus_key]
+
+        # ======================================================
+        # RANGE MATCH (SAFE)
+        # ======================================================
+        for k, v in sanctions.items():
+            if isinstance(k, str) and "+" in k:
+                try:
+                    base = int(k.replace("+", ""))
+                    if offense_number >= base:
+                        return v
+                except:
+                    continue
+
+        # ======================================================
+        # FALLBACK
+        # ======================================================
+        return list(sanctions.values())[0]
+
+    # ==========================================================
+    # 5. ALL OTHER CATEGORIES (STRICT PER CATEGORY)
+    # ==========================================================
+    previous_count = Violation.query.filter(
+        Violation.student_id == str(student_id),
+        Violation.predicted_violation == resolved_category,
+        Violation.is_resolved != "Resolved"
+    ).count()
+
+    offense_number = previous_count + 1
+
+    print("CATEGORY:", resolved_category)
+    print("COUNT:", previous_count)
+    print("OFFENSE:", offense_number)
+
+    if str(offense_number) in sanctions:
+        return sanctions[str(offense_number)]
+
+    plus_key = f"{offense_number}+"
+    if plus_key in sanctions:
+        return sanctions[plus_key]
+
+    for k, v in sanctions.items():
+        if isinstance(k, str) and "+" in k:
+            try:
+                if offense_number >= int(k.replace("+", "")):
+                    return v
+            except:
+                continue
+
+    return list(sanctions.values())[0]
 # ==========================
 # PREPROCESS
 # ==========================
@@ -211,6 +579,7 @@ def get_all_violations():
             "predicted_section": r.predicted_section or "—",
             "predictive_text": r.predictive_text or "—",
             "standard_text": r.standard_text or "—",
+            "sanction": r.sanction or "—",
             "is_resolved": r.is_resolved or ""
         }
         for r in records
@@ -240,7 +609,7 @@ def add_violation():
     text = data["violation_text"]
     text_proc = clean_input(text)
 
-    if len(text_proc.split()) < 3:
+    if len(text_proc.split()) < 1:
         return jsonify({
             "message": "Input Invalid",
             "error_type": "invalid_text"
@@ -269,6 +638,12 @@ def add_violation():
 
     standard_text = get_best_standard_text(pred, text_proc)
 
+    sanction = get_sanction(
+    data["student_id"],
+    pred,
+    data["violation_text"]
+)
+
     new_record = Violation(
         student_name=data["student_name"],
         student_id=str(data["student_id"]),
@@ -280,7 +655,8 @@ def add_violation():
         predicted_violation=pred,
         predicted_section=section,
         predictive_text=top_preds,
-        standard_text=standard_text  
+        standard_text=standard_text, 
+        sanction=sanction 
     )
 
     db.session.add(new_record)
@@ -342,20 +718,26 @@ def resolve_violation(id):
     record = Violation.query.get(id)
 
     if not record:
-        return jsonify({"message": "Violation not found"}), 404
+        return jsonify({
+            "message": "Violation not found"
+        }), 404
 
-    # check if already resolved
     if record.is_resolved == "Resolved":
-        return jsonify({"message": "Already resolved"}), 400
+        return jsonify({
+            "message": "Already resolved"
+        }), 400
 
+    # mark resolved
     record.is_resolved = "Resolved"
 
     db.session.commit()
 
     return jsonify({
-        "message": "Violation marked as resolved",
+        "message": "Violation marked as resolved successfully",
         "id": record.id,
-        "is_resolved": record.is_resolved or "Pending:"
+        "student_id": record.student_id,
+        "predicted_violation": record.predicted_violation,
+        "is_resolved": record.is_resolved
     }), 200
 
 # ==========================
@@ -410,7 +792,10 @@ def get_student_summary(student_number):
         "predicted_violation": latest.predicted_violation or "—",
         "predicted_section": latest.predicted_section or "—",
         "violation_date": latest.violation_date.strftime("%Y-%m-%d") if latest.violation_date else "—",
-        "semester": latest.semester or ""
+        "semester": latest.semester or "",
+        "sanction": latest.sanction or ""
+        
+        
     }), 200
 # ==========================
 # HISTORY 
@@ -436,7 +821,8 @@ def get_student_history(student_number):
             "predicted_violation": r.predicted_violation or "—",
             "predicted_section": r.predicted_section or "—",
             "violation_date": r.violation_date.strftime("%Y-%m-%d") if r.violation_date else "—",
-            "semester": r.semester or "" 
+            "semester": r.semester or "",
+            "sanction": r.sanction or "" 
         }
         for r in records
     ]), 200
@@ -503,7 +889,276 @@ def search_violations():
             "predicted_section": r.predicted_section,
             "predictive_text": r.predictive_text,
             "standard_text": r.standard_text,
+            "sanction": r.sanction or "—",
               "is_resolved": r.is_resolved or ""
         }
         for r in results
     ]), 200
+from datetime import datetime
+
+# =========================
+# Student violation notifications
+# =========================
+@violation_bp.get("/student/notifications")
+def student_notifications():
+
+    student_id = request.args.get("student_id")
+
+    if not student_id:
+        return jsonify({
+            "message":"student_id missing"
+        }),400
+
+    violations = Violation.query.filter(
+        Violation.student_id == str(student_id),
+        Violation.is_deleted == False
+    ).order_by(
+        Violation.violation_date.desc()
+    ).all()
+
+    notifications = []
+
+    changed = False
+
+    for v in violations:
+
+        # =========================
+        # INITIALIZE NULL SAFETY
+        # =========================
+        if v.is_notified is None:
+            v.is_notified = False
+            changed = True
+
+        if v.is_read is None:
+            v.is_read = False
+            changed = True
+
+        if v.is_deleted is None:
+            v.is_deleted = False
+            changed = True
+
+        # =========================
+        # RESOLVED
+        # =========================
+        if v.is_resolved == "Resolved":
+
+            remaining = Violation.query.filter(
+                Violation.student_id == str(student_id),
+                Violation.is_resolved != "Resolved",
+                Violation.is_deleted == False
+            ).count()
+
+            if remaining == 0:
+
+                status = "Cleared"
+
+                message = (
+                    "All your violations have been cleared."
+                )
+
+            else:
+
+                status = "Resolved"
+
+                message = (
+                    f"Your {v.predicted_violation} "
+                    f"violation has been resolved."
+                )
+
+        # =========================
+        # ACTIVE
+        # =========================
+        else:
+
+            status = "Violation"
+
+            message = (
+                f"You received a new "
+                f"{v.predicted_violation} violation."
+            )
+
+            if v.sanction:
+
+                message += (
+                    f" Sanction: {v.sanction}"
+                )
+
+        # =========================
+        # SAVE NOTIFICATION STATE
+        # =========================
+        if not v.is_notified:
+
+            v.is_notified = True
+
+            v.notification_sent_at = (
+                datetime.utcnow()
+            )
+
+            changed = True
+
+        notifications.append({
+
+            "request_id": v.id,
+
+            "violation":
+                v.predicted_violation,
+
+            "sanction":
+                v.sanction,
+
+            "status":
+                status,
+
+            "message":
+                message,
+
+            "requested_at":
+                (
+                    v.notification_sent_at.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    if v.notification_sent_at
+                    else
+                    v.violation_date.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    if v.violation_date
+                    else None
+                ),
+
+            "is_notified":
+                v.is_notified,
+
+            "is_read":
+                v.is_read,
+
+            "is_deleted":
+                v.is_deleted
+
+        })
+
+    # =========================
+    # COMMIT CHANGES
+    # =========================
+    if changed:
+        db.session.commit()
+
+    return jsonify({
+        "notifications": notifications
+    })
+
+
+# =========================
+# UNREAD COUNT
+# =========================
+@violation_bp.get(
+"/student/notifications/unread-count"
+)
+def unread_notification_count():
+
+    student_id = request.args.get(
+        "student_id"
+    )
+
+    if not student_id:
+        return jsonify({
+            "message":"student_id missing"
+        }),400
+
+    count = Violation.query.filter(
+        Violation.student_id ==
+        str(student_id),
+
+        Violation.is_notified == True,
+
+        Violation.is_read == False,
+
+        Violation.is_deleted == False
+    ).count()
+
+    return jsonify({
+        "unread_count":count
+    })
+
+
+# =========================
+# CLOSE / MARK READ
+# =========================
+@violation_bp.patch(
+"/student/notifications/close/<int:violation_id>"
+)
+def close_notification(
+    violation_id
+):
+
+    v = Violation.query.get(
+        violation_id
+    )
+
+    if not v:
+
+        return jsonify({
+            "message":
+            "Notification not found"
+        }),404
+
+    if v.is_deleted:
+
+        return jsonify({
+            "message":
+            "Already deleted"
+        }),404
+
+    v.is_read = True
+
+    db.session.commit()
+
+    return jsonify({
+        "message":
+        "Notification marked as read",
+
+        "id":
+        v.id,
+
+        "is_read":
+        v.is_read
+    })
+
+
+# =========================
+# DELETE (SOFT DELETE)
+# =========================
+@violation_bp.delete(
+"/student/notifications/<int:violation_id>"
+)
+def delete_notification(
+    violation_id
+):
+
+    v = Violation.query.get(
+        violation_id
+    )
+
+    if not v:
+
+        return jsonify({
+            "message":
+            "Notification not found"
+        }),404
+
+    v.is_deleted = True
+
+    db.session.commit()
+
+    return jsonify({
+
+        "message":
+        "Notification deleted",
+
+        "id":
+        v.id,
+
+        "is_deleted":
+        v.is_deleted
+
+    })

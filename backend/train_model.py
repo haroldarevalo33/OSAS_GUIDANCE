@@ -277,9 +277,10 @@ def is_weird_phrase(text, threshold=0.72):
     return similarity >= threshold
 
 # ==========================
-# GIBBERISH DETECTOR
+# GIBBERISH DETECTION (SAFE FOR VIOLATION INPUTS)
 # ==========================
 def is_gibberish(text):
+
     text = preprocess(text)
 
     if not text:
@@ -290,25 +291,31 @@ def is_gibberish(text):
     if len(words) == 0:
         return True
 
+    # must contain letters
     if not re.search(r"[a-zA-Z]", text):
         return True
 
+    # single word spam only
     if len(words) == 1:
+
         w = words[0]
-        if len(set(w)) <= 3 and len(w) > 6:
+
+        # repetitive character nonsense
+        if len(w) > 6 and len(set(w)) <= 2:
             return True
-        if not re.search(r"[aeiou]", w) and len(w) > 6:
+
+    # repeated same word spam
+    if len(words) >= 4:
+        if len(set(words)) <= max(1, int(len(words)*0.2)):
             return True
 
-    if len(set(words)) <= max(2, int(len(words) * 0.3)):
-        return True
+    # repetitive pattern detection
+    pattern_score = sum(
+        1 for w in words
+        if len(set(w)) <= 2 and len(w) > 4
+    )
 
-    avg_len = np.mean([len(w) for w in words])
-    if avg_len < 3:
-        return True
-
-    pattern_score = sum(1 for w in words if len(set(w)) <= 3)
-    if pattern_score / len(words) > 0.6:
+    if len(words) > 0 and pattern_score / len(words) > 0.7:
         return True
 
     return False

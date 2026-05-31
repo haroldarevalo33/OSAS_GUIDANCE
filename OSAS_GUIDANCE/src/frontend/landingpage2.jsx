@@ -1,86 +1,158 @@
 import React, { useState, useEffect } from "react";
+import { AcademicCapIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/solid";
 import { useNavigate } from "react-router-dom";
 
 export default function LandingPage2() {
+
   const words = ["TRUTH", "EXCELLENCE", "SERVICE", "EQUALITY"];
+
   const [index, setIndex] = useState(0);
   const [fade, setFade] = useState(true);
+
   const navigate = useNavigate();
 
   useEffect(() => {
+
+    setFade(true);
+
     const interval = setInterval(() => {
+
       setFade(false);
+
       setTimeout(() => {
+
         setIndex((prev) => (prev + 1) % words.length);
         setFade(true);
-      }, 500);
-    }, 2500);
+
+      }, 1000);
+
+    }, 3000);
+
     return () => clearInterval(interval);
+
   }, []);
 
   return (
-    <div className="w-screen h-screen bg-gray-900 flex overflow-hidden">
 
-      {/* LEFT SIDE */}
-      <div className="w-full md:w-[55%] h-full flex flex-col items-center justify-center p-6 md:p-8 text-center bg-white">
-        <img
-          src="/cvsu-logo.png"
-          alt="School Logo"
-          className="w-24 md:w-32 h-24 md:h-32 mb-4 md:mb-6"
-        />
+    <div className="relative w-screen h-screen overflow-hidden">
 
-        <h2 className="text-base md:text-xl font-medium">Cavite State University Naic</h2>
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Guidance Student Record</h1>
+      {/* BACKGROUND */}
+      <img
+        src="./cvsu-naic.jpg.jpg"
+        alt="Campus"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
 
-        <div className="mt-8 flex flex-col items-center space-y-4 w-full max-w-xs">
-          <p className="text-xl md:text-2xl font-bold text-gray-800 tracking-wide">
+      {/* OVERLAY */}
+      <div className="absolute inset-0 bg-green-900/50 backdrop-blur-[6px]" />
+
+      {/* HEADER */}
+      <header className="absolute top-0 left-0 w-full z-30 bg-black/20 backdrop-blur-md border-b border-white/10">
+      </header>
+
+      {/* MAIN CONTENT */}
+      <div className="relative z-10 flex items-center justify-center h-full px-5">
+
+        {/* GLASS CARD */}
+        <div className="w-full max-w-[430px] bg-white/20 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-2xl p-7 md:p-10 text-center">
+
+          {/* LOGO */}
+          <img
+            src="/Cavite_State_University_(CvSU).png"
+            alt="CvSU Logo"
+            className="w-16 md:w-20 h-16 md:h-20 mx-auto mb-0 object-contain"
+          />
+
+          {/* SCHOOL */}
+          <p className="text-green-200 mt-1 text-sm md:text-base">
+            Cavite State University Naic
+          </p>
+
+          {/* SYSTEM */}
+          <h2 className="text-white text-2xl md:text-1xl font-bold mb-2">
+            Guidance Services System
+          </h2>
+
+          {/* WELCOME */}
+          <p className="text-white/85 text-lg md:text-xl font-semibold mb-8">
             Welcome, STUDENT
           </p>
+
+          {/* BUTTONS */}
+          <div className="space-y-4">
+
             <button
-            onClick={() => navigate("/student_register")}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg md:text-xl py-3 mt-5 rounded-full shadow-md"
-          >
-            CREATE STUDENT ACCOUNT
-          </button>
-        
-          <button
-            onClick={() => navigate("/student_login")}
-            className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-lg md:text-xl py-3 rounded-full shadow-md"
-          >
-            LOGIN STUDENT ACCOUNT
-          </button>
-        </div>
-      </div>
-    
+              onClick={() => navigate("/student_register")}
+              className="w-full flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-full transition duration-300 shadow-lg"
+            >
+              <AcademicCapIcon className="w-5 h-5"/>
+              CREATE STUDENT ACCOUNT
+            </button>
 
-      {/* RIGHT SIDE - only visible on desktop */}
-      <div className="hidden md:block w-[100%] h-full relative">
-        <img
-          src="./cvsu-background.png"
-          alt="Campus"
-          className="absolute w-full h-full object-cover"
-        />
+            <button
+              onClick={() => navigate("/student_login")}
+              className="w-full flex items-center justify-center gap-3 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-3 rounded-full transition duration-300 shadow-lg"
+            >
+              <ArrowRightOnRectangleIcon className="w-5 h-5"/>
+              LOGIN STUDENT ACCOUNT
+            </button>
 
-        <div className="absolute inset-0 p-10 text-white flex flex-col justify-between">
-          <p className="text-2xl leading-relaxed font-semibold text-justify tracking-wide drop-shadow-lg max-w-3xl mx-auto mt-70 animate-fadein">
-            Cavite State University - Naic (CvSU) is required by law to process
-            your personal information and sensitive personal information in order
-            to safeguard academic freedom, uphold your right to quality education,
-            and protect your right to data privacy in conformity with Republic Act
-            No. 10173.
-          </p>
-
-          <div
-            className={`absolute bottom-10 right-10 text-5xl font-bold tracking-widest drop-shadow-md uppercase transition-all duration-1000 ease-in-out`}
-            style={{
-              opacity: fade ? 0.5 : 0,
-              transform: fade ? "translateX(0)" : "translateX(20px)",
-            }}
-          >
-            {words[index]}
           </div>
+
         </div>
+
       </div>
+
+      {/* LOWER RIGHT WORDS */}
+      <div
+        key={index}
+        className={`absolute bottom-6 right-6 md:bottom-10 md:right-10
+        text-white/70 text-2xl md:text-5xl font-bold tracking-[8px]
+        uppercase z-20 ${fade ? "slideRight" : "fadeOnly"}`}
+      >
+        {words[index]}
+      </div>
+
+      {/* ANIMATIONS */}
+      <style>{`
+
+      @keyframes slideRight {
+
+        from{
+          opacity:0;
+          transform:translateX(-80px);
+        }
+
+        to{
+          opacity:.65;
+          transform:translateX(0);
+        }
+
+      }
+
+      @keyframes fadeOnly {
+
+        from{
+          opacity:.65;
+        }
+
+        to{
+          opacity:0;
+        }
+
+      }
+
+      .slideRight{
+        animation:slideRight 1.8s ease-out forwards;
+      }
+
+      .fadeOnly{
+        animation:fadeOnly 1.2s ease-out forwards;
+      }
+
+      `}</style>
+
     </div>
+
   );
 }

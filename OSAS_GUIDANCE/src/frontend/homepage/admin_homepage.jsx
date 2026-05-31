@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {ChartBarIcon,NewspaperIcon,MagnifyingGlassIcon,PencilSquareIcon,ArrowRightOnRectangleIcon,UserGroupIcon,UserCircleIcon,DocumentPlusIcon, XMarkIcon, EyeIcon, TrashIcon} from "@heroicons/react/24/solid";
+import {ChartBarIcon,NewspaperIcon,MagnifyingGlassIcon,PencilSquareIcon,ArrowRightOnRectangleIcon,UserGroupIcon,UserCircleIcon,DocumentPlusIcon, XMarkIcon, EyeIcon, TrashIcon, CalendarDaysIcon, ClipboardDocumentCheckIcon, FlagIcon } from "@heroicons/react/24/solid";
 import Swal from "sweetalert2";
 import {LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,BarChart, Bar, PieChart, Pie, Cell, Legend} from "recharts";
 import { Document, Packer, Paragraph, TextRun } from "docx";
@@ -7,6 +7,8 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -17,6 +19,46 @@ export default function AdminHome() {
   const [loadingRss, setLoadingRss] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, IsItLoading] = useState(true);
+
+  //counseling
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
+  const [counselingFile, setCounselingFile] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [adminSetDate, setAdminSetDate] = useState("");
+  const [adminSetTime, setAdminSetTime] = useState("");
+
+  //Psychological Request
+  // ====== PSYCHOLOGICAL STATES ======
+const [psySelectedPdfUrl, setPsySelectedPdfUrl] = useState("");
+const [psyShowRequestList, setPsyShowRequestList] = useState(false);
+const [psyRequests, setPsyRequests] = useState([]);
+const [psySelectedRequest, setPsySelectedRequest] = useState(null);
+const [psyAdminSetDate, setPsyAdminSetDate] = useState("");
+const [psyAdminSetTime, setPsyAdminSetTime] = useState("");
+const [psyLoadingRequests, setPsyLoadingRequests] = useState(false);
+
+
+// EXIT INTERVIEW STATES
+const [exitRequests, setExitRequests] = useState([]);
+const [hasExitPending, setHasExitPending] = useState(false);
+
+const [exitPreferredDate, setExitPreferredDate] = useState("");
+const [exitPreferredTime, setExitPreferredTime] = useState("");
+
+const [exitLoading, setExitLoading] = useState(false);
+
+// PDF
+const [selectedExitPdfUrl, setSelectedExitPdfUrl] = useState(null);
+
+// MODALS
+const [showExitRequestList, setShowExitRequestList] = useState(false);
+const [selectedExitRequest, setSelectedExitRequest] = useState(null);
+
+// ADMIN SCHEDULE
+const [adminExitDate, setAdminExitDate] = useState("");
+const [adminExitTime, setAdminExitTime] = useState("");
 
 
   const [predictedViolation, setPredictedViolation] = useState("");
@@ -49,7 +91,7 @@ export default function AdminHome() {
   const [semester, setSemester] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
   const [submitViolationLoading, setSubmitViolationLoading] = useState(false);
-  
+
 
   // auto-filled student info fetched from /student?query=
   const [studentInfo, setStudentInfo] = useState(null);
@@ -289,6 +331,8 @@ tables.forEach((table) => {
 doc.save(`Guidance_Analytics_Report_${reportYear}.pdf`);
 };
 
+
+
 // ================= DOCX (UNCHANGED - SAFE) =================
 const downloadViolationDoc = (violation) => {
   const doc = new Document({
@@ -366,6 +410,7 @@ useEffect(() => {
   return () =>
     document.removeEventListener("click", handleClickOutside);
 }, []);
+
 //// ================= STATES =================
 const [lineData, setLineData] = useState([]);
 const [sectionData, setSectionData] = useState([]);
@@ -638,10 +683,29 @@ const [user, setUser] = useState({ name: "", email: "", profile_pic:"" });
 const uploadFile = async (file, fileType) => {
   if (!file) return null;
 
+  // Allowed file types including exit_request
+  const ALLOWED_TYPES = [
+    "good_moral",
+    "counseling_appointment",
+    "rules",
+    "psychological_request",
+    "exit_request"
+  ];
+
+  if (!ALLOWED_TYPES.includes(fileType)) {
+    throw new Error(`Invalid file type: ${fileType}`);
+  }
+
+  // Standardize names for backend
+  let sanitizedFileType = fileType;
+  if (fileType === "psychological-request" || fileType === "psychological_appointment") {
+    sanitizedFileType = "psychological_request";
+  }
+
   try {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("file_type", fileType);
+    formData.append("file_type", sanitizedFileType);
 
     const res = await fetch(`${import.meta.env.VITE_API_URL}/file/upload`, {
       method: "POST",
@@ -659,13 +723,11 @@ const uploadFile = async (file, fileType) => {
     const displayFile = {
       id: data.file_id,
       name: file.name,
-      fileType: fileType,
+      fileType: sanitizedFileType,
       stored: data.stored,
       original: data.original,
-      url: data.url, // Cloudinary URL
+      url: data.url,
     };
-
-    console.log("UPLOAD SUCCESS:", displayFile);
 
     Swal.fire({
       position: "top-end",
@@ -678,6 +740,15 @@ const uploadFile = async (file, fileType) => {
 
     await listFiles();
 
+    // Auto-update view state based on file type
+    if (sanitizedFileType === "psychological_request" && typeof setPsySelectedPdfUrl === "function") {
+      setPsySelectedPdfUrl(data.url);
+    }
+
+    if (sanitizedFileType === "exit_request" && typeof setSelectedExitPdfUrl === "function") {
+      setSelectedExitPdfUrl(data.url);
+    }
+
     return displayFile;
   } catch (err) {
     console.error("UPLOAD ERROR:", err);
@@ -686,33 +757,22 @@ const uploadFile = async (file, fileType) => {
   }
 };
 
-
 // =========================
 // LIST FILES
 // =========================
 const listFiles = async () => {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("List error:", res.status, text);
-      return;
-    }
+    if (!res.ok) return;
 
     const data = await res.json();
-
-    if (data.status !== "success") {
-      console.error("Backend error:", data.message);
-      return;
-    }
+    if (data.status !== "success") return;
 
     displayFiles(data.files);
   } catch (err) {
     console.error("Error fetching file list:", err);
   }
 };
-
 
 // =========================
 // DISPLAY FILES
@@ -738,27 +798,25 @@ const displayFiles = (files) => {
   });
 };
 
-
-// =========================
-// LOAD SAVED FILES (REACT)
-// =========================
+// ==========================================
+// LOAD SAVED FILES (REACT) - AUTO-UPDATE STATES
+// ==========================================
 useEffect(() => {
   const fetchSavedFiles = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
-
       if (!res.ok) return;
 
       const data = await res.json();
       if (data.status !== "success") return;
 
-      const goodMoralFile = data.files.find(
-        (f) => f.file_type === "good_moral"
+      const goodMoralFile = data.files.find((f) => f.file_type === "good_moral");
+      const rulesFile = data.files.find((f) => f.file_type === "rules");
+      const counselingFile = data.files.find((f) => f.file_type === "counseling_appointment");
+      const psychologicalFile = data.files.find(
+        (f) => f.file_type === "psychological_request" || f.file_type === "psychological_appointment"
       );
-
-      const rulesFile = data.files.find(
-        (f) => f.file_type === "rules"
-      );
+      const exitFile = data.files.find((f) => f.file_type === "exit_request"); 
 
       if (goodMoralFile) {
         setCurrentGoodMoral({
@@ -773,6 +831,22 @@ useEffect(() => {
           url: rulesFile.url,
         });
       }
+
+      if (counselingFile) {
+        setCounselingFile({
+          name: counselingFile.original,
+          url: counselingFile.url,
+        });
+      }
+
+      if (psychologicalFile && typeof setPsySelectedPdfUrl === "function") {
+        setPsySelectedPdfUrl(psychologicalFile.url);
+      }
+
+      if (exitFile && typeof setSelectedExitPdfUrl === "function") {
+        setSelectedExitPdfUrl(exitFile.url); 
+      }
+
     } catch (err) {
       console.error("Error fetching saved files:", err);
     }
@@ -954,8 +1028,11 @@ const menuItems = [
   { id: "records", label: "Accounts Record", icon: UserGroupIcon },
   { id: "search", label: "Students Violation", icon: MagnifyingGlassIcon },
   { id: "violation", label: "Encode Violation", icon: PencilSquareIcon },
-  {id: "uploadFileFormat", label: "Upload File Format", icon: DocumentPlusIcon,badge: pendingRequests.length,},
+  { id: "uploadFileFormat", label: "Upload File Format", icon: DocumentPlusIcon,badge: pendingRequests.length,},
   { id: "news", label: "News Management", icon: NewspaperIcon },
+  { id: "counseling", label: "Counseling Approval", icon: CalendarDaysIcon},
+  { id: "psychologicalRequest", label: "Psychological Approval", icon: ClipboardDocumentCheckIcon},
+  { id: "exitInterviewRequest", label: "Exit Interview Approval", icon: FlagIcon},
 
     
   ];
@@ -1156,9 +1233,9 @@ async function handleSubmitViolation() {
       toast: true,
       position: "top-end",
       icon: "success",
-      title: "Violation submitted successfully",
+      title: `Violation submitted successfully`,
       showConfirmButton: false,
-      timer: 1500,
+      timer: 1800,
     });
 
     setShowViolationModal(false);
@@ -1178,17 +1255,18 @@ async function handleSubmitViolation() {
   } catch (err) {
     console.error(err);
 
- Swal.fire({
-  icon: "error",
-  title: "Student Not Found",
-  text: "Please check the student number and try again.",
-});
+    Swal.fire({
+      icon: "error",
+      title: "Invalid Input",
+      text: "Please check your Input Text or Student number.",
+    });
 
   } finally {
     // ================= ALWAYS STOP LOADING =================
     setSubmitViolationLoading(false);
   }
 }
+
 // ------------------ View Student Info ------------------
 function viewStudentInfo(student) {
   setSelectedStudent(student);
@@ -1454,13 +1532,24 @@ const [currentAdminId] = useState(null);
 const fetchPendingRequests = async () => {
   try {
     const res = await fetch(
-  `${import.meta.env.VITE_API_URL}/good-moral/admin/requests?status=Pending`);
+      `${import.meta.env.VITE_API_URL}/good-moral/admin/requests?status=Pending`
+    );
+
     const data = await res.json();
 
     const formatted = data.map((req) => ({
       ...req,
+
+      // =========================
+      // BACKEND DATA (SAFE MAP)
+      // =========================
       student_name: req.student_name || "N/A",
       course: req.course || "N/A",
+
+      predicted_violation: req.predicted_violation || "N/A",
+
+      //  LATEST SANCTION FROM BACKEND
+      sanction: req.sanction || "No sanction recorded",
     }));
 
     setPendingRequests(formatted);
@@ -1468,6 +1557,7 @@ const fetchPendingRequests = async () => {
     console.error("Failed to fetch pending requests:", err);
   }
 };
+
 
 // ----------------- AUTO-POLLING EVERY 5 SECONDS -----------------
 useEffect(() => {
@@ -1480,8 +1570,10 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
+
+// ----------------- APPROVE REQUEST -----------------
 const handleApprove = async (request) => {
-  setApprovedAction(true); // START SPINNER
+  setApprovedAction(true);
 
   try {
     const res = await fetch(
@@ -1502,7 +1594,7 @@ const handleApprove = async (request) => {
 
     setSelectedRequest((prev) => ({ ...prev, status: "Approved" }));
 
-    await fetchPendingRequests(); // optional await para sync update
+    await fetchPendingRequests();
 
     if (data?.request?.filename_url) {
       setCurrentGoodMoral({
@@ -1535,12 +1627,14 @@ const handleApprove = async (request) => {
     });
 
   } finally {
-    setApprovedAction(false); // STOP SPINNER ALWAYS (SUCCESS OR ERROR)
+    setApprovedAction(false);
   }
 };
 
+
+// ----------------- REJECT REQUEST -----------------
 const handleReject = async (request) => {
-  setRejectAction(true); // START SPINNER
+  setRejectAction(true);
 
   try {
     const res = await fetch(
@@ -1564,7 +1658,7 @@ const handleReject = async (request) => {
       status: "Rejected",
     }));
 
-    await fetchPendingRequests(); // wait update
+    await fetchPendingRequests();
 
     setShowRequestDetails(false);
 
@@ -1590,15 +1684,18 @@ const handleReject = async (request) => {
     });
 
   } finally {
-    setRejectAction(false); // STOP SPINNER ALWAYS
+    setRejectAction(false);
   }
 };
 
-// Fetch all requests for a student
+
+// ----------------- FETCH STUDENT REQUESTS -----------------
 const fetchStudentRequests = async (studentNumber) => {
   try {
     const res = await fetch(
-   `${import.meta.env.VITE_API_URL}/good-moral/history?student_number=${studentNumber}`);
+      `${import.meta.env.VITE_API_URL}/good-moral/history?student_number=${studentNumber}`
+    );
+
     const data = await res.json();
     setStudentRequests(data);
   } catch (err) {
@@ -1606,11 +1703,11 @@ const fetchStudentRequests = async (studentNumber) => {
   }
 };
 
-// Automatically fetch pending requests
+
+// ----------------- AUTO REFRESH INIT -----------------
 useEffect(() => {
   fetchPendingRequests();
 }, []);
-
 // ===================== STATES ===================== //
 const [courseFilter, setCourseFilter] = useState("ALL");
 const [dateFrom, setDateFrom] = useState("");
@@ -1837,6 +1934,486 @@ useEffect(() => {
   loadData();
 
 }, [activePage]);
+
+// =========================
+// Upload Counseling Schedule (AUTO REFRESH)
+// =========================
+useEffect(() => {
+  let interval;
+
+  const fetchSavedCounseling = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
+      const data = await res.json();
+
+      if (data.status !== "success") return;
+
+      const counselingFile = data.files.find(
+        (f) => f.file_type === "counseling_appointment"
+      );
+
+      if (counselingFile) {
+        setSelectedPdfUrl(counselingFile.url);
+      } else {
+        setSelectedPdfUrl(null);
+      }
+
+    } catch (err) {
+      console.error("Failed to load saved PDF:", err);
+    }
+  };
+
+  // initial load
+  fetchSavedCounseling();
+
+  // auto refresh every 5 seconds
+  interval = setInterval(() => {
+    fetchSavedCounseling();
+  }, 5000);
+
+  // cleanup
+  return () => clearInterval(interval);
+
+}, []);
+// =========================
+// FETCH REQUESTS (WITH VIOLATION + SANCTION)
+// =========================
+const fetchRequests = async (status = "Pending") => {
+  try {
+    setLoadingRequests(true);
+
+    const res = await axios.get(`${API}/counseling/admin/requests`, {
+      params: { status }
+    });
+
+    const data = Array.isArray(res.data) ? res.data : [];
+
+    const formatted = data.map((r) => ({
+      ...r,
+      latest_violation: r.latest_violation ?? null,
+      sanction: r.sanction ?? null,
+      violation_date: r.violation_date ?? null
+    }));
+
+    setRequests(formatted);
+
+  } catch (err) {
+    console.log("Fetch requests error:", err);
+    setRequests([]);
+  } finally {
+    setLoadingRequests(false);
+  }
+};
+
+// =========================
+// INIT LOAD
+// =========================
+useEffect(() => {
+  fetchRequests();
+
+  const interval = setInterval(() => {
+    console.log("AUTO REFRESH TRIGGERED");
+    fetchRequests("Pending");
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+/// =========================
+// PROCESS REQUEST (APPROVE / REJECT)
+// =========================
+
+// IMPORTANT: define admin_id FIRST
+const admin_id = localStorage.getItem("admin_id");
+
+const processRequest = async (request_id, status) => {
+  try {
+    setLoadingRequests(true);
+
+    const payload = {
+      status,
+      admin_id,
+    };
+
+    if (status === "Approved") {
+      if (!adminSetDate || !adminSetTime) {
+        Swal.fire({
+          position: "top-end",
+          icon: "warning",
+          title: "Set schedule first",
+          showConfirmButton: false,
+          timer: 2000,
+          toast: true
+        });
+
+        setLoadingRequests(false);
+        return;
+      }
+
+      payload.admin_set_date = adminSetDate;
+      payload.admin_set_time = adminSetTime;
+    }
+
+    await axios.patch(
+      `${API}/counseling/process/${request_id}`,
+      payload
+    );
+
+    Swal.fire({
+      position: "top-end",
+      icon: status === "Approved" ? "success" : "error",
+      title: status === "Approved" ? "Request Approved" : "Request Rejected",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true,
+      width: "280px"
+    });
+
+    await fetchRequests("Pending");
+    setSelectedRequest(null);
+
+  } catch (err) {
+
+    console.log(err);
+
+    Swal.fire({
+      position: "top-start",
+      icon: "error",
+      title: "Failed to process request",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true
+    });
+
+  } finally {
+    setLoadingRequests(false);
+  }
+};
+
+// =========================
+// 1. UPLOAD PSYCHOLOGICAL FILE HANDLER
+// =========================
+const psyHandleFileUpload = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (file.type !== "application/pdf") {
+    Swal.fire({ icon: "error", title: "Only PDF files allowed", toast: true, position: "top-end", showConfirmButton: false, timer: 2000 });
+    return;
+  }
+
+  try {
+    setPsyLoadingRequests(true);
+    // Gamit ang iyong existing uploadFile utility function
+    const uploaded = await uploadFile(file, "psychological_request");
+
+    if (uploaded?.url) {
+      setPsySelectedPdfUrl(uploaded.url);
+      Swal.fire({ icon: "success", title: "Psychological PDF uploaded successfully", toast: true, position: "top-end", showConfirmButton: false, timer: 2000 });
+    }
+  } catch (err) {
+    console.error("Upload failed:", err);
+    Swal.fire({ icon: "error", title: "Upload failed", toast: true, position: "top-end", showConfirmButton: false, timer: 2000 });
+  } finally {
+    setPsyLoadingRequests(false);
+  }
+};
+
+// =========================
+// 2. FETCH SAVED PSYCHOLOGICAL SCHEDULE (AUTO REFRESH)
+// =========================
+useEffect(() => {
+  let interval;
+
+  const psyFetchSavedSchedule = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
+      const data = await res.json();
+
+      if (data.status !== "success") return;
+
+      const psyFile = data.files.find(
+        (f) => f.file_type === "psychological_request"
+      );
+
+      if (psyFile) {
+        setPsySelectedPdfUrl(psyFile.url);
+      } else {
+        setPsySelectedPdfUrl(null);
+      }
+    } catch (err) {
+      console.error("Failed to load saved PDF:", err);
+    }
+  };
+
+  psyFetchSavedSchedule();
+
+  interval = setInterval(() => {
+    psyFetchSavedSchedule();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+
+// =========================
+// 3. FETCH PSY REQUESTS (WITH VIOLATION + SANCTION)
+// =========================
+const psyFetchRequests = async (status = "Pending") => {
+  try {
+    setPsyLoadingRequests(true);
+
+    const res = await axios.get(`${API}/psychological/admin/requests`, {
+      params: { status }
+    });
+
+    const psyData = Array.isArray(res.data) ? res.data : [];
+
+    const psyFormatted = psyData.map((r) => ({
+      ...r,
+      latest_violation: r.latest_violation ?? null,
+      sanction: r.sanction ?? null,
+      violation_date: r.violation_date ?? null,
+      concern_purpose: r.concern_purpose ?? null
+    }));
+
+    setPsyRequests(psyFormatted);
+  } catch (err) {
+    console.log("Fetch psy requests error:", err);
+    setPsyRequests([]);
+  } finally {
+    setPsyLoadingRequests(false);
+  }
+};
+
+// =========================
+// 4. INIT LOAD FOR REQUESTS
+// =========================
+useEffect(() => {
+  psyFetchRequests();
+
+  const psyInterval = setInterval(() => {
+    console.log("PSY AUTO REFRESH TRIGGERED");
+    psyFetchRequests("Pending");
+  }, 5000);
+
+  return () => clearInterval(psyInterval);
+}, []);
+
+// =========================
+// 5. PROCESS PSY REQUEST (APPROVE / REJECT)
+// =========================
+const psyAdminId = localStorage.getItem("admin_id");
+
+const psyProcessRequest = async (request_id, status) => {
+  try {
+    setPsyLoadingRequests(true);
+
+    const psyPayload = {
+      status,
+      admin_id: psyAdminId,
+    };
+
+    if (status === "Approved") {
+      if (!psyAdminSetDate || !psyAdminSetTime) {
+        Swal.fire({
+          position: "top-end",
+          icon: "warning",
+          title: "Set schedule first",
+          showConfirmButton: false,
+          timer: 2000,
+          toast: true
+        });
+
+        setPsyLoadingRequests(false);
+        return;
+      }
+
+      psyPayload.admin_set_date = psyAdminSetDate;
+      psyPayload.admin_set_time = psyAdminSetTime;
+    }
+
+    await axios.patch(
+      `${API}/psychological/process/${request_id}`,
+      psyPayload
+    );
+
+    Swal.fire({
+      position: "top-end",
+      icon: status === "Approved" ? "success" : "error",
+      title: status === "Approved" ? "Request Approved" : "Request Rejected",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true,
+      width: "280px"
+    });
+
+    await psyFetchRequests("Pending");
+    setPsySelectedRequest(null);
+
+  } catch (err) {
+    console.log(err);
+
+    Swal.fire({
+      position: "top-start",
+      icon: "error",
+      title: "Failed to process request",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true
+    });
+  } finally {
+    setPsyLoadingRequests(false);
+  }
+};
+
+// =========================
+// Upload EXIT PDF (AUTO REFRESH)
+// =========================
+useEffect(() => {
+  let interval;
+
+  const fetchSavedExit = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/file/list`);
+      const data = await res.json();
+
+      if (data.status !== "success") return;
+        const exitFiles = data.files.filter(
+          (f) => f.file_type?.toLowerCase() === "exit_request"
+        );
+
+        if (exitFiles.length > 0) {
+          // take the latest uploaded
+          const latestExitFile = exitFiles[0]; // or sort by id/created_at if available
+          setSelectedExitPdfUrl(latestExitFile.url);
+        } else {
+          setSelectedExitPdfUrl(null);
+        }
+
+    } catch (err) {
+      console.error("Failed to load Exit PDF:", err);
+    }
+  };
+
+  fetchSavedExit();
+
+  interval = setInterval(() => {
+    fetchSavedExit();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+
+
+// =========================
+// FETCH EXIT REQUESTS
+// =========================
+const fetchExitRequests = async (status = "Pending") => {
+  try {
+    setLoadingRequests(true);
+
+    const res = await axios.get(`${API}/exit_request/admin/requests`, {
+      params: { status }
+    });
+
+    const data = Array.isArray(res.data) ? res.data : [];
+
+    const formatted = data.map((r) => ({
+      ...r,
+      latest_violation: r.latest_violation ?? null,
+      sanction: r.sanction ?? null,
+      violation_date: r.violation_date ?? null
+    }));
+
+    setExitRequests(formatted);
+
+  } catch (err) {
+    console.log("Fetch Exit requests error:", err);
+    setExitRequests([]);
+  } finally {
+    setLoadingRequests(false);
+  }
+};
+
+
+// =========================
+// INIT LOAD + AUTO REFRESH EXIT
+// =========================
+useEffect(() => {
+  fetchExitRequests();
+
+  const interval = setInterval(() => {
+    fetchExitRequests("Pending");
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+
+
+// =========================
+// PROCESS EXIT REQUEST
+// =========================
+const processExitRequest = async (request_id, status) => {
+  try {
+    setLoadingRequests(true);
+
+    const payload = {
+      status,
+      admin_id: localStorage.getItem("admin_id"),
+    };
+
+    if (status === "Approved") {
+      if (!adminExitDate || !adminExitTime) {
+        Swal.fire({
+          position: "top-end",
+          icon: "warning",
+          title: "Set schedule first",
+          showConfirmButton: false,
+          timer: 2000,
+          toast: true
+        });
+
+        setLoadingRequests(false);
+        return;
+      }
+
+      payload.admin_set_date = adminExitDate;
+      payload.admin_set_time = adminExitTime;
+    }
+
+    await axios.patch(
+      `${API}/exit_request/process/${request_id}`,
+      payload
+    );
+
+    Swal.fire({
+      position: "top-end",
+      icon: status === "Approved" ? "success" : "error",
+      title: status === "Approved" ? "Exit Approved" : "Exit Rejected",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true,
+      width: "280px"
+    });
+
+    await fetchExitRequests("Pending");
+    setSelectedExitRequest(null);
+
+  } catch (err) {
+    console.log(err);
+
+    Swal.fire({
+      position: "top-start",
+      icon: "error",
+      title: "Failed to process exit request",
+      showConfirmButton: false,
+      timer: 2000,
+      toast: true
+    });
+
+  } finally {
+    setLoadingRequests(false);
+  }
+};
 // ------------------ Render ------------------
 return (
   <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
@@ -2038,6 +2615,9 @@ return (
         {activePage === "violation" && "Encode Violation"}
         {activePage === "uploadFileFormat" && "Upload File Format"}
         {activePage === "news" && "News Management"}
+        {activePage === "counseling" && "Counseling Approval"}
+        {activePage === "psychologicalRequest" && "Psychological Approval"}
+        {activePage === "exitRequest" && "Psychological Approval"}
       </h2>
          {isLoading && (
             <div className="fixed bottom-10 right-10 flex flex-col items-center justify-center z-50">
@@ -2718,7 +3298,7 @@ return (
                         <span>{course}</span>
                         <span>{count}</span>
                       </div>
-                    );
+                    )
                   });
                 })()}
 
@@ -2798,6 +3378,931 @@ return (
                 ))}
             </div>
           )}
+          {/* ================= COUNSELING ================= */}
+          {activePage === "counseling" && (
+          <div className="p-3 sm:p-4 md:p-6 flex flex-col items-center relative">
+
+            {/* CENTER CARD */}
+            <div className="w-full max-w-2xl bg-white border shadow-xl rounded-xl p-4 sm:p-5 md:p-6">
+
+              {/* HEADER */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+
+                <div className="flex items-center gap-2 text-gray-700">
+
+                  <span className="text-lg">
+                    📄
+                  </span>
+
+                  <p className="font-semibold text-sm sm:text-base break-all">
+                    Appointment Counseling.pdf
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={() => setShowRequestList(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
+                >
+                  View Request List
+                </button>
+
+              </div>
+                {/* ================= PDF VIEWER (COUNSELING) ================= */}
+                <div className="border rounded-xl overflow-hidden bg-gray-100 w-full relative">
+
+                  {selectedPdfUrl ? (
+
+                    <div
+                      onClick={() => window.open(selectedPdfUrl, "_blank")}
+                      className="relative cursor-pointer group"
+                    >
+
+                      {/* OVERLAY */}
+                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition">
+
+                        <div className="opacity-0 group-hover:opacity-100 transition bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
+                          Click to Full View
+                        </div>
+
+                      </div>
+                      <iframe
+                        key={selectedPdfUrl}
+                        src={`${selectedPdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                        title="PDF Preview"
+                        className="w-full h-[240px] sm:h-[300px] md:h-[380px] lg:h-[460px] bg-white pointer-events-none"
+                      />
+
+                    </div>
+
+                  ) : (
+
+                    <div className="flex items-center justify-center text-center text-gray-500 w-full h-[240px] sm:h-[300px] md:h-[380px] lg:h-[460px] p-5">
+
+                      <div className="bg-white border shadow-sm rounded-2xl p-6 max-w-sm w-full">
+
+                        <div className="text-5xl mb-3">
+                          📄
+                        </div>
+
+                        <h3 className="font-bold text-lg text-gray-700">
+                          No PDF Uploaded
+                        </h3>
+
+                        <p className="text-sm text-gray-500 mt-2">
+                          Upload counseling PDF file for preview.
+                        </p>
+
+                        <p className="text-xs text-gray-400 mt-2">
+                          PDF files only allowed
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              {/* =========================
+                  FILE UPLOAD BUTTON (CLOUDINARY + DB SYNC)
+              ========================= */}
+              <div className="flex justify-end mt-4">
+
+                <label className="cursor-pointer w-full sm:w-auto">
+
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={async (e) => {
+
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      if (file.type !== "application/pdf") {
+                        alert("Only PDF files allowed");
+                        return;
+                      }
+
+                      try {
+                        const uploaded = await uploadFile(
+                          file,
+                          "counseling_appointment"
+                        );
+
+                        console.log("UPLOADED RESPONSE:", uploaded);
+                        if (uploaded?.url) {
+                          setSelectedPdfUrl(uploaded.url);
+                        }
+
+                      } catch (err) {
+                        console.error("Upload failed:", err);
+                      }
+
+                    }}
+                  />
+
+                  <span className="block text-center bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition text-sm sm:text-base">
+
+                    {selectedPdfUrl ? "Change File" : "Upload File"}
+
+                  </span>
+
+                </label>
+
+              </div>
+            </div>
+          {/* =====================
+              REQUEST LIST MODAL
+          ===================== */}
+          {showRequestList && !selectedRequest && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+
+              <div className="bg-white w-full max-w-4xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-hidden">
+
+                <button
+                  onClick={() => setShowRequestList(false)}
+                  className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                >
+                  ✕
+                </button>
+
+                <h3 className="text-lg sm:text-xl font-bold mb-4 text-green-700">
+                  Counseling Request List
+                </h3>
+
+                <div className="space-y-3 overflow-y-auto max-h-[70vh]">
+
+                  {requests?.length === 0 ? (
+                    <div className="text-center text-gray-400 py-10">
+                      No requests found
+                    </div>
+                  ) : (
+                    requests?.map((r) => (
+                      <div
+                        key={r.request_id}
+                        onClick={() => {
+                          setSelectedRequest(r);
+                          setAdminSetDate("");
+                          setAdminSetTime("");
+                        }}
+                        className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center"
+                      >
+                        <div>
+                          <p className="font-semibold">{r.student_number}</p>
+                          <p className="text-sm text-gray-500">{r.student_name}</p>
+                        </div>
+
+                        <div className="text-sm text-right">
+                          <p className="font-medium">{r.status}</p>
+                          <p className="text-gray-500">
+                            {r.preferred_date} {r.preferred_time}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+
+          {/* =====================
+              REQUEST DETAILS MODAL
+          ===================== */}
+          {selectedRequest && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+
+              <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-y-auto">
+
+                <button
+                  onClick={() => setSelectedRequest(null)}
+                  className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                >
+                  ✕
+                </button>
+
+                <h3 className="text-lg sm:text-xl font-bold text-green-700 mb-5">
+                  Request Details
+                </h3>
+
+                {/* STUDENT INFO */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+                  <div>
+                    <p className="text-gray-500">Student Number</p>
+                    <p className="font-semibold">{selectedRequest.student_number}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Name</p>
+                    <p className="font-semibold">{selectedRequest.student_name}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Course</p>
+                    <p className="font-semibold">{selectedRequest.course}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Status</p>
+                    <p className="font-semibold">{selectedRequest.status}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Preferred Date</p>
+                    <p className="font-semibold">{selectedRequest.preferred_date}</p>
+                  </div>
+                  <p className="text-red-500 text-ml mt-1 font-semibold">
+                      Violation: {selectedRequest.latest_violation}
+                    </p>
+
+                    <p className="text-orange-500 text-ml font-semibold">
+                      Sanction: {selectedRequest.sanction}
+                    </p>
+                  <div>
+                    <p className="text-gray-500">Preferred Time</p>
+                    <p className="font-semibold">{selectedRequest.preferred_time}</p>
+                  </div>
+
+                </div>
+
+
+                {/* =====================
+                    ADMIN SET SCHEDULE
+                ===================== */}
+                <div className="mt-6 border-t pt-4">
+                  <h4 className="font-semibold text-gray-700 mb-3">
+                    Admin Schedule (Override)
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-3">
+
+                    <input
+                      type="date"
+                      value={adminSetDate}
+                      onChange={(e) => setAdminSetDate(e.target.value)}
+                      className="border p-2 rounded-lg w-full"
+                    />
+
+                    <input
+                      type="time"
+                      value={adminSetTime}
+                      onChange={(e) => setAdminSetTime(e.target.value)}
+                      className="border p-2 rounded-lg w-full"
+                    />
+
+                  </div>
+                </div>
+
+
+                {/* =====================
+                    ACTIONS
+                ===================== */}
+                <div className="flex justify-end gap-3 mt-6">
+
+                  <button
+                    onClick={() =>
+                      processRequest(selectedRequest.request_id, "Rejected")
+                    }
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                  >
+                    Reject
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      processRequest(selectedRequest.request_id, "Approved")
+                    }
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                  >
+                    Approve
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+            )}
+          </div>
+          )}
+        {/* ================= EXIT INTERVIEW ================= */}
+        {activePage === "exitInterviewRequest" && (
+          <div className="p-3 sm:p-4 md:p-6 flex flex-col items-center relative">
+
+            {/* CENTER CARD */}
+            <div className="w-full max-w-2xl bg-white border shadow-xl rounded-xl p-4 sm:p-5 md:p-6">
+
+              {/* HEADER */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+
+                <div className="flex items-center gap-2 text-gray-700">
+
+                  <span className="text-lg">📄</span>
+
+                  <p className="font-semibold text-sm sm:text-base break-all">
+                    Exit Interview.pdf
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={() => setShowExitRequestList(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
+                >
+                  View Request List
+                </button>
+
+              </div>
+
+              {/* ================= PDF VIEWER ================= */}
+              <div className="border rounded-xl overflow-hidden bg-gray-100 w-full relative">
+
+                {selectedExitPdfUrl ? (
+
+                  <div
+                    onClick={() => window.open(selectedExitPdfUrl, "_blank")}
+                    className="relative cursor-pointer group"
+                  >
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition">
+                      <div className="opacity-0 group-hover:opacity-100 transition bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
+                        Click to Full View
+                      </div>
+                    </div>
+
+                    <iframe
+                      key={selectedExitPdfUrl}
+                      src={`${selectedExitPdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                      title="PDF Preview"
+                      className="w-full h-[240px] sm:h-[300px] md:h-[380px] lg:h-[460px] bg-white pointer-events-none"
+                    />
+                  </div>
+
+                ) : (
+
+                  <div className="flex items-center justify-center text-center text-gray-500 w-full h-[240px] sm:h-[300px] md:h-[380px] lg:h-[460px] p-5">
+
+                    <div className="bg-white border shadow-sm rounded-2xl p-6 max-w-sm w-full">
+
+                      <div className="text-5xl mb-3">📄</div>
+
+                      <h3 className="font-bold text-lg text-gray-700">
+                        No PDF Uploaded
+                      </h3>
+
+                      <p className="text-sm text-gray-500 mt-2">
+                        Upload exit interview PDF file for preview.
+                      </p>
+
+                      <p className="text-xs text-gray-400 mt-2">
+                        PDF files only allowed
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                )}
+
+              </div>
+
+              {/* ================= FILE UPLOAD ================= */}
+              <div className="flex justify-end mt-4">
+
+                <label className="cursor-pointer w-full sm:w-auto">
+
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      if (file.type !== "application/pdf") {
+                        alert("Only PDF files allowed");
+                        return;
+                      }
+
+                      try {
+                        const uploaded = await uploadFile(file, "exit_request");
+
+                        if (uploaded?.url) {
+                          setSelectedExitPdfUrl(uploaded.url);
+                        }
+
+                      } catch (err) {
+                        console.error("Upload failed:", err);
+                      }
+                    }}
+                  />
+
+                  <span className="block text-center bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition text-sm sm:text-base">
+                    {selectedExitPdfUrl ? "Change File" : "Upload File"}
+                  </span>
+
+                </label>
+              </div>
+            </div>
+
+            {/* ================= REQUEST LIST MODAL ================= */}
+            {showExitRequestList && !selectedExitRequest && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+
+                <div className="bg-white w-full max-w-4xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-hidden">
+
+                  <button
+                    onClick={() => setShowExitRequestList(false)}
+                    className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+
+                  <h3 className="text-lg sm:text-xl font-bold mb-4 text-green-700">
+                    Exit Interview Request List
+                  </h3>
+
+                  <div className="space-y-3 overflow-y-auto max-h-[70vh]">
+
+                    {exitRequests?.length === 0 ? (
+                      <div className="text-center text-gray-400 py-10">
+                        No requests found
+                      </div>
+                    ) : (
+                      exitRequests?.map((r) => (
+                        <div
+                          key={r.request_id}
+                          onClick={() => {
+                            setSelectedExitRequest(r);
+                            setAdminExitDate("");
+                            setAdminExitTime("");
+                          }}
+                          className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center"
+                        >
+                          <div>
+                            <p className="font-semibold">{r.student_number}</p>
+                            <p className="text-sm text-gray-500">{r.student_name}</p>
+                          </div>
+
+                          <div className="text-sm text-right">
+                            <p className="font-medium">{r.status}</p>
+                            <p className="text-gray-500">
+                              {r.preferred_date} {r.preferred_time}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ================= REQUEST DETAILS ================= */}
+            {selectedExitRequest && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+
+                <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-y-auto">
+
+                  <button
+                    onClick={() => setSelectedExitRequest(null)}
+                    className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+
+                  <h3 className="text-lg sm:text-xl font-bold text-green-700 mb-5">
+                    Exit Request Details
+                  </h3>
+
+                  {/* STUDENT INFO */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+                    <div>
+                      <p className="text-gray-500">Student Number</p>
+                      <p className="font-semibold">{selectedExitRequest.student_number}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-500">Name</p>
+                      <p className="font-semibold">{selectedExitRequest.student_name}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-500">Course</p>
+                      <p className="font-semibold">{selectedExitRequest.course}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-500">Status</p>
+                      <p className="font-semibold">{selectedExitRequest.status}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-500">Preferred Date</p>
+                      <p className="font-semibold">{selectedExitRequest.preferred_date}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-gray-500">Preferred Time</p>
+                      <p className="font-semibold">{selectedExitRequest.preferred_time}</p>
+                    </div>
+
+                    <p className="text-red-500 font-semibold">
+                      Violation: {selectedExitRequest.latest_violation}
+                    </p>
+
+                    <p className="text-orange-500 font-semibold">
+                      Sanction: {selectedExitRequest.sanction}
+                    </p>
+
+                  </div>
+
+                  {/* ================= ADMIN SCHEDULE ================= */}
+                  <div className="mt-6 border-t pt-4">
+
+                    <h4 className="font-semibold text-gray-700 mb-3">
+                      Admin Schedule (Override)
+                    </h4>
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <input
+                        type="date"
+                        value={adminExitDate}
+                        onChange={(e) => setAdminExitDate(e.target.value)}
+                        className="border p-2 rounded-lg w-full"
+                      />
+
+                      <input
+                        type="time"
+                        value={adminExitTime}
+                        onChange={(e) => setAdminExitTime(e.target.value)}
+                        className="border p-2 rounded-lg w-full"
+                      />
+
+                    </div>
+                  </div>
+
+                  {/* ================= ACTIONS (FULL FIXED) ================= */}
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+
+                    <button
+                      onClick={() =>
+                        processExitRequest(selectedExitRequest.request_id, "Rejected")
+                      }
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 w-full sm:w-auto"
+                    >
+                      Reject
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        processExitRequest(selectedExitRequest.request_id, "Approved")
+                      }
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 w-full sm:w-auto"
+                      disabled={!adminExitDate || !adminExitTime}
+                    >
+                      Approve
+                    </button>
+
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+        {/* ================= PSYCHOLOGICAL REQUEST ================= */}
+              {activePage === "psychologicalRequest" && (
+                <div className="p-3 sm:p-4 md:p-6 flex flex-col items-center relative">
+
+                  {/* CENTER CARD */}
+                  <div className="w-full max-w-2xl bg-white border shadow-xl rounded-xl p-4 sm:p-5 md:p-6">
+
+                    {/* HEADER */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <span className="text-lg">📄</span>
+                        <p className="font-semibold text-sm sm:text-base break-all">
+                          Psychological Request.pdf
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setPsyShowRequestList(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
+                      >
+                        View Request List
+                      </button>
+
+                    </div>
+
+                    {/* ================= PDF VIEWER ================= */}
+                    <div className="border rounded-xl overflow-hidden bg-gray-100 w-full relative">
+
+                      {psySelectedPdfUrl ? (
+                        <div
+                          onClick={() => window.open(psySelectedPdfUrl, "_blank")}
+                          className="relative cursor-pointer group"
+                        >
+
+                          {/* OVERLAY */}
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition">
+                            <div className="opacity-0 group-hover:opacity-100 transition bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
+                              Click to Full View
+                            </div>
+                          </div>
+
+                          <iframe
+                            key={psySelectedPdfUrl}
+                            src={`${psySelectedPdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                            title="PDF Preview"
+                            className="w-full h-[240px] sm:h-[300px] md:h-[380px] lg:h-[460px] bg-white pointer-events-none"
+                          />
+
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center text-center text-gray-500 w-full h-[240px] sm:h-[300px] md:h-[380px] lg:h-[460px] p-5">
+
+                          <div className="bg-white border shadow-sm rounded-2xl p-6 max-w-sm w-full">
+                            <div className="text-5xl mb-3">📄</div>
+
+                            <h3 className="font-bold text-lg text-gray-700">
+                              No PDF Uploaded
+                            </h3>
+
+                            <p className="text-sm text-gray-500 mt-2">
+                              Upload psychological request PDF file for preview.
+                            </p>
+
+                            <p className="text-xs text-gray-400 mt-2">
+                              PDF files only allowed
+                            </p>
+                          </div>
+
+                        </div>
+                      )}
+
+                    </div>
+
+                  {/* ================= UPLOAD BUTTON ================= */}
+              <div className="flex justify-end mt-4">
+
+                <label className="cursor-pointer w-full sm:w-auto">
+
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={async (e) => {
+
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      
+                      if (file.type !== "application/pdf") {
+                        Swal.fire({
+                          icon: "error",
+                          title: "Invalid File",
+                          text: "Only PDF files are allowed",
+                        });
+                        return;
+                      }
+
+                      try {
+                        const uploaded = await uploadFile(file, "psychological_request");
+
+                        console.log("UPLOADED RESPONSE:", uploaded);
+
+                        if (uploaded?.url) {
+                    
+                          setPsySelectedPdfUrl(uploaded.url);
+
+                          Swal.fire({
+                            icon: "success",
+                            title: "Uploaded Successfully",
+                            toast: true,
+                            position: "top-end",
+                            timer: 2000,
+                            showConfirmButton: false,
+                          });
+                        } else {
+                          Swal.fire({
+                            icon: "error",
+                            title: "Upload Failed",
+                            text: "No URL returned from server",
+                          });
+                        }
+
+                      } catch (err) {
+                        console.error("Upload failed:", err);
+
+                        Swal.fire({
+                          icon: "error",
+                          title: "Upload Error",
+                          text: err.message || "Something went wrong",
+                        });
+                      }
+
+                    }}
+                  />
+
+                  <span className="block text-center bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition text-sm sm:text-base">
+                    {psySelectedPdfUrl ? "Change File" : "Upload File"}
+                  </span>
+
+                </label>
+
+              </div>
+              </div>
+                  {/* ================= REQUEST LIST MODAL ================= */}
+                  {psyShowRequestList && !psySelectedRequest && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+
+                      <div className="bg-white w-full max-w-4xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-hidden">
+
+                        <button
+                          onClick={() => setPsyShowRequestList(false)}
+                          className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                        >
+                          ✕
+                        </button>
+
+                        <h3 className="text-lg sm:text-xl font-bold mb-4 text-green-700">
+                          Psychological Request List
+                        </h3>
+
+                        <div className="space-y-3 overflow-y-auto max-h-[70vh]">
+
+                          {psyRequests?.length === 0 ? (
+                            <div className="text-center text-gray-400 py-10">
+                              No requests found
+                            </div>
+                          ) : (
+                            psyRequests?.map((r) => (
+                              <div
+                                key={r.request_id}
+                                onClick={() => {
+                                  setPsySelectedRequest(r);
+                                  setPsyAdminSetDate("");
+                                  setPsyAdminSetTime("");
+                                }}
+                                className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer flex justify-between items-center"
+                              >
+                                <div>
+                                  <p className="font-semibold">{r.student_number}</p>
+                                  <p className="text-sm text-gray-500">{r.student_name}</p>
+                                </div>
+
+                                <div className="text-sm text-right">
+                                  <p className="font-medium">{r.status}</p>
+                                  <p className="text-gray-500">
+                                    {r.preferred_date} {r.preferred_time}
+                                  </p>
+                                </div>
+
+                              </div>
+                            ))
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* ================= REQUEST DETAILS MODAL ================= */}
+                  {psySelectedRequest && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+
+                      <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-y-auto">
+
+                        <button
+                          onClick={() => setPsySelectedRequest(null)}
+                          className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                        >
+                          ✕
+                        </button>
+
+                        <h3 className="text-lg sm:text-xl font-bold text-green-700 mb-5">
+                          Request Details
+                        </h3>
+
+                        {/* STUDENT INFO */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+                          <div>
+                            <p className="text-gray-500">Student Number</p>
+                            <p className="font-semibold">{psySelectedRequest.student_number}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-gray-500">Name</p>
+                            <p className="font-semibold">{psySelectedRequest.student_name}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-gray-500">Course</p>
+                            <p className="font-semibold">{psySelectedRequest.course}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-gray-500">Status</p>
+                            <p className="font-semibold">{psySelectedRequest.status}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-gray-500">Preferred Date</p>
+                            <p className="font-semibold">{psySelectedRequest.preferred_date}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-gray-500">Preferred Time</p>
+                            <p className="font-semibold">{psySelectedRequest.preferred_time}</p>
+                          </div>
+
+                        </div>
+                          {/* CONCERN / PURPOSE */}
+                          <div className="mt-3 text-sm">
+
+                            <p className="text-black">
+                              Concern / Purpose:
+                            </p>
+
+                            <p className="text-gray-700 font-semibold mt-1 whitespace-pre-wrap">
+                              {psySelectedRequest.concern_purpose
+                                ? psySelectedRequest.concern_purpose
+                                : "No concern/purpose provided"}
+                            </p>
+
+                          </div>
+                        {/* ADMIN SCHEDULE */}
+                        <div className="mt-6 border-t pt-4">
+                          <h4 className="font-semibold text-gray-700 mb-3">
+                            Admin Schedule (Override)
+                          </h4>
+
+                          <div className="grid grid-cols-2 gap-3">
+
+                            <input
+                              type="date"
+                              value={psyAdminSetDate}
+                              onChange={(e) => setPsyAdminSetDate(e.target.value)}
+                              className="border p-2 rounded-lg w-full"
+                            />
+
+                            <input
+                              type="time"
+                              value={psyAdminSetTime}
+                              onChange={(e) => setPsyAdminSetTime(e.target.value)}
+                              className="border p-2 rounded-lg w-full"
+                            />
+
+                          </div>
+                        </div>
+
+                        {/* ACTIONS */}
+                        <div className="flex justify-end gap-3 mt-6">
+
+                          <button
+                            onClick={() =>
+                              psyProcessRequest(psySelectedRequest.request_id, "Rejected")
+                            }
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                          >
+                            Reject
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              psyProcessRequest(psySelectedRequest.request_id, "Approved")
+                            }
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                          >
+                            Approve
+                          </button>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+                  )}
+
+                </div>
+              )}
             {/* Search Students */}
             {activePage === "search" && (
               <div className="space-y-6">
@@ -3296,6 +4801,7 @@ return (
                                   new Paragraph(`Section: ${v.predicted_section || "—"}`),
                                   new Paragraph(`Admin Note: ${v.violation_text || "—"}`),
                                   new Paragraph(`Standard Model Text: ${v.standard_text || "—"}`),
+                                  new Paragraph(`Sanction: ${v.sanction || "—"}`),
                                   new Paragraph(`Date: ${v.violation_date || "—"}`),
                                 ],
                               },
@@ -3344,7 +4850,8 @@ return (
 
                 <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
                 ${v.standard_text || "No standard violation text available."}</p>
-
+                <p><b>Sanction:</b> ${v.sanction || "—"}</p>
+ 
                 <p style="margin-top:10px;"><b>Date:</b> ${v.violation_date || "—"}</p>
 
               </div>
@@ -3703,19 +5210,19 @@ return (
 
 </div>
 )}
-   {/* ======================= VIOLATION CARDS ======================= */}
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-    {violations.length === 0 ? (
-      <p className="text-gray-500 col-span-full">No violation records yet.</p>
-    ) : (
-      violations.map((v, idx) => {
-        const date = new Date(v.violation_date);
-        const mm = String(date.getMonth() + 1).padStart(2, "0");
-        const dd = String(date.getDate()).padStart(2, "0");
-        const yy = String(date.getFullYear()).slice(-2);
-        const formattedDate = `${mm}/${dd}/${yy}`;
+  {/* ======================= VIOLATION CARDS ======================= */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+  {violations.length === 0 ? (
+    <p className="text-gray-500 col-span-full">No violation records yet.</p>
+  ) : (
+    violations.map((v, idx) => {
+      const date = new Date(v.violation_date);
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const yy = String(date.getFullYear()).slice(-2);
+      const formattedDate = `${mm}/${dd}/${yy}`;
 
-        const isResolved = v.is_resolved === "Resolved";
+      const isResolved = v.is_resolved === "Resolved";
 
       return (
         <div
@@ -3748,26 +5255,35 @@ return (
             Violation: {v.predicted_violation || "—"}
           </p>
 
+          {/*SANCTION DISPLAY */}
+          <p className="text-gray-700 mb-2">
+            <span className="font-semibold">Sanction:</span>{" "}
+            <span className="text-red-600 font-medium">
+              {v.sanction || "—"}
+            </span>
+          </p>
+
           <p className="text-sm text-gray-400">
             Date: {formattedDate}
           </p>
-          <p className="text-gray-600 mb-1">
-          <span className="font-semibold">Semester:</span> {v.semester || "—"}
-        </p>
-            {/* STATUS LABEL */}
-            <p
-              className={`text-xs mt-2 font-semibold ${
-                isResolved ? "text-green-600" : "text-yellow-600"
-              }`}
-            >
-              {isResolved ? "Resolved" : "Pending"}
-            </p>
-          </div>
-        );
-      })
-    )}
-  </div>
 
+          <p className="text-gray-600 mb-1">
+            <span className="font-semibold">Semester:</span> {v.semester || "—"}
+          </p>
+
+          {/* STATUS LABEL */}
+          <p
+            className={`text-xs mt-2 font-semibold ${
+              isResolved ? "text-green-600" : "text-yellow-600"
+            }`}
+          >
+            {isResolved ? "Resolved" : "Pending"}
+          </p>
+        </div>
+      );
+    })
+  )}
+</div>
    {/* ======================= SWEETALERT VIEW DETAILS ======================= */}
     {showViolationDetailsModal && currentViolation && (() => {
       const v = currentViolation;
@@ -3797,6 +5313,7 @@ return (
                 new Paragraph(`Section: ${v.predicted_section}`),
                 new Paragraph(`Admin Note: ${v.violation_text}`),
                 new Paragraph(`Standard Model Text: ${v.standard_text}`),
+                new Paragraph(`Sanction: ${v.sanction || "—"}`),
                 new Paragraph(`Date: ${v.formattedDate}`),
               ],
             },
@@ -3841,9 +5358,10 @@ return (
 
             <p style="margin-top:10px;"><b>Admin Note:</b><br>
             ${v.violation_text}</p>
-
+            <p><b>Sanction:</b> ${v.sanction || "—"}</p>
             <p style="margin-top:10px;"><b>Standard Model Text:</b><br>
             ${v.standard_text}</p>
+
 
             <p style="margin-top:10px;"><b>Date:</b> ${v.formattedDate}</p>
 
@@ -4054,12 +5572,33 @@ return (
 
                   <h3 className="text-lg font-semibold mb-4">Request Details</h3>
 
-                  <div className="space-y-2">
-                    <p><strong>Student Number:</strong> {selectedRequest.student_number}</p>
-                    <p><strong>Name:</strong> {selectedRequest.student_name}</p>
-                    <p><strong>Course:</strong> {selectedRequest.course || ""}</p>
-                    <p><strong>Status:</strong> {selectedRequest.status}</p>
+                <div className="space-y-2">
+                  <p>
+                    <strong>Student Number:</strong> {selectedRequest.student_number}
+                  </p>
 
+                  <p>
+                    <strong>Name:</strong> {selectedRequest.student_name}
+                  </p>
+
+                  <p>
+                    <strong>Course:</strong> {selectedRequest.course || ""}
+                  </p>
+
+                  <p>
+                    <strong>Status:</strong> {selectedRequest.status}
+                  </p>
+
+                  <p>
+                    <strong>Latest Violation:</strong>{" "}
+                    {selectedRequest.predicted_section || selectedRequest.predicted_violation || "—"}
+                  </p>
+                  <p>
+                    <strong>Sanction:</strong>{" "}
+                    <span className="text-red-600 font-semibold">
+                      {selectedRequest.sanction || "No sanction recorded"}
+                    </span>
+                  </p>
                     {selectedRequest.status === "Pending" && (
                    <div className="flex gap-2 mt-4">
                       {/* APPROVE */}
@@ -4102,11 +5641,11 @@ return (
               </div>
             )}
 
-            {/* ================== CVSU RULES (PDF ONLY) ================== */}
+            {/* ================== CVSU Handbook (PDF ONLY) ================== */}
             <div className="flex bg-white shadow-lg rounded mb-20 p-6 w-full lg:w-[550px] flex flex-col gap-4 h-full border border-gray-200">
 
               <h3 className="text-lg font-semibold text-center">
-                CVSU Rules and Regulations
+                CvSU Handbook
               </h3>
 
               {currentRules ? (
@@ -4123,7 +5662,7 @@ return (
                         className="truncate font-medium cursor-pointer hover:underline"
                         onClick={() => setPreviewFile(currentRules)}
                       >
-                        CVSU Rules and Regulations.pdf
+                        CvSU Handbook.pdf
                       </span>
 
                     </div>

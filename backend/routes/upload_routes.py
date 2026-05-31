@@ -24,11 +24,11 @@ def upload_file():
 
     try:
         result = cloudinary.uploader.upload(
-        file,
-        folder=f"{file_type}_files",
-        resource_type="image" if file.mimetype == "application/pdf" else "raw",
-        public_id=uuid.uuid4().hex
-    )
+            file,
+            folder=f"{file_type}_files",
+            resource_type="image" if file.mimetype == "application/pdf" else "raw",
+            public_id=uuid.uuid4().hex
+        )
         
 
         new_file = UploadedFile(
@@ -123,7 +123,107 @@ def list_good_moral_files():
             "message": str(e)
         }), 500
 
+# =========================
+# COUNSELING APPOINTMENT FILES ONLY
+# =========================
+@upload_bp.route("/counseling-appointment", methods=["GET"])
+def list_counseling_appointment_files():
 
+    try:
+        files = UploadedFile.query.filter_by(
+            file_type="counseling_appointment"
+        ).order_by(UploadedFile.id.desc()).all()
+
+        return jsonify({
+            "status": "success",
+            "count": len(files),
+            "files": [
+                {
+                    "id": f.id,
+                    "file_type": f.file_type, 
+                    "original": f.filename_original,
+                    "stored": f.filename_stored,
+                    "mimetype": f.mimetype,
+                    "size_bytes": f.size_bytes,
+                    "url": f.path
+                }
+                for f in files
+            ]
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+# =========================
+# PSYCHOLOGICAL REQUEST FILES ONLY
+# =========================
+@upload_bp.route("/psychological-request", methods=["GET"])
+def list_psychological_request_files():
+
+    try:
+        files = UploadedFile.query.filter_by(
+            file_type="psychological_request"
+        ).order_by(UploadedFile.id.desc()).all()
+
+        return jsonify({
+            "status": "success",
+            "count": len(files),
+            "files": [
+                {
+                    "id": f.id,
+                    "file_type": f.file_type,
+                    "original": f.filename_original,
+                    "stored": f.filename_stored,
+                    "mimetype": f.mimetype,
+                    "size_bytes": f.size_bytes,
+                    "url": f.path
+                }
+                for f in files
+            ]
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+# =========================
+# EXIT REQUEST FILES ONLY
+# =========================
+@upload_bp.route("/exit-request", methods=["GET"])
+def list_exit_request_files():
+
+    try:
+        files = UploadedFile.query.filter_by(
+            file_type="exit_request"
+        ).order_by(UploadedFile.id.desc()).all()
+
+        return jsonify({
+            "status": "success",
+            "count": len(files),
+            "files": [
+                {
+                    "id": f.id,
+                    "file_type": f.file_type,
+                    "original": f.filename_original,
+                    "stored": f.filename_stored,
+                    "mimetype": f.mimetype,
+                    "size_bytes": f.size_bytes,
+                    "url": f.path
+                }
+                for f in files
+            ]
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 # =========================
 # GET SINGLE FILE
