@@ -1,6 +1,13 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime, date
-from models import GoodMoralRequest, Violation, db
+from datetime import datetime, date, time
+from models import (
+    GoodMoralRequest,
+    Violation,
+    ExitRequest,
+    CounselingRequest,
+    PsychologicalRequest,
+    db
+)
 
 notification_bp = Blueprint(
     "notification_bp",
@@ -31,7 +38,20 @@ def safe_date(value):
 
 
 # =========================
-# MAIN MERGED NOTIFICATIONS (FIXED)
+# SAFE JSON SERIALIZER (FIX FOR TIME ERROR)
+# =========================
+def safe_json(value):
+    if value is None:
+        return None
+
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+
+    return value
+
+
+# =========================
+# MAIN MERGED NOTIFICATIONS
 # =========================
 @notification_bp.get("/student")
 def combined_notifications():
@@ -45,7 +65,7 @@ def combined_notifications():
     notifications = []
 
     # =====================================================
-    # GOOD MORAL NOTIFICATIONS (FIXED REVOCATION LOCK)
+    # GOOD MORAL NOTIFICATIONS
     # =====================================================
     good_morals = GoodMoralRequest.query.filter_by(
         student_number=student_number,
@@ -54,9 +74,6 @@ def combined_notifications():
 
     for r in good_morals:
 
-        # =========================
-        # LOCKED VIOLATION (IMPORTANT FIX)
-        # =========================
         if hasattr(r, "revoke_violation_id") and r.revoke_violation_id:
             latest_violation = Violation.query.get(r.revoke_violation_id)
         else:
@@ -77,50 +94,31 @@ def combined_notifications():
             violation_name = latest_violation.predicted_violation or "Violation"
             sanction_text = latest_violation.sanction or "No sanction recorded"
 
-        # =========================
-        # MESSAGE LOGIC (UNCHANGED BUT STABLE)
-        # =========================
         if r.status == "Pending":
             message = "Your Good Moral request is pending."
-
         elif r.status == "Approved":
             message = "Your Good Moral request has been approved."
         elif r.status == "Rejected":
-
             if r.remarks and "auto-revoked" in (r.remarks or "").lower():
                 message = "Auto-revoked due to violation sanction level."
-
             else:
-                parts = ["Your Good Moral request has been rejected"]
-
-                if violation_name:
-                    parts.append(f"Violation: {violation_name}")
-
-                if sanction_text:
-                    parts.append(f"Sanction: {sanction_text}")
-
-                message = ". ".join(parts) + "."
-
+                message = "Your Good Moral request has been rejected."
         else:
             message = "Status unknown."
-
-        if not r.is_notified:
-            r.is_notified = True
-            r.notification_sent_at = datetime.utcnow()
 
         notifications.append({
             "id": r.request_id,
             "type": "good_moral",
             "status": r.status,
             "message": message,
-            "created_at": r.requested_at,
+            "created_at": safe_json(r.requested_at),
             "is_read": bool(r.is_read),
             "is_deleted": bool(r.is_deleted)
         })
 
-    # =========================
-    # VIOLATION NOTIFICATIONS (UNCHANGED LOGIC)
-    # =========================
+    # =====================================================
+    # VIOLATION NOTIFICATIONS
+    # =====================================================
     violations = Violation.query.filter(
         Violation.student_id == str(student_id),
         Violation.is_deleted == False
@@ -143,40 +141,103 @@ def combined_notifications():
             changed = True
 
         if v.is_resolved == "Resolved":
-
-            remaining = Violation.query.filter(
-                Violation.student_id == str(student_id),
-                Violation.is_resolved != "Resolved",
-                Violation.is_deleted == False
-            ).count()
-
-            if remaining == 0:
-                status = "Cleared"
-                message = "All your violations have been cleared."
-            else:
-                status = "Resolved"
-                message = f"Your {v.predicted_violation} violation has been resolved."
-
+            status = "Resolved"
+            message = f"Your {v.predicted_violation} violation has been resolved."
         else:
             status = "Violation"
             message = f"You received a new {v.predicted_violation} violation."
-
             if v.sanction:
                 message += f" Sanction: {v.sanction}"
-
-        if not v.is_notified:
-            v.is_notified = True
-            v.notification_sent_at = datetime.utcnow()
-            changed = True
 
         notifications.append({
             "id": v.id,
             "type": "violation",
             "status": status,
             "message": message,
-            "created_at": v.notification_sent_at or v.violation_date,
+            "created_at": safe_json(v.notification_sent_at or v.violation_date),
             "is_read": bool(v.is_read),
             "is_deleted": bool(v.is_deleted)
+        })
+
+    # =====================================================
+    # EXIT REQUEST NOTIFICATIONS
+    # =====================================================
+    exits = ExitRequest.query.filter_by(
+        student_number=student_number,
+        is_deleted=False
+    ).order_by(ExitRequest.requested_at.desc()).all()
+
+    for r in exits:
+
+        msg = f"Exit request is {r.status.lower()}."
+
+        if r.status == "Approved" and r.admin_set_date:
+            msg += f" Scheduled: {r.admin_set_date} {r.admin_set_time or ''}"
+
+        notifications.append({
+            "id": r.request_id,
+            "type": "exit_request",
+            "status": r.status,
+            "message": msg,
+            "created_at": safe_json(r.requested_at),
+            "is_read": bool(r.is_read),
+            "is_deleted": bool(r.is_deleted),
+            "admin_set_date": safe_json(r.admin_set_date),
+            "admin_set_time": safe_json(r.admin_set_time)
+        })
+
+    # =====================================================
+    # COUNSELING REQUEST NOTIFICATIONS
+    # =====================================================
+    counselings = CounselingRequest.query.filter_by(
+        student_number=student_number,
+        is_deleted=False
+    ).order_by(CounselingRequest.requested_at.desc()).all()
+
+    for r in counselings:
+
+        msg = f"Counseling request is {r.status.lower()}."
+
+        if r.status == "Approved" and r.admin_set_date:
+            msg += f" Scheduled: {r.admin_set_date} {r.admin_set_time or ''}"
+
+        notifications.append({
+            "id": r.request_id,
+            "type": "counseling_request",
+            "status": r.status,
+            "message": msg,
+            "created_at": safe_json(r.requested_at),
+            "is_read": bool(r.is_read),
+            "is_deleted": bool(r.is_deleted),
+            "admin_set_date": safe_json(r.admin_set_date),
+            "admin_set_time": safe_json(r.admin_set_time)
+        })
+
+    # =====================================================
+    # PSYCHOLOGICAL REQUEST NOTIFICATIONS
+    # =====================================================
+    psychs = PsychologicalRequest.query.filter_by(
+        student_number=student_number,
+        is_deleted=False
+    ).order_by(PsychologicalRequest.requested_at.desc()).all()
+
+    for r in psychs:
+
+        msg = f"Psychological request is {r.status.lower()}."
+
+        if r.status == "Approved" and r.admin_set_date:
+            msg += f" Scheduled: {r.admin_set_date} {r.admin_set_time or ''}"
+
+        notifications.append({
+            "id": r.request_id,
+            "type": "psychological_request",
+            "status": r.status,
+            "message": msg,
+            "created_at": safe_json(r.requested_at),
+            "is_read": bool(r.is_read),
+            "is_deleted": bool(r.is_deleted),
+            "admin_set_date": safe_json(r.admin_set_date),
+            "admin_set_time": safe_json(r.admin_set_time)
         })
 
     # =========================
@@ -220,40 +281,24 @@ def unread_count():
         Violation.is_deleted == False
     ).count()
 
+    exitc = ExitRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
+    ).count()
+
+    counsel = CounselingRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
+    ).count()
+
+    psych = PsychologicalRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
+    ).count()
+
     return jsonify({
-        "unread_count": good + viol
+        "unread_count": good + viol + exitc + counsel + psych
     })
-
-
-# =========================
-# MARK AS READ
-# =========================
-@notification_bp.patch("/student/close/<string:ntype>/<int:notification_id>")
-def mark_as_read(ntype, notification_id):
-
-    obj = GoodMoralRequest.query.get(notification_id) if ntype == "good_moral" else Violation.query.get(notification_id)
-
-    if not obj:
-        return jsonify({"message": "not found"}), 404
-
-    obj.is_read = True
-    db.session.commit()
-
-    return jsonify({"message": "marked as read"})
-
-
-# =========================
-# DELETE (SOFT)
-# =========================
-@notification_bp.delete("/student/delete/<string:ntype>/<int:notification_id>")
-def delete_notification(ntype, notification_id):
-
-    obj = GoodMoralRequest.query.get(notification_id) if ntype == "good_moral" else Violation.query.get(notification_id)
-
-    if not obj:
-        return jsonify({"message": "not found"}), 404
-
-    obj.is_deleted = True
-    db.session.commit()
-
-    return jsonify({"message": "deleted"})

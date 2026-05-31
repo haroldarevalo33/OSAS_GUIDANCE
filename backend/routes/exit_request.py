@@ -711,3 +711,18 @@ def admin_request_detail(request_id):
             if req.locked_violation_date else None
         )
     })
+# =========================
+# ADMIN BADGE COUNT (PENDING EXIT REQUESTS)
+# =========================
+@exit_request_bp.get("/admin/notifications/unread-count")
+def admin_unread_count():
+
+    # Count all pending exit requests for admin badge
+    count = ExitRequest.query.filter_by(
+        status="Pending",
+        is_deleted=False
+    ).count()
+
+    return jsonify({
+        "pending": count
+    })

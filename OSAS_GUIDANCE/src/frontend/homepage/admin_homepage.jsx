@@ -28,6 +28,8 @@ export default function AdminHome() {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [adminSetDate, setAdminSetDate] = useState("");
   const [adminSetTime, setAdminSetTime] = useState("");
+  const [badgeCount, setBadgeCount] = useState(0);
+  const [psyBadgeCount, setPsyBadgeCount] = useState(0);
 
   //Psychological Request
   // ====== PSYCHOLOGICAL STATES ======
@@ -59,6 +61,8 @@ const [selectedExitRequest, setSelectedExitRequest] = useState(null);
 // ADMIN SCHEDULE
 const [adminExitDate, setAdminExitDate] = useState("");
 const [adminExitTime, setAdminExitTime] = useState("");
+
+const [exitBadgeCount, setExitBadgeCount] = useState(0);
 
 
   const [predictedViolation, setPredictedViolation] = useState("");
@@ -2090,6 +2094,33 @@ const processRequest = async (request_id, status) => {
 };
 
 // =========================
+// ADMIN BADGE (PENDING COUNTS AUTO REFRESH)
+// =========================
+const fetchAdminBadge = async () => {
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/counseling/admin/notifications/unread-count`
+    );
+    const data = await res.json();
+
+    setBadgeCount(data.pending || 0);
+
+  } catch (err) {
+    console.log("Badge fetch error:", err);
+    setBadgeCount(0);
+  }
+};
+useEffect(() => {
+  fetchAdminBadge();
+
+  const interval = setInterval(() => {
+    fetchAdminBadge();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+
+// =========================
 // 1. UPLOAD PSYCHOLOGICAL FILE HANDLER
 // =========================
 const psyHandleFileUpload = async (e) => {
@@ -2264,6 +2295,34 @@ const psyProcessRequest = async (request_id, status) => {
     setPsyLoadingRequests(false);
   }
 };
+// =========================
+// badge
+// =========================
+const fetchPsyBadge = async () => {
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/psychological/admin/notifications/unread-count`
+    );
+    const data = await res.json();
+
+    setPsyBadgeCount(data.pending || 0);
+
+  } catch (err) {
+    console.log("Psychological badge error:", err);
+    setPsyBadgeCount(0);
+  }
+};
+useEffect(() => {
+
+  fetchPsyBadge();
+
+  const interval = setInterval(() => {
+    fetchPsyBadge();
+  }, 5000);
+
+  return () => clearInterval(interval);
+
+}, []);
 
 // =========================
 // Upload EXIT PDF (AUTO REFRESH)
@@ -2414,6 +2473,34 @@ const processExitRequest = async (request_id, status) => {
     setLoadingRequests(false);
   }
 };
+// =========================
+// badge
+// =========================
+useEffect(() => {
+  let interval;
+
+  const fetchExitBadge = async () => {
+    try {
+      const res = await axios.get(
+        `${API}/exit_request/admin/notifications/unread-count`
+      );
+
+      setExitBadgeCount(res.data?.pending || 0);
+
+    } catch (err) {
+      console.log("Exit badge error:", err);
+      setExitBadgeCount(0);
+    }
+  };
+
+  fetchExitBadge();
+
+  interval = setInterval(() => {
+    fetchExitBadge();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, []);
 // ------------------ Render ------------------
 return (
   <div className="w-screen h-screen flex bg-gray-100 overflow-hidden">
@@ -2482,15 +2569,33 @@ return (
 
               {/* ===== BADGE FOR UPLOAD FILE ===== */}
               {item.id === "uploadFileFormat" && pendingRequests.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                <span className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
                   {pendingRequests.length}
                 </span>
               )}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+                {/* ===== COUNSELING BADGE (NEW) ===== */}
+                  {item.id === "counseling" && badgeCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                      {badgeCount}
+                    </span>
+                  )}
+                     {/* ===== PSYCHOLOGICAL EXAM BADGE (NEW) ===== */}
+                    {item.id === "psychologicalRequest" && psyBadgeCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                        {psyBadgeCount}
+                      </span>
+                    )}
+                    {/* ===== EXIT REQUEST BADGE (NEW) ===== */}
+                      {item.id === "exitInterviewRequest" && exitBadgeCount > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                          {exitBadgeCount}
+                        </span>
+                      )}
+                  </button>                  
+                  );
+                })}
+              </div>
+            </nav>
 
     {/* LOGOUT */}
     <div className="px-4 mt-auto pb-4">
@@ -3399,13 +3504,19 @@ return (
                   </p>
 
                 </div>
+                  <button
+                    onClick={() => setShowRequestList(true)}
+                    className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
+                  >
+                    View Request List
 
-                <button
-                  onClick={() => setShowRequestList(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
-                >
-                  View Request List
-                </button>
+                    {/* BADGE */}
+                    {badgeCount > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full min-w-[20px] text-center">
+                        {badgeCount}
+                      </span>
+                    )}
+                  </button>
 
               </div>
                 {/* ================= PDF VIEWER (COUNSELING) ================= */}
@@ -3726,12 +3837,16 @@ return (
                   </p>
 
                 </div>
-
                 <button
                   onClick={() => setShowExitRequestList(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
+                  className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
                 >
                   View Request List
+                  {exitBadgeCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                      {exitBadgeCount}
+                    </span>
+                  )}
                 </button>
 
               </div>
@@ -4031,13 +4146,19 @@ return (
                         </p>
                       </div>
 
-                      <button
-                        onClick={() => setPsyShowRequestList(true)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
-                      >
-                        View Request List
-                      </button>
+                     <button
+                      onClick={() => setPsyShowRequestList(true)}
+                      className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base w-full sm:w-auto"
+                    >
+                      View Request List
 
+                      {/* ===== PSYCHOLOGICAL BADGE ===== */}
+                      {psyBadgeCount > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                          {psyBadgeCount}
+                        </span>
+                      )}
+                    </button>
                     </div>
 
                     {/* ================= PDF VIEWER ================= */}

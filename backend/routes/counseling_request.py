@@ -505,6 +505,20 @@ def unread_count():
     return jsonify({"unread": count})
 
 # =========================
+# ADMIN unread notification count (FOR BADGE)
+# =========================
+@counseling_bp.get("/admin/notifications/unread-count")
+def admin_unread_count():
+
+    count = CounselingRequest.query.filter_by(
+        status="Pending",
+        is_deleted=False
+    ).count()
+
+    return jsonify({
+        "pending": count
+    }),200
+# =========================
 # MARK AS READ
 # =========================
 @counseling_bp.patch("/notifications/read/<int:request_id>")

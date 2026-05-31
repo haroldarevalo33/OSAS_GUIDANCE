@@ -578,3 +578,19 @@ def admin_request_detail(request_id):
         "filename_original": req.filename_original,
         "concern_purpose": req.concern_purpose
     })
+
+# =========================
+# ADMIN BADGE COUNT (PENDING PSYCHOLOGICAL REQUESTS)
+# =========================
+@psychological_bp.get("/admin/notifications/unread-count")
+def admin_unread_count():
+
+    # Count all pending psychological requests for admin badge
+    count = PsychologicalRequest.query.filter_by(
+        status="Pending",
+        is_deleted=False
+    ).count()
+
+    return jsonify({
+        "pending": count
+    })

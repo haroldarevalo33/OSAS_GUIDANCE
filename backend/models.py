@@ -292,7 +292,7 @@ class CounselingRequest(db.Model):
     locked_violation_date = db.Column(
         db.Date
     )
-
+    
     requested_at = db.Column(
         db.DateTime,
         default=datetime.utcnow

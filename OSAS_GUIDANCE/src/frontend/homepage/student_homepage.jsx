@@ -1154,7 +1154,7 @@ useEffect(() => {
 }, [checkedNotifications, notifications]);
 
 // =========================
-// BULK DELETE (GOOD MORAL + VIOLATION SAFE)
+// BULK DELETE (ALL MODULES SAFE + ALIGNED)
 // =========================
 const handleDeleteSelected = async () => {
   if (checkedNotifications.length === 0) return;
@@ -1175,15 +1175,53 @@ const handleDeleteSelected = async () => {
   try {
     await Promise.all(
       checkedNotifications.map(async (note) => {
-        const endpoint =
-          note.type === "violation"
-            ? `${API_BASE}/violations/student/notifications/${note.request_id}`
-            : `${API_BASE}/good-moral/student/notifications/${note.request_id}`;
+        const id = note?.id || note?.request_id;
+        const type = note?.type;
 
-        await fetch(endpoint, { method: "DELETE" });
+        if (!id || !type) return;
+
+        let endpoint = "";
+
+        switch (type) {
+          case "violation":
+            endpoint = `${API_BASE}/violations/student/notifications/${id}`;
+            break;
+
+          case "good_moral":
+            endpoint = `${API_BASE}/good-moral/student/notifications/${id}`;
+            break;
+
+          case "counseling_request":
+            endpoint = `${API_BASE}/counseling/notifications/${id}`;
+            break;
+
+          case "psychological_request":
+            endpoint = `${API_BASE}/psychological/notifications/${id}`;
+            break;
+
+          case "exit_request":
+            endpoint = `${API_BASE}/exit_request/notifications/${id}`;
+            break;
+
+          default:
+            console.warn("Unknown type:", type);
+            return;
+        }
+
+        const res = await fetch(endpoint, {
+          method: "DELETE",
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || "Delete failed");
+        }
       })
     );
 
+    // =========================
+    // UI UPDATE
+    // =========================
     const deletedKeys = new Set(checkedNotifications.map(getKey));
 
     updateNotifications((prev) =>
@@ -1208,7 +1246,7 @@ const handleDeleteSelected = async () => {
 
     Swal.fire({
       title: "Error!",
-      text: "Failed to delete selected notifications.",
+      text: err.message || "Failed to delete selected notifications.",
       icon: "error",
       timer: 2000,
       showConfirmButton: false,
@@ -1217,43 +1255,80 @@ const handleDeleteSelected = async () => {
     });
   }
 };
-
 // =========================
-// MARK AS READ (FIXED MULTI API)
+// MARK AS READ (ALL MODULES SAFE)
 // =========================
 const markAsRead = async (note) => {
-  const endpoint =
-    note.type === "violation"
-      ? `${API_BASE}/violations/student/notifications/close/${note.request_id}`
-      : `${API_BASE}/good-moral/student/notifications/close/${note.request_id}`;
-
-  updateNotifications((prev) =>
-    prev.map((n) =>
-      getKey(n) === getKey(note)
-        ? { ...n, is_read: true }
-        : n
-    )
-  );
-
   try {
+    if (!note) return;
+
+    const id = note?.id || note?.request_id;
+    const type = note?.type;
+
+    if (!id || !type) return;
+
+    let endpoint = "";
+
+    switch (type) {
+      case "violation":
+        endpoint = `${API_BASE}/violations/student/notifications/close/${id}`;
+        break;
+
+      case "good_moral":
+        endpoint = `${API_BASE}/good-moral/student/notifications/close/${id}`;
+        break;
+
+      case "counseling_request":
+        endpoint = `${API_BASE}/counseling/notifications/read/${id}`;
+        break;
+
+      case "psychological_request":
+        endpoint = `${API_BASE}/psychological/notifications/read/${id}`;
+        break;
+
+      case "exit_request":
+        endpoint = `${API_BASE}/exit_request/notifications/read/${id}`;
+        break;
+
+      default:
+        console.warn("Unknown type:", type);
+        return;
+    }
+
+    // =========================
+    // OPTIMISTIC UI UPDATE
+    // =========================
+    updateNotifications((prev) =>
+      prev.map((n) =>
+        getKey(n) === getKey(note)
+          ? { ...n, is_read: true }
+          : n
+      )
+    );
+
     await fetch(endpoint, { method: "PATCH" });
+
     fetchUnreadCount();
+
   } catch (err) {
     console.error("Failed mark as read:", err);
   }
 };
-
 // =========================
 // OPEN NOTIFICATION
 // =========================
 const openNotification = async (note) => {
+
+  if (!note) return;
+
+  // open modal/details
   setSelectedNotification(note);
 
+  // auto mark as read
   if (!note.is_read) {
     await markAsRead(note);
   }
 };
-
 // =========================
 // CLOSE NOTIFICATION
 // =========================
@@ -1264,25 +1339,48 @@ const closeNotification = (note) => {
     markAsRead(note);
   }
 };
-/// =========================
-// DELETE SINGLE (CLEAN + SAFE + FIXED)
+// =========================
+// DELETE SINGLE NOTIFICATION
 // =========================
 const deleteNotification = async (note) => {
   try {
     if (!note) return;
 
-    const id = typeof note === "object" ? (note.id || note.request_id) : note;
-    const type = typeof note === "object" ? note.type : null;
+    const id = note?.id || note?.request_id;
+    const type = note?.type;
 
-    if (!id) {
-      console.error("Missing ID:", note);
+    if (!id || !type) {
+      console.error("Missing data:", note);
       return;
     }
 
-    const endpoint =
-      type === "violation"
-        ? `${API_BASE}/violations/student/notifications/${id}`
-        : `${API_BASE}/good-moral/student/notifications/${id}`;
+    let endpoint = "";
+
+    switch (type) {
+      case "violation":
+        endpoint = `${API_BASE}/violations/student/notifications/${id}`;
+        break;
+
+      case "good_moral":
+        endpoint = `${API_BASE}/good-moral/student/notifications/${id}`;
+        break;
+
+      case "counseling_request":
+        endpoint = `${API_BASE}/counseling/notifications/${id}`;
+        break;
+
+      case "psychological_request":
+        endpoint = `${API_BASE}/psychological/notifications/${id}`;
+        break;
+
+      case "exit_request":
+        endpoint = `${API_BASE}/exit_request/notifications/${id}`;
+        break;
+
+      default:
+        console.warn("Unknown type:", type);
+        return;
+    }
 
     const res = await fetch(endpoint, {
       method: "DELETE",
@@ -1294,7 +1392,7 @@ const deleteNotification = async (note) => {
     }
 
     // =========================
-    // REMOVE FROM UI (SAFE)
+    // UPDATE UI SAFELY
     // =========================
     updateNotifications((prev) =>
       prev.filter((n) => (n.id || n.request_id) !== id)
@@ -1317,7 +1415,7 @@ const deleteNotification = async (note) => {
 
     Swal.fire({
       title: "Error!",
-      text: "Failed to delete notification.",
+      text: err.message || "Failed to delete notification.",
       icon: "error",
       timer: 2000,
       showConfirmButton: false,
@@ -1326,7 +1424,6 @@ const deleteNotification = async (note) => {
     });
   }
 };
-
 // =========================
 // Polling
 // =========================
