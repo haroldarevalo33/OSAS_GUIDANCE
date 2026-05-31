@@ -111,7 +111,7 @@ export default function LandingPage() {
               Data Privacy Notice
             </h2>
 
-            <p className="text-black leading-relaxed text-sm md:text-lg text-center">
+            <p className="text-black leading-relaxed text-sm md:text-lg text-align">
 
               Cavite State University - Naic (CvSU) is required by law to
               process your personal information and sensitive personal

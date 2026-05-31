@@ -89,7 +89,7 @@ VIOLATION_RULES = {
         "plagiarism","copy paste","copyright","stolen work",
 
         "fabrication","fake data","invented data","manipulated results",
-        "falsification","forge","forgery","fake signature","altered document",
+        "falsification","forgery","fake signature","altered document",
 
         "theft","stealing","nakaw","stolen","robbery",
 
@@ -105,7 +105,7 @@ VIOLATION_RULES = {
 
         "bribery","bribe","money offer","gift to authority",
 
-        "fictitious name","fake identity","fake name",
+        "fictitious name","fake name",
 
         "curfew violation","curfew","past curfew",
 

@@ -44,6 +44,21 @@ def exit_request():
         file.save(upload_path)
         filename_original = file.filename
 
+    # =========================
+    # 🔥 GET CURRENT ACTIVE VIOLATION (SNAPSHOT)
+    # =========================
+    violation = Violation.query.filter(
+        Violation.student_id == str(student.student_number),
+        Violation.is_deleted == False,
+        Violation.is_resolved != "Resolved"
+    ).order_by(
+        Violation.violation_date.desc(),
+        Violation.id.desc()
+    ).first()
+
+    # =========================
+    # CREATE EXIT REQUEST
+    # =========================
     req = ExitRequest(
         student_number=student_number,
         filename_stored=filename_stored,
@@ -53,7 +68,15 @@ def exit_request():
         status="Pending",
         is_notified=False,
         is_read=False,
-        is_deleted=False
+        is_deleted=False,
+
+        # =========================
+        # LOCKED VIOLATION SNAPSHOT
+        # =========================
+        locked_violation=violation.predicted_violation if violation else None,
+        locked_section=violation.predicted_section if violation else None,
+        locked_sanction=violation.sanction if violation else None,
+        locked_violation_date=violation.violation_date if violation else None
     )
 
     db.session.add(req)
@@ -90,6 +113,9 @@ def get_request(request_id):
         "student_number": req.student_number,
         "status": req.status,
 
+        # =========================
+        # SCHEDULE
+        # =========================
         "preferred_date": (
             req.preferred_date.isoformat()
             if req.preferred_date else None
@@ -110,16 +136,19 @@ def get_request(request_id):
             if req.admin_set_time else None
         ),
 
+        # =========================
+        # FILE
+        # =========================
         "filename_original": req.filename_original,
 
-        # =========================
-        # CLOUDINARY FILE URL (ADDED)
-        # =========================
         "file_url": (
             file_record.path
             if file_record else None
         ),
 
+        # =========================
+        # TIMESTAMPS
+        # =========================
         "requested_at": (
             req.requested_at.isoformat()
             if req.requested_at else None
@@ -130,19 +159,28 @@ def get_request(request_id):
             if req.processed_at else None
         ),
 
-        "is_read": req.is_read
+        "is_read": req.is_read,
+
+        # =========================
+        # LOCKED VIOLATION SNAPSHOT (ADDED)
+        # =========================
+        "locked_violation": req.locked_violation,
+        "locked_section": req.locked_section,
+        "locked_sanction": req.locked_sanction,
+
+        "locked_violation_date": (
+            req.locked_violation_date.isoformat()
+            if req.locked_violation_date else None
+        )
     })
 
-
 # =========================
-# STUDENT HISTORY + LATEST VIOLATION
+# STUDENT HISTORY (LOCKED VIOLATION VERSION)
 # =========================
 @exit_request_bp.get("/history")
 def history():
 
-    student_number = request.args.get(
-        "student_number"
-    )
+    student_number = request.args.get("student_number")
 
     if not student_number:
         return jsonify({
@@ -151,10 +189,16 @@ def history():
 
     try:
 
+        # =========================
+        # GET STUDENT
+        # =========================
         student = Student.query.filter_by(
             student_number=student_number
         ).first()
 
+        # =========================
+        # GET REQUESTS
+        # =========================
         requests = ExitRequest.query.filter_by(
             student_number=student_number,
             is_deleted=False
@@ -162,34 +206,12 @@ def history():
             ExitRequest.requested_at.desc()
         ).all()
 
-        latest_violation = None
-
-        if student:
-
-            latest_violation = Violation.query.filter(
-
-                Violation.student_id ==
-                str(student.student_number),
-
-                Violation.is_resolved !=
-                "Resolved",
-
-                Violation.is_deleted ==
-                False
-
-            ).order_by(
-
-                Violation.violation_date.desc(),
-                Violation.id.desc()
-
-            ).first()
-
         result = []
 
         for r in requests:
 
             # =========================
-            # GET ADMIN APPROVED FILE
+            # GET FILE (LATEST UPLOADED)
             # =========================
             file_record = UploadedFile.query.filter_by(
                 file_type="exit_request"
@@ -199,82 +221,78 @@ def history():
 
             result.append({
 
-                "request_id":
-                    r.request_id,
+                # =========================
+                # REQUEST INFO
+                # =========================
+                "request_id": r.request_id,
+                "status": r.status,
 
-                "status":
-                    r.status,
-
-                "preferred_date":
+                # =========================
+                # SCHEDULE
+                # =========================
+                "preferred_date": (
                     r.preferred_date.isoformat()
-                    if r.preferred_date
-                    else None,
+                    if r.preferred_date else None
+                ),
 
-                "preferred_time":
+                "preferred_time": (
                     str(r.preferred_time)
-                    if r.preferred_time
-                    else None,
+                    if r.preferred_time else None
+                ),
 
-                "admin_set_date":
+                "admin_set_date": (
                     r.admin_set_date.isoformat()
-                    if r.admin_set_date
-                    else None,
+                    if r.admin_set_date else None
+                ),
 
-                "admin_set_time":
+                "admin_set_time": (
                     str(r.admin_set_time)
-                    if r.admin_set_time
-                    else None,
+                    if r.admin_set_time else None
+                ),
 
-                # STUDENT FILE
-                "filename_stored":
-                    r.filename_stored,
+                # =========================
+                # FILE INFO
+                # =========================
+                "filename_stored": r.filename_stored,
+                "filename_original": r.filename_original,
 
-                "filename_original":
-                    r.filename_original,
-
-                # ADMIN APPROVED FILE
-                "file_url":
+                "file_url": (
                     file_record.path
-                    if file_record
-                    else None,
+                    if file_record else None
+                ),
 
-                "requested_at":
+                # =========================
+                # TIMESTAMPS
+                # =========================
+                "requested_at": (
                     r.requested_at.isoformat()
-                    if r.requested_at
-                    else None,
+                    if r.requested_at else None
+                ),
 
-                "processed_at":
+                "processed_at": (
                     r.processed_at.isoformat()
-                    if r.processed_at
-                    else None,
+                    if r.processed_at else None
+                ),
 
-                "predicted_violation":
-                    latest_violation.predicted_violation
-                    if latest_violation
-                    else "—",
+                # =========================
+                # LOCKED VIOLATION (FINAL SYSTEM)
+                # =========================
+                "predicted_violation": (
+                    r.locked_violation if r.locked_violation else "—"
+                ),
 
-                "predicted_section":
-                    latest_violation.predicted_section
-                    if latest_violation
-                    else "—",
+                "predicted_section": (
+                    r.locked_section if r.locked_section else "—"
+                ),
 
-                "sanction":
-                    latest_violation.sanction
-                    if latest_violation
-                    else "—",
+                "sanction": (
+                    r.locked_sanction if r.locked_sanction else "—"
+                ),
 
-                "violation_date":
-                    (
-                        latest_violation
-                        .violation_date
-                        .strftime("%Y-%m-%d")
-                    )
-                    if (
-                        latest_violation
-                        and
-                        latest_violation.violation_date
-                    )
-                    else "—"
+                "violation_date": (
+                    r.locked_violation_date.strftime("%Y-%m-%d")
+                    if r.locked_violation_date else "—"
+                )
 
             })
 
@@ -282,19 +300,14 @@ def history():
 
     except Exception as e:
 
-        print(
-            "EXIT REQUEST HISTORY ERROR:",
-            str(e)
-        )
+        print("EXIT REQUEST HISTORY ERROR:", str(e))
 
         return jsonify({
             "message": "Server error",
             "error": str(e)
         }), 500
-
-
 # =========================
-# ADMIN LIST REQUESTS
+# ADMIN LIST REQUESTS (LOCKED VERSION)
 # =========================
 @exit_request_bp.get("/admin/requests")
 def admin_requests():
@@ -320,12 +333,11 @@ def admin_requests():
         ).first()
 
         # =========================
-        # LATEST ACTIVE VIOLATION (FIXED)
+        # LATEST ACTIVE VIOLATION (fallback only)
         # =========================
         violation = None
 
         if student:
-
             violation = Violation.query.filter(
                 Violation.student_id == str(student.student_number),
                 Violation.is_deleted == False,
@@ -339,13 +351,18 @@ def admin_requests():
         # RESPONSE
         # =========================
         result.append({
-            # REQUEST
+
+            # =========================
+            # REQUEST INFO
+            # =========================
             "request_id": r.request_id,
             "student_number": r.student_number,
             "student_name": student.student_name if student else "",
             "course": student.course if student else "",
 
+            # =========================
             # SCHEDULE
+            # =========================
             "preferred_date": (
                 r.preferred_date.isoformat()
                 if r.preferred_date else None
@@ -364,7 +381,9 @@ def admin_requests():
                 if r.admin_set_time else None
             ),
 
+            # =========================
             # STATUS
+            # =========================
             "status": r.status,
             "requested_at": (
                 r.requested_at.isoformat()
@@ -374,32 +393,35 @@ def admin_requests():
                 r.processed_at.isoformat()
                 if r.processed_at else None
             ),
+
             "filename_original": r.filename_original,
 
             # =========================
-            # VIOLATION (FIXED LOGIC)
+            #  LOCKED VIOLATION (PRIMARY SOURCE)
             # =========================
-            "latest_violation": (
-                violation.predicted_violation
-                if violation else None
+            "latest_violation": r.locked_violation or (
+                violation.predicted_violation if violation else None
             ),
 
-            "sanction": (
-                violation.sanction
-                if violation else None
+            "sanction": r.locked_sanction or (
+                violation.sanction if violation else None
             ),
 
             "violation_date": (
-                violation.violation_date.isoformat()
-                if violation and violation.violation_date else None
+                r.locked_violation_date.isoformat()
+                if r.locked_violation_date
+                else (
+                    violation.violation_date.isoformat()
+                    if violation and violation.violation_date
+                    else None
+                )
             )
         })
 
     return jsonify(result)
 
-
 # =========================
-# ADMIN PROCESS
+# ADMIN PROCESS (EXIT REQUEST)
 # =========================
 @exit_request_bp.patch("/process/<int:request_id>")
 def process_request(request_id):
@@ -421,31 +443,67 @@ def process_request(request_id):
     if req.status != "Pending":
         return jsonify({"message": "Request already processed"}), 400
 
+    # =========================
+    # BASIC UPDATE
+    # =========================
     req.status = status
     req.processed_by = admin_id
     req.processed_at = db.func.now()
 
-    # reset notification flag so student gets update
     req.is_notified = False
     req.is_read = False
 
+    # =========================
+    # APPROVED FLOW
+    # =========================
     if status == "Approved":
-        if not data.get("admin_set_date") or not data.get("admin_set_time"):
+
+        admin_date = data.get("admin_set_date")
+        admin_time = data.get("admin_set_time")
+
+        if not admin_date or not admin_time:
             return jsonify({"message": "Missing schedule for approval"}), 400
 
-        req.admin_set_date = data.get("admin_set_date")
-        req.admin_set_time = data.get("admin_set_time")
+        req.admin_set_date = admin_date
+        req.admin_set_time = admin_time
 
+    # =========================
+    # REJECTED FLOW
+    # =========================
     else:
         req.admin_set_date = None
         req.admin_set_time = None
 
+    # =========================
+    #  LOCKED VIOLATION SYNC (RECOMMENDED)
+    # =========================
+
+    student_id = str(req.student_number)
+
+    violation = Violation.query.filter(
+        Violation.student_id == student_id,
+        Violation.is_deleted == False,
+        Violation.is_resolved != "Resolved"
+    ).order_by(
+        Violation.violation_date.desc(),
+        Violation.id.desc()
+    ).first()
+
+    if violation:
+
+        req.locked_violation = violation.predicted_violation
+        req.locked_section = violation.predicted_section
+        req.locked_sanction = violation.sanction
+        req.locked_violation_date = violation.violation_date
+
+    # =========================
+    # SAVE
+    # =========================
     db.session.commit()
 
     return jsonify({
         "message": f"Request {status} successfully"
     })
-
 
 # =========================
 # NOTIFICATIONS
@@ -582,7 +640,7 @@ def cancel_request(request_id):
 
 
 # =========================
-# full details view 
+# FULL DETAILS VIEW (ADMIN)
 # =========================
 @exit_request_bp.get("/admin/request/<int:request_id>")
 def admin_request_detail(request_id):
@@ -597,15 +655,59 @@ def admin_request_detail(request_id):
     ).first()
 
     return jsonify({
+
+        # =========================
+        # REQUEST INFO
+        # =========================
         "request_id": req.request_id,
         "student_name": student.student_name if student else "",
         "course": student.course if student else "",
-        "preferred_date": req.preferred_date.isoformat() if req.preferred_date else None,
-        "preferred_time": str(req.preferred_time) if req.preferred_time else None,
-        "admin_set_date": req.admin_set_date.isoformat() if req.admin_set_date else None,
-        "admin_set_time": str(req.admin_set_time) if req.admin_set_time else None,
+
+        # =========================
+        # SCHEDULE
+        # =========================
+        "preferred_date": (
+            req.preferred_date.isoformat()
+            if req.preferred_date else None
+        ),
+        "preferred_time": (
+            str(req.preferred_time)
+            if req.preferred_time else None
+        ),
+
+        "admin_set_date": (
+            req.admin_set_date.isoformat()
+            if req.admin_set_date else None
+        ),
+        "admin_set_time": (
+            str(req.admin_set_time)
+            if req.admin_set_time else None
+        ),
+
+        # =========================
+        # STATUS
+        # =========================
         "status": req.status,
-        "requested_at": req.requested_at.isoformat() if req.requested_at else None,
-        "processed_at": req.processed_at.isoformat() if req.processed_at else None,
-        "filename_original": req.filename_original
+        "requested_at": (
+            req.requested_at.isoformat()
+            if req.requested_at else None
+        ),
+        "processed_at": (
+            req.processed_at.isoformat()
+            if req.processed_at else None
+        ),
+
+        "filename_original": req.filename_original,
+
+        # =========================
+        #  LOCKED VIOLATION (IMPORTANT)
+        # =========================
+        "locked_violation": req.locked_violation,
+        "locked_section": req.locked_section,
+        "locked_sanction": req.locked_sanction,
+
+        "locked_violation_date": (
+            req.locked_violation_date.isoformat()
+            if req.locked_violation_date else None
+        )
     })

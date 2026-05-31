@@ -231,7 +231,10 @@ class CounselingRequest(db.Model):
 
     student_number = db.Column(
         db.Integer,
-        db.ForeignKey("students.student_number", ondelete="CASCADE"),
+        db.ForeignKey(
+            "students.student_number",
+            ondelete="CASCADE"
+        ),
         nullable=False
     )
 
@@ -242,7 +245,12 @@ class CounselingRequest(db.Model):
     # STATUS FLOW
     # =========================
     status = db.Column(
-        db.Enum("Pending", "Approved", "Rejected", name="counseling_status_enum"),
+        db.Enum(
+            "Pending",
+            "Approved",
+            "Rejected",
+            name="counseling_status_enum"
+        ),
         default="Pending",
         nullable=False
     )
@@ -250,33 +258,75 @@ class CounselingRequest(db.Model):
     # =========================
     # STUDENT PREFERRED SCHEDULE
     # =========================
-    preferred_date = db.Column(db.Date, nullable=False)
-    preferred_time = db.Column(db.Time, nullable=False)
+    preferred_date = db.Column(
+        db.Date,
+        nullable=False
+    )
+
+    preferred_time = db.Column(
+        db.Time,
+        nullable=False
+    )
 
     # =========================
-    # ADMIN FINAL SCHEDULE (OVERRIDE ON APPROVAL)
+    # ADMIN FINAL SCHEDULE
     # =========================
     admin_set_date = db.Column(db.Date)
     admin_set_time = db.Column(db.Time)
+
+    # =========================
+    # LOCKED VIOLATION SNAPSHOT
+    # =========================
+    locked_violation = db.Column(
+        db.Text
+    )
+
+    locked_section = db.Column(
+        db.Text
+    )
+
+    locked_sanction = db.Column(
+        db.Text
+    )
+
+    locked_violation_date = db.Column(
+        db.Date
+    )
 
     requested_at = db.Column(
         db.DateTime,
         default=datetime.utcnow
     )
 
-    processed_at = db.Column(db.DateTime)
+    processed_at = db.Column(
+        db.DateTime
+    )
 
     processed_by = db.Column(
         db.Integer,
-        db.ForeignKey("admin_tbl.admin_id", ondelete="SET NULL")
+        db.ForeignKey(
+            "admin_tbl.admin_id",
+            ondelete="SET NULL"
+        )
     )
 
     # =========================
     # FLAGS
     # =========================
-    is_notified = db.Column(db.Boolean, default=False)
-    is_read = db.Column(db.Boolean, default=False)
-    is_deleted = db.Column(db.Boolean, default=False)
+    is_notified = db.Column(
+        db.Boolean,
+        default=False
+    )
+
+    is_read = db.Column(
+        db.Boolean,
+        default=False
+    )
+
+    is_deleted = db.Column(
+        db.Boolean,
+        default=False
+    )
 
     # =========================
     # RELATIONSHIPS
@@ -290,8 +340,7 @@ class CounselingRequest(db.Model):
         "Admin",
         back_populates="counseling_processed"
     )
-
-   # -----------------------------
+# -----------------------------
 # Exit Request
 # -----------------------------
 class ExitRequest(db.Model):
@@ -347,6 +396,14 @@ class ExitRequest(db.Model):
     is_notified = db.Column(db.Boolean, default=False)
     is_read = db.Column(db.Boolean, default=False)
     is_deleted = db.Column(db.Boolean, default=False)
+
+    # =========================
+    #  LOCKED VIOLATION 
+    # =========================
+    locked_violation = db.Column(db.Text, nullable=True)
+    locked_section = db.Column(db.Text, nullable=True)
+    locked_sanction = db.Column(db.Text, nullable=True)
+    locked_violation_date = db.Column(db.DateTime, nullable=True)
 
     # =========================
     # RELATIONSHIPS

@@ -1031,7 +1031,7 @@ const menuItems = [
   { id: "uploadFileFormat", label: "Upload File Format", icon: DocumentPlusIcon,badge: pendingRequests.length,},
   { id: "news", label: "News Management", icon: NewspaperIcon },
   { id: "counseling", label: "Counseling Approval", icon: CalendarDaysIcon},
-  { id: "psychologicalRequest", label: "Psychological Approval", icon: ClipboardDocumentCheckIcon},
+  { id: "psychologicalRequest", label: "Psych. Exam Approval", icon: ClipboardDocumentCheckIcon},
   { id: "exitInterviewRequest", label: "Exit Interview Approval", icon: FlagIcon},
 
     
@@ -2076,7 +2076,7 @@ const processRequest = async (request_id, status) => {
     console.log(err);
 
     Swal.fire({
-      position: "top-start",
+      position: "top-end",
       icon: "error",
       title: "Failed to process request",
       showConfirmButton: false,
@@ -2616,8 +2616,8 @@ return (
         {activePage === "uploadFileFormat" && "Upload File Format"}
         {activePage === "news" && "News Management"}
         {activePage === "counseling" && "Counseling Approval"}
-        {activePage === "psychologicalRequest" && "Psychological Approval"}
-        {activePage === "exitRequest" && "Psychological Approval"}
+        {activePage === "psychologicalRequest" && "Psychological Exam Approval"}
+        {activePage === "exitInterviewRequest" && "Exit Request Approval"}
       </h2>
          {isLoading && (
             <div className="fixed bottom-10 right-10 flex flex-col items-center justify-center z-50">
@@ -4027,7 +4027,7 @@ return (
                       <div className="flex items-center gap-2 text-gray-700">
                         <span className="text-lg">📄</span>
                         <p className="font-semibold text-sm sm:text-base break-all">
-                          Psychological Request.pdf
+                          Psychological Exam Approval.pdf
                         </p>
                       </div>
 
