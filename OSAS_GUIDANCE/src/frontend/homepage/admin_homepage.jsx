@@ -2253,7 +2253,7 @@ const psyProcessRequest = async (request_id, status) => {
     console.log(err);
 
     Swal.fire({
-      position: "top-start",
+      position: "top-end",
       icon: "error",
       title: "Failed to process request",
       showConfirmButton: false,
@@ -2402,7 +2402,7 @@ const processExitRequest = async (request_id, status) => {
     console.log(err);
 
     Swal.fire({
-      position: "top-start",
+      position: "top-end",
       icon: "error",
       title: "Failed to process exit request",
       showConfirmButton: false,
@@ -3572,125 +3572,139 @@ return (
             </div>
           )}
 
+        {/* =====================
+            REQUEST DETAILS MODAL
+        ===================== */}
+        {selectedRequest && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
 
-          {/* =====================
-              REQUEST DETAILS MODAL
-          ===================== */}
-          {selectedRequest && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-y-auto">
 
-              <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-5 relative max-h-[90vh] overflow-y-auto">
+              <button
+                onClick={() => setSelectedRequest(null)}
+                className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+              >
+                ✕
+              </button>
 
+              <h3 className="text-lg sm:text-xl font-bold text-green-700 mb-5">
+                Request Details
+              </h3>
+
+              {/* ================= STUDENT INFO ================= */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+                <div>
+                  <p className="text-gray-500">Student Number</p>
+                  <p className="font-semibold">{selectedRequest.student_number}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Name</p>
+                  <p className="font-semibold">{selectedRequest.student_name}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Course</p>
+                  <p className="font-semibold">{selectedRequest.course}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Status</p>
+                  <p className="font-semibold">{selectedRequest.status}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Preferred Date</p>
+                  <p className="font-semibold">{selectedRequest.preferred_date}</p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Preferred Time</p>
+                  <p className="font-semibold">{selectedRequest.preferred_time}</p>
+                </div>
+
+                <p className="text-red-500 font-semibold">
+                  Violation: {selectedRequest.latest_violation}
+                </p>
+
+                <p className="text-orange-500 font-semibold">
+                  Sanction: {selectedRequest.sanction}
+                </p>
+
+              </div>
+
+              {/* ================= ADMIN SCHEDULE ================= */}
+              <div className="mt-6 border-t pt-4">
+
+                <h4 className="font-semibold text-gray-700 mb-3">
+                  Admin Schedule (Override)
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3">
+
+                  <input
+                    type="date"
+                    value={adminSetDate}
+                    onChange={(e) => setAdminSetDate(e.target.value)}
+                    className="border p-2 rounded-lg w-full"
+                  />
+
+                  <input
+                    type="time"
+                    value={adminSetTime}
+                    onChange={(e) => setAdminSetTime(e.target.value)}
+                    className="border p-2 rounded-lg w-full"
+                  />
+
+                </div>
+              </div>
+
+              {/* ================= ACTIONS ================= */}
+              <div className="flex justify-end gap-3 mt-6">
+
+                {/* REJECT */}
                 <button
-                  onClick={() => setSelectedRequest(null)}
-                  className="absolute top-3 right-3 text-xl text-gray-500 hover:text-red-600"
+                  onClick={() =>
+                    processRequest(selectedRequest.request_id, "Rejected")
+                  }
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
                 >
-                  ✕
+                  Reject
                 </button>
 
-                <h3 className="text-lg sm:text-xl font-bold text-green-700 mb-5">
-                  Request Details
-                </h3>
-
-                {/* STUDENT INFO */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-
-                  <div>
-                    <p className="text-gray-500">Student Number</p>
-                    <p className="font-semibold">{selectedRequest.student_number}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500">Name</p>
-                    <p className="font-semibold">{selectedRequest.student_name}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500">Course</p>
-                    <p className="font-semibold">{selectedRequest.course}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500">Status</p>
-                    <p className="font-semibold">{selectedRequest.status}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500">Preferred Date</p>
-                    <p className="font-semibold">{selectedRequest.preferred_date}</p>
-                  </div>
-                  <p className="text-red-500 text-ml mt-1 font-semibold">
-                      Violation: {selectedRequest.latest_violation}
-                    </p>
-
-                    <p className="text-orange-500 text-ml font-semibold">
-                      Sanction: {selectedRequest.sanction}
-                    </p>
-                  <div>
-                    <p className="text-gray-500">Preferred Time</p>
-                    <p className="font-semibold">{selectedRequest.preferred_time}</p>
-                  </div>
-
-                </div>
-
-
-                {/* =====================
-                    ADMIN SET SCHEDULE
-                ===================== */}
-                <div className="mt-6 border-t pt-4">
-                  <h4 className="font-semibold text-gray-700 mb-3">
-                    Admin Schedule (Override)
-                  </h4>
-
-                  <div className="grid grid-cols-2 gap-3">
-
-                    <input
-                      type="date"
-                      value={adminSetDate}
-                      onChange={(e) => setAdminSetDate(e.target.value)}
-                      className="border p-2 rounded-lg w-full"
-                    />
-
-                    <input
-                      type="time"
-                      value={adminSetTime}
-                      onChange={(e) => setAdminSetTime(e.target.value)}
-                      className="border p-2 rounded-lg w-full"
-                    />
-
-                  </div>
-                </div>
-
-
-                {/* =====================
-                    ACTIONS
-                ===================== */}
-                <div className="flex justify-end gap-3 mt-6">
-
-                  <button
-                    onClick={() =>
-                      processRequest(selectedRequest.request_id, "Rejected")
+                {/* APPROVE (WITH SWAL VALIDATION) */}
+                <button
+                  onClick={() => {
+                    if (!adminSetDate || !adminSetTime) {
+                      Swal.fire({
+                        position: "top-end",
+                        icon: "error",
+                        title: "Schedule Required",
+                        text: "Please set both date and time before approving.",
+                        showConfirmButton: false,
+                        timer: 2500,
+                        toast: true
+                      });
+                      return;
                     }
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-                  >
-                    Reject
-                  </button>
 
-                  <button
-                    onClick={() =>
-                      processRequest(selectedRequest.request_id, "Approved")
-                    }
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                  >
-                    Approve
-                  </button>
-
-                </div>
+                    processRequest(selectedRequest.request_id, "Approved");
+                  }}
+                  className={`bg-green-600 text-white px-4 py-2 rounded-lg
+                    ${(!adminSetDate || !adminSetTime)
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-green-700"
+                    }`}
+                >
+                  Approve
+                </button>
 
               </div>
 
             </div>
-            )}
+          </div>
+        )}
           </div>
           )}
         {/* ================= EXIT INTERVIEW ================= */}
@@ -3866,7 +3880,7 @@ return (
               </div>
             )}
 
-            {/* ================= REQUEST DETAILS ================= */}
+          {/* ================= REQUEST DETAILS ================= */}
             {selectedExitRequest && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
 
@@ -3883,7 +3897,7 @@ return (
                     Exit Request Details
                   </h3>
 
-                  {/* STUDENT INFO */}
+                  {/* ================= STUDENT INFO ================= */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
 
                     <div>
@@ -3952,9 +3966,10 @@ return (
                     </div>
                   </div>
 
-                  {/* ================= ACTIONS (FULL FIXED) ================= */}
+                  {/* ================= ACTIONS (WITH SWAL FIX) ================= */}
                   <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
 
+                    {/* REJECT */}
                     <button
                       onClick={() =>
                         processExitRequest(selectedExitRequest.request_id, "Rejected")
@@ -3964,12 +3979,29 @@ return (
                       Reject
                     </button>
 
+                    {/* APPROVE (WITH SWAL VALIDATION) */}
                     <button
-                      onClick={() =>
-                        processExitRequest(selectedExitRequest.request_id, "Approved")
-                      }
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 w-full sm:w-auto"
-                      disabled={!adminExitDate || !adminExitTime}
+                      onClick={() => {
+                        if (!adminExitDate || !adminExitTime) {
+                          Swal.fire({
+                            position: "top-end",
+                            icon: "error",
+                            title: "Schedule Required",
+                            text: "Please set both date and time before approving.",
+                            showConfirmButton: false,
+                            timer: 2500,
+                            toast: true
+                          });
+                          return;
+                        }
+
+                        processExitRequest(selectedExitRequest.request_id, "Approved");
+                      }}
+                      className={`bg-green-600 text-white px-4 py-2 rounded-lg w-full sm:w-auto
+                        ${(!adminExitDate || !adminExitTime)
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-green-700"
+                        }`}
                     >
                       Approve
                     </button>
@@ -4182,7 +4214,6 @@ return (
 
                     </div>
                   )}
-
                   {/* ================= REQUEST DETAILS MODAL ================= */}
                   {psySelectedRequest && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
@@ -4205,51 +4236,66 @@ return (
 
                           <div>
                             <p className="text-gray-500">Student Number</p>
-                            <p className="font-semibold">{psySelectedRequest.student_number}</p>
+                            <p className="font-semibold">
+                              {psySelectedRequest.student_number}
+                            </p>
                           </div>
 
                           <div>
                             <p className="text-gray-500">Name</p>
-                            <p className="font-semibold">{psySelectedRequest.student_name}</p>
+                            <p className="font-semibold">
+                              {psySelectedRequest.student_name}
+                            </p>
                           </div>
 
                           <div>
                             <p className="text-gray-500">Course</p>
-                            <p className="font-semibold">{psySelectedRequest.course}</p>
+                            <p className="font-semibold">
+                              {psySelectedRequest.course}
+                            </p>
                           </div>
 
                           <div>
                             <p className="text-gray-500">Status</p>
-                            <p className="font-semibold">{psySelectedRequest.status}</p>
+                            <p className="font-semibold">
+                              {psySelectedRequest.status}
+                            </p>
                           </div>
 
                           <div>
                             <p className="text-gray-500">Preferred Date</p>
-                            <p className="font-semibold">{psySelectedRequest.preferred_date}</p>
+                            <p className="font-semibold">
+                              {psySelectedRequest.preferred_date}
+                            </p>
                           </div>
 
                           <div>
                             <p className="text-gray-500">Preferred Time</p>
-                            <p className="font-semibold">{psySelectedRequest.preferred_time}</p>
+                            <p className="font-semibold">
+                              {psySelectedRequest.preferred_time}
+                            </p>
                           </div>
 
                         </div>
-                          {/* CONCERN / PURPOSE */}
-                          <div className="mt-3 text-sm">
 
-                            <p className="text-black">
-                              Concern / Purpose:
-                            </p>
+                        {/* CONCERN / PURPOSE */}
+                        <div className="mt-3 text-sm">
 
-                            <p className="text-gray-700 font-semibold mt-1 whitespace-pre-wrap">
-                              {psySelectedRequest.concern_purpose
-                                ? psySelectedRequest.concern_purpose
-                                : "No concern/purpose provided"}
-                            </p>
+                          <p className="text-black">
+                            Concern / Purpose:
+                          </p>
 
-                          </div>
+                          <p className="text-gray-700 font-semibold mt-1 whitespace-pre-wrap">
+                            {psySelectedRequest.concern_purpose
+                              ? psySelectedRequest.concern_purpose
+                              : "No concern/purpose provided"}
+                          </p>
+
+                        </div>
+
                         {/* ADMIN SCHEDULE */}
                         <div className="mt-6 border-t pt-4">
+
                           <h4 className="font-semibold text-gray-700 mb-3">
                             Admin Schedule (Override)
                           </h4>
@@ -4259,37 +4305,74 @@ return (
                             <input
                               type="date"
                               value={psyAdminSetDate}
-                              onChange={(e) => setPsyAdminSetDate(e.target.value)}
+                              onChange={(e) =>
+                                setPsyAdminSetDate(e.target.value)
+                              }
                               className="border p-2 rounded-lg w-full"
                             />
 
                             <input
                               type="time"
                               value={psyAdminSetTime}
-                              onChange={(e) => setPsyAdminSetTime(e.target.value)}
+                              onChange={(e) =>
+                                setPsyAdminSetTime(e.target.value)
+                              }
                               className="border p-2 rounded-lg w-full"
                             />
 
                           </div>
+
                         </div>
 
                         {/* ACTIONS */}
                         <div className="flex justify-end gap-3 mt-6">
 
+                          {/* REJECT */}
                           <button
                             onClick={() =>
-                              psyProcessRequest(psySelectedRequest.request_id, "Rejected")
+                              psyProcessRequest(
+                                psySelectedRequest.request_id,
+                                "Rejected"
+                              )
                             }
                             className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
                           >
                             Reject
                           </button>
 
+                          {/* APPROVE WITH SWAL VALIDATION */}
                           <button
-                            onClick={() =>
-                              psyProcessRequest(psySelectedRequest.request_id, "Approved")
-                            }
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                            onClick={() => {
+
+                              if (!psyAdminSetDate || !psyAdminSetTime) {
+
+                                Swal.fire({
+                                  position: "top-end",
+                                  icon: "error",
+                                  title: "Schedule Required",
+                                  text:
+                                    "Please set both date and time before approving.",
+                                  showConfirmButton: false,
+                                  timer: 2500,
+                                  toast: true
+                                });
+
+                                return;
+                              }
+
+                              psyProcessRequest(
+                                psySelectedRequest.request_id,
+                                "Approved"
+                              );
+
+                            }}
+                            className={`bg-green-600 text-white px-4 py-2 rounded-lg
+                              ${
+                                (!psyAdminSetDate || !psyAdminSetTime)
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : "hover:bg-green-700"
+                              }
+                            `}
                           >
                             Approve
                           </button>
@@ -4300,7 +4383,6 @@ return (
 
                     </div>
                   )}
-
                 </div>
               )}
             {/* Search Students */}
