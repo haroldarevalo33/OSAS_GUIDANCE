@@ -1939,7 +1939,7 @@ useEffect(() => {
 
 }, [activePage]);
 
-// =========================
+ // =========================
 // Upload Counseling Schedule (AUTO REFRESH)
 // =========================
 useEffect(() => {
@@ -1956,29 +1956,25 @@ useEffect(() => {
         (f) => f.file_type === "counseling_appointment"
       );
 
-      if (counselingFile) {
-        setSelectedPdfUrl(counselingFile.url);
-      } else {
-        setSelectedPdfUrl(null);
-      }
+      setSelectedPdfUrl(
+        counselingFile ? counselingFile.url : null
+      );
 
     } catch (err) {
       console.error("Failed to load saved PDF:", err);
     }
   };
 
-  // initial load
   fetchSavedCounseling();
 
-  // auto refresh every 5 seconds
   interval = setInterval(() => {
     fetchSavedCounseling();
   }, 5000);
 
-  // cleanup
   return () => clearInterval(interval);
-
 }, []);
+
+
 // =========================
 // FETCH REQUESTS (WITH VIOLATION + SANCTION)
 // =========================
@@ -1986,14 +1982,23 @@ const fetchRequests = async (status = "Pending") => {
   try {
     setLoadingRequests(true);
 
-    const res = await axios.get(`${API}/counseling/admin/requests`, {
-      params: { status }
-    });
+    const res = await axios.get(
+      `${API}/counseling/admin/requests`,
+      { params: { status } }
+    );
 
     const data = Array.isArray(res.data) ? res.data : [];
 
     const formatted = data.map((r) => ({
       ...r,
+
+      // RAW VALUES ONLY (NO FORMATTER HERE)
+      preferred_time: r.preferred_time,
+      admin_set_time: r.admin_set_time,
+
+      preferred_date: r.preferred_date,
+      admin_set_date: r.admin_set_date,
+
       latest_violation: r.latest_violation ?? null,
       sanction: r.sanction ?? null,
       violation_date: r.violation_date ?? null
@@ -2009,29 +2014,31 @@ const fetchRequests = async (status = "Pending") => {
   }
 };
 
+
 // =========================
-// INIT LOAD
+// INIT LOAD + AUTO REFRESH
 // =========================
 useEffect(() => {
+  let interval;
+
   fetchRequests();
 
-  const interval = setInterval(() => {
+  interval = setInterval(() => {
     console.log("AUTO REFRESH TRIGGERED");
     fetchRequests("Pending");
   }, 5000);
 
   return () => clearInterval(interval);
 }, []);
+
+
 // =========================
 // PROCESS REQUEST (APPROVE / REJECT)
 // =========================
-
 const admin_id = localStorage.getItem("admin_id");
 
 const processRequest = async (request_id, status) => {
-
   try {
-
     setLoadingRequests(true);
 
     const payload = {
@@ -2040,15 +2047,11 @@ const processRequest = async (request_id, status) => {
     };
 
     if (status === "Approved") {
-
-      // Use admin schedule if provided
-      // otherwise use student's selected schedule
       payload.admin_set_date =
         adminSetDate || selectedRequest?.preferred_date;
 
       payload.admin_set_time =
         adminSetTime || selectedRequest?.preferred_time;
-
     }
 
     await axios.patch(
@@ -2058,9 +2061,7 @@ const processRequest = async (request_id, status) => {
 
     Swal.fire({
       position: "top-end",
-      icon: status === "Approved"
-        ? "success"
-        : "error",
+      icon: status === "Approved" ? "success" : "error",
       title: status === "Approved"
         ? "Request Approved"
         : "Request Rejected",
@@ -2073,13 +2074,10 @@ const processRequest = async (request_id, status) => {
     await fetchRequests("Pending");
 
     setSelectedRequest(null);
-
-    // optional reset
     setAdminSetDate("");
     setAdminSetTime("");
 
   } catch (err) {
-
     console.log(err);
 
     Swal.fire({
@@ -2092,11 +2090,8 @@ const processRequest = async (request_id, status) => {
     });
 
   } finally {
-
     setLoadingRequests(false);
-
   }
-
 };
 
 // =========================

@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, date, time
-from sqlalchemy import or_
 from models import (
     GoodMoralRequest,
     Violation,
@@ -15,6 +14,13 @@ notification_bp = Blueprint(
     __name__,
     url_prefix="/notification"
 )
+
+# =========================
+# TIME FORMATTER (12-HOUR AM/PM)
+# =========================
+def format_time(t):
+    return t.strftime("%I:%M %p") if t else None
+
 
 # =========================
 # SAFE DATETIME HANDLER
@@ -64,7 +70,6 @@ def combined_notifications():
         return jsonify({"message": "missing student info"}), 400
 
     notifications = []
-    changed = False
 
     # =====================================================
     # GOOD MORAL NOTIFICATIONS
@@ -88,13 +93,6 @@ def combined_notifications():
                 .order_by(Violation.violation_date.desc())
                 .first()
             )
-
-        violation_name = "Violation"
-        sanction_text = "No sanction recorded"
-
-        if latest_violation:
-            violation_name = latest_violation.predicted_violation or "Violation"
-            sanction_text = latest_violation.sanction or "No sanction recorded"
 
         if r.status == "Pending":
             message = "Your Good Moral request is pending."
@@ -125,6 +123,8 @@ def combined_notifications():
         Violation.student_id == str(student_id),
         Violation.is_deleted == False
     ).order_by(Violation.violation_date.desc()).all()
+
+    changed = False
 
     for v in violations:
 
@@ -169,18 +169,10 @@ def combined_notifications():
 
     for r in exits:
 
-        if r.is_read is None:
-            r.is_read = False
-            changed = True
-
-        if r.is_deleted is None:
-            r.is_deleted = False
-            changed = True
-
         msg = f"Exit request is {r.status.lower()}."
 
         if r.status == "Approved" and r.admin_set_date:
-            msg += f" Scheduled: {r.admin_set_date} {r.admin_set_time or ''}"
+            msg += f" Scheduled: {r.admin_set_date} {format_time(r.admin_set_time) or ''}"
 
         notifications.append({
             "id": r.request_id,
@@ -191,7 +183,7 @@ def combined_notifications():
             "is_read": bool(r.is_read),
             "is_deleted": bool(r.is_deleted),
             "admin_set_date": safe_json(r.admin_set_date),
-            "admin_set_time": safe_json(r.admin_set_time)
+            "admin_set_time": format_time(r.admin_set_time)
         })
 
     # =====================================================
@@ -204,18 +196,10 @@ def combined_notifications():
 
     for r in counselings:
 
-        if r.is_read is None:
-            r.is_read = False
-            changed = True
-
-        if r.is_deleted is None:
-            r.is_deleted = False
-            changed = True
-
         msg = f"Counseling request is {r.status.lower()}."
 
         if r.status == "Approved" and r.admin_set_date:
-            msg += f" Scheduled: {r.admin_set_date} {r.admin_set_time or ''}"
+            msg += f" Scheduled: {r.admin_set_date} {format_time(r.admin_set_time) or ''}"
 
         notifications.append({
             "id": r.request_id,
@@ -226,7 +210,7 @@ def combined_notifications():
             "is_read": bool(r.is_read),
             "is_deleted": bool(r.is_deleted),
             "admin_set_date": safe_json(r.admin_set_date),
-            "admin_set_time": safe_json(r.admin_set_time)
+            "admin_set_time": format_time(r.admin_set_time)
         })
 
     # =====================================================
@@ -239,18 +223,10 @@ def combined_notifications():
 
     for r in psychs:
 
-        if r.is_read is None:
-            r.is_read = False
-            changed = True
-
-        if r.is_deleted is None:
-            r.is_deleted = False
-            changed = True
-
         msg = f"Psychological request is {r.status.lower()}."
 
         if r.status == "Approved" and r.admin_set_date:
-            msg += f" Scheduled: {r.admin_set_date} {r.admin_set_time or ''}"
+            msg += f" Scheduled: {r.admin_set_date} {format_time(r.admin_set_time) or ''}"
 
         notifications.append({
             "id": r.request_id,
@@ -261,11 +237,11 @@ def combined_notifications():
             "is_read": bool(r.is_read),
             "is_deleted": bool(r.is_deleted),
             "admin_set_date": safe_json(r.admin_set_date),
-            "admin_set_time": safe_json(r.admin_set_time)
+            "admin_set_time": format_time(r.admin_set_time)
         })
 
     # =========================
-    # SAFE SORT
+    # SORT BY DATE
     # =========================
     notifications = sorted(
         notifications,
@@ -276,11 +252,13 @@ def combined_notifications():
     if changed:
         db.session.commit()
 
-    return jsonify({"notifications": notifications})
+    return jsonify({
+        "notifications": notifications
+    })
 
 
 # =========================
-# UNREAD COUNT (FIXED NULL ISSUE)
+# UNREAD COUNT
 # =========================
 @notification_bp.get("/student/unread-count")
 def unread_count():
@@ -291,34 +269,34 @@ def unread_count():
     if not student_number or not student_id:
         return jsonify({"message": "missing student info"}), 400
 
-    good = GoodMoralRequest.query.filter(
-        GoodMoralRequest.student_number == student_number,
-        GoodMoralRequest.is_deleted == False,
-        or_(GoodMoralRequest.is_read == False, GoodMoralRequest.is_read == None)
+    good = GoodMoralRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
     ).count()
 
     viol = Violation.query.filter(
         Violation.student_id == str(student_id),
-        Violation.is_deleted == False,
-        or_(Violation.is_read == False, Violation.is_read == None)
+        Violation.is_read == False,
+        Violation.is_deleted == False
     ).count()
 
-    exitc = ExitRequest.query.filter(
-        ExitRequest.student_number == student_number,
-        ExitRequest.is_deleted == False,
-        or_(ExitRequest.is_read == False, ExitRequest.is_read == None)
+    exitc = ExitRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
     ).count()
 
-    counsel = CounselingRequest.query.filter(
-        CounselingRequest.student_number == student_number,
-        CounselingRequest.is_deleted == False,
-        or_(CounselingRequest.is_read == False, CounselingRequest.is_read == None)
+    counsel = CounselingRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
     ).count()
 
-    psych = PsychologicalRequest.query.filter(
-        PsychologicalRequest.student_number == student_number,
-        PsychologicalRequest.is_deleted == False,
-        or_(PsychologicalRequest.is_read == False, PsychologicalRequest.is_read == None)
+    psych = PsychologicalRequest.query.filter_by(
+        student_number=student_number,
+        is_read=False,
+        is_deleted=False
     ).count()
 
     return jsonify({

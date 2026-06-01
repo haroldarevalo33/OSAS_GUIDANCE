@@ -2,8 +2,23 @@ import os
 import uuid
 from flask import Blueprint, request, jsonify, current_app
 from models import Student, Violation, UploadedFile, PsychologicalRequest, db
+from datetime import datetime
 
 psychological_bp = Blueprint("psychological_bp", __name__, url_prefix="/psychological")
+
+
+
+def parse_time(value):
+    if not value:
+        return None
+
+    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p"):
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
+            pass
+
+    return None
 
 # =========================
 # TIME FORMATTER
@@ -424,7 +439,10 @@ def process_request(request_id):
             return jsonify({"message": "Missing schedule for approval"}), 400
 
         req.admin_set_date = admin_date
-        req.admin_set_time = admin_time
+        if admin_time:
+            req.admin_set_time = parse_time(admin_time)
+        else:
+            req.admin_set_time = None
 
     # =========================
     # REJECTED FLOW
@@ -549,8 +567,8 @@ def update_request(request_id):
         return jsonify({"message": "Cannot update processed request"}), 400
 
     req.preferred_date = data.get("preferred_date", req.preferred_date)
-    req.preferred_time = data.get("preferred_time", req.preferred_time)
-
+    if "preferred_time" in data:
+     req.preferred_time = parse_time(data.get("preferred_time"))
     db.session.commit()
 
     return jsonify({"message": "Request updated"})

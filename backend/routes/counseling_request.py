@@ -1,9 +1,22 @@
 import os
 import uuid
+from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from models import Student, CounselingRequest, Violation, UploadedFile,db
 
 counseling_bp = Blueprint("counseling_bp", __name__, url_prefix="/counseling")
+
+def parse_time(value):
+    if not value:
+        return None
+
+    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p"):
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
+            pass
+
+    return None     
 
 
 # =========================
@@ -451,7 +464,10 @@ def process_request(request_id):
             return jsonify({"message": "Missing schedule for approval"}), 400
 
         req.admin_set_date = admin_date
-        req.admin_set_time = admin_time
+        if admin_time:
+            req.admin_set_time = parse_time(admin_time)
+        else:
+         req.admin_set_time = None
 
     # =========================
     # REJECTED FLOW
@@ -465,7 +481,6 @@ def process_request(request_id):
     # OPTIONAL: ENSURE LOCK CONSISTENCY
     # (ONLY IF YOU WANT REFRESHED VIOLATION SNAPSHOT)
     # =========================
-    from models import Violation
 
     violation = Violation.query.filter(
         Violation.student_id == str(req.student_number),
@@ -616,10 +631,8 @@ def update_request(request_id):
         req.preferred_date
     )
 
-    req.preferred_time = data.get(
-        "preferred_time",
-        req.preferred_time
-    )
+    if "preferred_time" in data:
+     req.preferred_time = parse_time(data.get("preferred_time"))
 
     # =========================
     # OPTIONAL: KEEP LOCK CONSISTENT (SAFE REFRESH)
