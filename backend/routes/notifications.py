@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, date, time
+from sqlalchemy import or_
 from models import (
     GoodMoralRequest,
     Violation,
@@ -38,7 +39,7 @@ def safe_date(value):
 
 
 # =========================
-# SAFE JSON SERIALIZER (FIX FOR TIME ERROR)
+# SAFE JSON SERIALIZER
 # =========================
 def safe_json(value):
     if value is None:
@@ -63,6 +64,7 @@ def combined_notifications():
         return jsonify({"message": "missing student info"}), 400
 
     notifications = []
+    changed = False
 
     # =====================================================
     # GOOD MORAL NOTIFICATIONS
@@ -124,8 +126,6 @@ def combined_notifications():
         Violation.is_deleted == False
     ).order_by(Violation.violation_date.desc()).all()
 
-    changed = False
-
     for v in violations:
 
         if v.is_notified is None:
@@ -169,6 +169,14 @@ def combined_notifications():
 
     for r in exits:
 
+        if r.is_read is None:
+            r.is_read = False
+            changed = True
+
+        if r.is_deleted is None:
+            r.is_deleted = False
+            changed = True
+
         msg = f"Exit request is {r.status.lower()}."
 
         if r.status == "Approved" and r.admin_set_date:
@@ -196,6 +204,14 @@ def combined_notifications():
 
     for r in counselings:
 
+        if r.is_read is None:
+            r.is_read = False
+            changed = True
+
+        if r.is_deleted is None:
+            r.is_deleted = False
+            changed = True
+
         msg = f"Counseling request is {r.status.lower()}."
 
         if r.status == "Approved" and r.admin_set_date:
@@ -222,6 +238,14 @@ def combined_notifications():
     ).order_by(PsychologicalRequest.requested_at.desc()).all()
 
     for r in psychs:
+
+        if r.is_read is None:
+            r.is_read = False
+            changed = True
+
+        if r.is_deleted is None:
+            r.is_deleted = False
+            changed = True
 
         msg = f"Psychological request is {r.status.lower()}."
 
@@ -252,13 +276,11 @@ def combined_notifications():
     if changed:
         db.session.commit()
 
-    return jsonify({
-        "notifications": notifications
-    })
+    return jsonify({"notifications": notifications})
 
 
 # =========================
-# UNREAD COUNT
+# UNREAD COUNT (FIXED NULL ISSUE)
 # =========================
 @notification_bp.get("/student/unread-count")
 def unread_count():
@@ -269,34 +291,34 @@ def unread_count():
     if not student_number or not student_id:
         return jsonify({"message": "missing student info"}), 400
 
-    good = GoodMoralRequest.query.filter_by(
-        student_number=student_number,
-        is_read=False,
-        is_deleted=False
+    good = GoodMoralRequest.query.filter(
+        GoodMoralRequest.student_number == student_number,
+        GoodMoralRequest.is_deleted == False,
+        or_(GoodMoralRequest.is_read == False, GoodMoralRequest.is_read == None)
     ).count()
 
     viol = Violation.query.filter(
         Violation.student_id == str(student_id),
-        Violation.is_read == False,
-        Violation.is_deleted == False
+        Violation.is_deleted == False,
+        or_(Violation.is_read == False, Violation.is_read == None)
     ).count()
 
-    exitc = ExitRequest.query.filter_by(
-        student_number=student_number,
-        is_read=False,
-        is_deleted=False
+    exitc = ExitRequest.query.filter(
+        ExitRequest.student_number == student_number,
+        ExitRequest.is_deleted == False,
+        or_(ExitRequest.is_read == False, ExitRequest.is_read == None)
     ).count()
 
-    counsel = CounselingRequest.query.filter_by(
-        student_number=student_number,
-        is_read=False,
-        is_deleted=False
+    counsel = CounselingRequest.query.filter(
+        CounselingRequest.student_number == student_number,
+        CounselingRequest.is_deleted == False,
+        or_(CounselingRequest.is_read == False, CounselingRequest.is_read == None)
     ).count()
 
-    psych = PsychologicalRequest.query.filter_by(
-        student_number=student_number,
-        is_read=False,
-        is_deleted=False
+    psych = PsychologicalRequest.query.filter(
+        PsychologicalRequest.student_number == student_number,
+        PsychologicalRequest.is_deleted == False,
+        or_(PsychologicalRequest.is_read == False, PsychologicalRequest.is_read == None)
     ).count()
 
     return jsonify({

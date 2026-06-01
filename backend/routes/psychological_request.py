@@ -5,6 +5,11 @@ from models import Student, Violation, UploadedFile, PsychologicalRequest, db
 
 psychological_bp = Blueprint("psychological_bp", __name__, url_prefix="/psychological")
 
+# =========================
+# TIME FORMATTER
+# =========================
+def format_time(t):
+    return t.strftime("%I:%M %p") if t else None
 
 # ==============================================================================
 # STUDENT SUBMIT REQUEST
@@ -91,26 +96,26 @@ def get_request(request_id):
         "student_number": req.student_number,
         "status": req.status,
 
+        # =========================
+        # SCHEDULE
+        # =========================
         "preferred_date": (
             req.preferred_date.isoformat()
             if req.preferred_date else None
         ),
 
-        "preferred_time": (
-            str(req.preferred_time)
-            if req.preferred_time else None
-        ),
+        "preferred_time": format_time(req.preferred_time),
 
         "admin_set_date": (
             req.admin_set_date.isoformat()
             if req.admin_set_date else None
         ),
 
-        "admin_set_time": (
-            str(req.admin_set_time)
-            if req.admin_set_time else None
-        ),
+        "admin_set_time": format_time(req.admin_set_time),
 
+        # =========================
+        # FILE INFO
+        # =========================
         "filename_original": req.filename_original,
 
         # =========================
@@ -121,6 +126,9 @@ def get_request(request_id):
             if file_record else None
         ),
 
+        # =========================
+        # TIMESTAMPS
+        # =========================
         "requested_at": (
             req.requested_at.isoformat()
             if req.requested_at else None
@@ -133,8 +141,6 @@ def get_request(request_id):
 
         "is_read": req.is_read
     })
-
-
 # ==============================================================================
 # STUDENT HISTORY + LATEST VIOLATION
 # ==============================================================================
@@ -190,15 +196,15 @@ def history():
 
                 "status": r.status,
 
+                # =========================
+                # SCHEDULE
+                # =========================
                 "preferred_date": (
                     r.preferred_date.isoformat()
                     if r.preferred_date else None
                 ),
 
-                "preferred_time": (
-                    str(r.preferred_time)
-                    if r.preferred_time else None
-                ),
+                "preferred_time": format_time(r.preferred_time),
 
                 "has_schedule": bool(r.preferred_date and r.preferred_time),
 
@@ -207,16 +213,19 @@ def history():
                     if r.admin_set_date else None
                 ),
 
-                "admin_set_time": (
-                    str(r.admin_set_time)
-                    if r.admin_set_time else None
-                ),
+                "admin_set_time": format_time(r.admin_set_time),
 
+                # =========================
+                # FILE INFO
+                # =========================
                 "filename_stored": r.filename_stored,
                 "filename_original": r.filename_original,
 
                 "file_url": file_record.path if file_record else None,
 
+                # =========================
+                # TIMESTAMPS
+                # =========================
                 "requested_at": (
                     r.requested_at.isoformat()
                     if r.requested_at else None
@@ -227,6 +236,9 @@ def history():
                     if r.processed_at else None
                 ),
 
+                # =========================
+                # VIOLATION SNAPSHOT
+                # =========================
                 "predicted_violation": (
                     latest_violation.predicted_violation
                     if latest_violation else "—"
@@ -287,7 +299,7 @@ def admin_requests():
         ).first()
 
         # =========================
-        # LATEST ACTIVE VIOLATION (FIXED)
+        # LATEST ACTIVE VIOLATION
         # =========================
         violation = None
 
@@ -306,30 +318,29 @@ def admin_requests():
         # RESPONSE
         # =========================
         result.append({
+
             # REQUEST
             "request_id": r.request_id,
             "student_number": r.student_number,
             "student_name": student.student_name if student else "",
             "course": student.course if student else "",
 
-            # SCHEDULE
+            # =========================
+            # SCHEDULE (WITH FORMAT TIME FIX)
+            # =========================
             "preferred_date": (
                 r.preferred_date.isoformat()
                 if r.preferred_date else None
             ),
-            "preferred_time": (
-                r.preferred_time.strftime("%H:%M:%S")
-                if r.preferred_time else None
-            ),
+
+            "preferred_time": format_time(r.preferred_time),
 
             "admin_set_date": (
                 r.admin_set_date.isoformat()
                 if r.admin_set_date else None
             ),
-            "admin_set_time": (
-                r.admin_set_time.strftime("%H:%M:%S")
-                if r.admin_set_time else None
-            ),
+
+            "admin_set_time": format_time(r.admin_set_time),
 
             # STATUS
             "status": r.status,
@@ -337,12 +348,15 @@ def admin_requests():
                 r.requested_at.isoformat()
                 if r.requested_at else None
             ),
+
             "processed_at": (
                 r.processed_at.isoformat()
                 if r.processed_at else None
             ),
+
             "filename_original": r.filename_original,
             "concern_purpose": r.concern_purpose,
+
             # =========================
             # VIOLATION (FIXED LOGIC)
             # =========================
@@ -360,11 +374,10 @@ def admin_requests():
                 violation.violation_date.isoformat()
                 if violation and violation.violation_date else None
             )
-         
+
         })
 
     return jsonify(result)
-
 
 # ==============================================================================
 # ADMIN PROCESS
@@ -389,31 +402,45 @@ def process_request(request_id):
     if req.status != "Pending":
         return jsonify({"message": "Request already processed"}), 400
 
+    # =========================
+    # BASIC UPDATE
+    # =========================
     req.status = status
     req.processed_by = admin_id
     req.processed_at = db.func.now()
 
-    # reset notification flag so student gets update
     req.is_notified = False
     req.is_read = False
 
+    # =========================
+    # APPROVED FLOW
+    # =========================
     if status == "Approved":
-        if not data.get("admin_set_date") or not data.get("admin_set_time"):
+
+        admin_date = data.get("admin_set_date")
+        admin_time = data.get("admin_set_time")
+
+        if not admin_date or not admin_time:
             return jsonify({"message": "Missing schedule for approval"}), 400
 
-        req.admin_set_date = data.get("admin_set_date")
-        req.admin_set_time = data.get("admin_set_time")
+        req.admin_set_date = admin_date
+        req.admin_set_time = admin_time
 
+    # =========================
+    # REJECTED FLOW
+    # =========================
     else:
         req.admin_set_date = None
         req.admin_set_time = None
 
+    # =========================
+    # SAVE
+    # =========================
     db.session.commit()
 
     return jsonify({
         "message": f"Request {status} successfully"
     })
-
 
 # ==============================================================================
 # NOTIFICATIONS

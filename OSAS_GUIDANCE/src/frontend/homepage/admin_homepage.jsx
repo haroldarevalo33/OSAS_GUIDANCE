@@ -2022,15 +2022,16 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, []);
-/// =========================
+// =========================
 // PROCESS REQUEST (APPROVE / REJECT)
 // =========================
 
-// IMPORTANT: define admin_id FIRST
 const admin_id = localStorage.getItem("admin_id");
 
 const processRequest = async (request_id, status) => {
+
   try {
+
     setLoadingRequests(true);
 
     const payload = {
@@ -2039,22 +2040,15 @@ const processRequest = async (request_id, status) => {
     };
 
     if (status === "Approved") {
-      if (!adminSetDate || !adminSetTime) {
-        Swal.fire({
-          position: "top-end",
-          icon: "warning",
-          title: "Set schedule first",
-          showConfirmButton: false,
-          timer: 2000,
-          toast: true
-        });
 
-        setLoadingRequests(false);
-        return;
-      }
+      // Use admin schedule if provided
+      // otherwise use student's selected schedule
+      payload.admin_set_date =
+        adminSetDate || selectedRequest?.preferred_date;
 
-      payload.admin_set_date = adminSetDate;
-      payload.admin_set_time = adminSetTime;
+      payload.admin_set_time =
+        adminSetTime || selectedRequest?.preferred_time;
+
     }
 
     await axios.patch(
@@ -2064,8 +2058,12 @@ const processRequest = async (request_id, status) => {
 
     Swal.fire({
       position: "top-end",
-      icon: status === "Approved" ? "success" : "error",
-      title: status === "Approved" ? "Request Approved" : "Request Rejected",
+      icon: status === "Approved"
+        ? "success"
+        : "error",
+      title: status === "Approved"
+        ? "Request Approved"
+        : "Request Rejected",
       showConfirmButton: false,
       timer: 2000,
       toast: true,
@@ -2073,7 +2071,12 @@ const processRequest = async (request_id, status) => {
     });
 
     await fetchRequests("Pending");
+
     setSelectedRequest(null);
+
+    // optional reset
+    setAdminSetDate("");
+    setAdminSetTime("");
 
   } catch (err) {
 
@@ -2089,8 +2092,11 @@ const processRequest = async (request_id, status) => {
     });
 
   } finally {
+
     setLoadingRequests(false);
+
   }
+
 };
 
 // =========================
@@ -2244,22 +2250,11 @@ const psyProcessRequest = async (request_id, status) => {
     };
 
     if (status === "Approved") {
-      if (!psyAdminSetDate || !psyAdminSetTime) {
-        Swal.fire({
-          position: "top-end",
-          icon: "warning",
-          title: "Set schedule first",
-          showConfirmButton: false,
-          timer: 2000,
-          toast: true
-        });
+      psyPayload.admin_set_date =
+        psyAdminSetDate || psySelectedRequest?.preferred_date;
 
-        setPsyLoadingRequests(false);
-        return;
-      }
-
-      psyPayload.admin_set_date = psyAdminSetDate;
-      psyPayload.admin_set_time = psyAdminSetTime;
+      psyPayload.admin_set_time =
+        psyAdminSetTime || psySelectedRequest?.preferred_time;
     }
 
     await axios.patch(
@@ -2270,7 +2265,9 @@ const psyProcessRequest = async (request_id, status) => {
     Swal.fire({
       position: "top-end",
       icon: status === "Approved" ? "success" : "error",
-      title: status === "Approved" ? "Request Approved" : "Request Rejected",
+      title: status === "Approved"
+        ? "Request Approved"
+        : "Request Rejected",
       showConfirmButton: false,
       timer: 2000,
       toast: true,
@@ -2291,6 +2288,7 @@ const psyProcessRequest = async (request_id, status) => {
       timer: 2000,
       toast: true
     });
+
   } finally {
     setPsyLoadingRequests(false);
   }
@@ -2323,7 +2321,6 @@ useEffect(() => {
   return () => clearInterval(interval);
 
 }, []);
-
 // =========================
 // Upload EXIT PDF (AUTO REFRESH)
 // =========================
@@ -2408,9 +2405,6 @@ useEffect(() => {
 }, []);
 
 
-// =========================
-// PROCESS EXIT REQUEST
-// =========================
 const processExitRequest = async (request_id, status) => {
   try {
     setLoadingRequests(true);
@@ -2421,22 +2415,11 @@ const processExitRequest = async (request_id, status) => {
     };
 
     if (status === "Approved") {
-      if (!adminExitDate || !adminExitTime) {
-        Swal.fire({
-          position: "top-end",
-          icon: "warning",
-          title: "Set schedule first",
-          showConfirmButton: false,
-          timer: 2000,
-          toast: true
-        });
+      payload.admin_set_date =
+        adminExitDate || selectedExitRequest?.preferred_date;
 
-        setLoadingRequests(false);
-        return;
-      }
-
-      payload.admin_set_date = adminExitDate;
-      payload.admin_set_time = adminExitTime;
+      payload.admin_set_time =
+        adminExitTime || selectedExitRequest?.preferred_time;
     }
 
     await axios.patch(
@@ -2447,7 +2430,9 @@ const processExitRequest = async (request_id, status) => {
     Swal.fire({
       position: "top-end",
       icon: status === "Approved" ? "success" : "error",
-      title: status === "Approved" ? "Exit Approved" : "Exit Rejected",
+      title: status === "Approved"
+        ? "Exit Approved"
+        : "Exit Rejected",
       showConfirmButton: false,
       timer: 2000,
       toast: true,
@@ -3785,33 +3770,26 @@ return (
                 </button>
 
                 {/* APPROVE (WITH SWAL VALIDATION) */}
-                <button
-                  onClick={() => {
-                    if (!adminSetDate || !adminSetTime) {
-                      Swal.fire({
-                        position: "top-end",
-                        icon: "error",
-                        title: "Schedule Required",
-                        text: "Please set both date and time before approving.",
-                        showConfirmButton: false,
-                        timer: 2500,
-                        toast: true
-                      });
-                      return;
-                    }
+              <button
+                onClick={() => {
+                  processRequest(
+                    selectedRequest.request_id,
+                    "Approved"
+                  );
+                }}
+                className="
+                  bg-green-600
+                  text-white
+                  px-4
+                  py-2
+                  rounded-lg
+                  hover:bg-green-700
+                "
+              >
+                Approve
+              </button>
 
-                    processRequest(selectedRequest.request_id, "Approved");
-                  }}
-                  className={`bg-green-600 text-white px-4 py-2 rounded-lg
-                    ${(!adminSetDate || !adminSetTime)
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-green-700"
-                    }`}
-                >
-                  Approve
-                </button>
-
-              </div>
+                </div>
 
             </div>
           </div>
@@ -4093,33 +4071,17 @@ return (
                     >
                       Reject
                     </button>
-
-                    {/* APPROVE (WITH SWAL VALIDATION) */}
-                    <button
-                      onClick={() => {
-                        if (!adminExitDate || !adminExitTime) {
-                          Swal.fire({
-                            position: "top-end",
-                            icon: "error",
-                            title: "Schedule Required",
-                            text: "Please set both date and time before approving.",
-                            showConfirmButton: false,
-                            timer: 2500,
-                            toast: true
-                          });
-                          return;
-                        }
-
-                        processExitRequest(selectedExitRequest.request_id, "Approved");
-                      }}
-                      className={`bg-green-600 text-white px-4 py-2 rounded-lg w-full sm:w-auto
-                        ${(!adminExitDate || !adminExitTime)
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:bg-green-700"
-                        }`}
-                    >
-                      Approve
-                    </button>
+                 <button
+                  onClick={() =>
+                    processExitRequest(
+                      selectedExitRequest.request_id,
+                      "Approved"
+                    )
+                  }
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg w-full sm:w-auto hover:bg-green-700"
+                >
+                  Approve
+                </button>
 
                   </div>
 
@@ -4461,43 +4423,17 @@ return (
                             Reject
                           </button>
 
-                          {/* APPROVE WITH SWAL VALIDATION */}
                           <button
-                            onClick={() => {
-
-                              if (!psyAdminSetDate || !psyAdminSetTime) {
-
-                                Swal.fire({
-                                  position: "top-end",
-                                  icon: "error",
-                                  title: "Schedule Required",
-                                  text:
-                                    "Please set both date and time before approving.",
-                                  showConfirmButton: false,
-                                  timer: 2500,
-                                  toast: true
-                                });
-
-                                return;
-                              }
-
+                            onClick={() =>
                               psyProcessRequest(
                                 psySelectedRequest.request_id,
                                 "Approved"
-                              );
-
-                            }}
-                            className={`bg-green-600 text-white px-4 py-2 rounded-lg
-                              ${
-                                (!psyAdminSetDate || !psyAdminSetTime)
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : "hover:bg-green-700"
-                              }
-                            `}
+                              )
+                            }
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
                           >
                             Approve
-                          </button>
-
+                          </button>           
                         </div>
 
                       </div>
