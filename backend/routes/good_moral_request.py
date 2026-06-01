@@ -596,9 +596,6 @@ def soft_delete_notification(request_id):
     return jsonify({"message": "Notification deleted successfully"})
 
 # =========================
-# Download Good Moral PDF
-# =========================
-# =========================
 # Download Good Moral PDF (FIXED FOR CLOUDINARY)
 # =========================
 @good_moral_bp.get("/download/<int:request_id>")
